@@ -3,6 +3,9 @@ name = "sphinx-crypter"
 version = "0.1.0"
 authors = ["Evan Feenstra <evanfeenstra@gmail.com>"]
 edition = "2018"
+description = "end-to-end ECDH crypto"
+repository = "https://github.com/stakwork/sphinx-rs"
+license = "MIT"
 
 [dependencies]
 anyhow = {version = "1", features = ["backtrace"]}
