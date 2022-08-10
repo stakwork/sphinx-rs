@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use anyhow::Result;
 use base64::{decode_config, encode_config, URL_SAFE};
 use secp256k1::ecdsa::{self, Signature};
-use secp256k1::hashes::sha256d::Hash as Sha256dHash;
+use secp256k1::hashes::sha256::Hash as Sha256Hash;
 use secp256k1::hashes::Hash;
 use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
 use std::convert::TryInto;
@@ -20,10 +20,10 @@ fn now() -> u32 {
 }
 
 pub fn u32_to_bytes(input: u32) -> [u8; 4] {
-    input.to_le_bytes()
+    input.to_be_bytes()
 }
 pub fn bytes_to_u32(bytes: [u8; 4]) -> u32 {
-    u32::from_le_bytes(bytes)
+    u32::from_be_bytes(bytes)
 }
 
 pub fn base64_encode(input: &Vec<u8>) -> String {
@@ -33,7 +33,6 @@ pub fn base64_decode(input: &str) -> Result<Vec<u8>> {
     let r = decode_config(input, URL_SAFE)?;
     Ok(r)
 }
-// 27 for uncompressed
 // 27 + 4 for compressed
 const MAGIC_NUMBER: i32 = 31;
 
@@ -61,7 +60,6 @@ impl Token {
     pub fn sign(&self, secret_key: &SecretKey) -> Result<Vec<u8>> {
         let mut ts = u32_to_bytes(self.0).to_vec();
         let sig = self.sign_message(&ts, secret_key)?;
-        println!("tts {:?}", ts);
         ts.extend(sig);
         assert_eq!(ts.len(), self.expected_len());
         Ok(ts)
@@ -98,10 +96,8 @@ impl Token {
         let secp_ctx = Secp256k1::signing_only();
         let sig = secp_ctx.sign_ecdsa_recoverable(&encmsg, &secret_key);
         let (rid, sig) = sig.serialize_compact();
-        // let mut res = sig.to_vec();
         let mut fin = vec![(rid.to_i32() + MAGIC_NUMBER) as u8];
         fin.extend_from_slice(&sig[..]);
-        // res.push(rid.to_i32() as u8 + 31);
         Ok(fin)
     }
     fn verify_message(
@@ -130,38 +126,25 @@ impl Token {
     fn lightning_hash(&self, message: &Vec<u8>) -> Result<Message> {
         let mut buffer = String::from("Lightning Signed Message:").into_bytes();
         buffer.extend(message);
-        let hash1 = Sha256dHash::hash(&buffer);
-        let hash2 = Sha256dHash::hash(&hash1[..]);
+        let hash1 = Sha256Hash::hash(&buffer[..]);
+        let hash2 = Sha256Hash::hash(&hash1[..]);
         let encmsg = secp256k1::Message::from_slice(&hash2[..])?;
         Ok(encmsg)
     }
 }
 
-pub fn sign<T: secp256k1::Signing>(
-    secp: &Secp256k1<T>,
-    input: Vec<u8>,
-    secret_key: &SecretKey,
-) -> Signature {
-    let message = hash_message(input);
-    secp.sign_ecdsa(&message, &secret_key)
-}
-
-pub fn hash_message(input: Vec<u8>) -> Message {
-    let hash = Sha256dHash::hash(&input);
-    Message::from_slice(&hash[..]).expect("encmsg failed")
-}
-
 #[cfg(test)]
 mod tests {
     use crate::*;
+    use secp256k1::hashes::sha256d::Hash as Sha256dHash;
     use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
     fn secret_key() -> SecretKey {
         SecretKey::from_slice(&[0xcd; 32]).expect("32 bytes, within curve order")
     }
 
-    fn premade_token() -> String {
-        "4gDzYiAKt1FvXWbzpXCOZJ_ua0Jo1XAtueC-0yUgxHZd7DpDDjfX1Vd8yM34-ei4h83SfCAC7Mt0POCNACD5WF2TRAT3".to_string()
+    fn a_token() -> String {
+        "YvM0wyAZBWdHaVsS4sqy-ub3X0JRx7zVTY9O6aL0q_CIV9zOKykO_grPE4DSelinHNX9pTFZ3wEoLhg5QT7EVZpOlj0x".to_string()
     }
 
     #[test]
@@ -170,8 +153,9 @@ mod tests {
         let sk = secret_key();
         let public_key = PublicKey::from_secret_key(&secp, &sk);
         let input = vec![1, 2, 3];
-        let message = hash_message(input);
-        let sig = sign(&secp, vec![1, 2, 3], &sk);
+        let hash = Sha256dHash::hash(&input);
+        let message = Message::from_slice(&hash[..]).expect("encmsg failed");
+        let sig = secp.sign_ecdsa(&message, &sk);
         assert!(secp.verify_ecdsa(&message, &sig, &public_key).is_ok());
     }
 
@@ -186,7 +170,6 @@ mod tests {
         let sig: [u8; 65] = res[4..].try_into().expect("wrong sig length");
         t.set_sig(sig);
         t.verify(&public_key).expect("couldnt verify");
-        println!("token verified!");
     }
 
     #[test]
@@ -194,9 +177,8 @@ mod tests {
         let sk = secret_key();
         let secp = Secp256k1::new();
         let public_key = PublicKey::from_secret_key(&secp, &sk);
-        let t = Token::from_base64(&premade_token()).expect("couldnt parse base64");
+        let t = Token::from_base64(&a_token()).expect("couldnt parse base64");
         t.verify(&public_key).expect("failed to verify");
-        println!("decoded token verified!");
     }
 
     #[test]
@@ -204,12 +186,10 @@ mod tests {
         let sk = secret_key();
         let secp = Secp256k1::new();
         let public_key = PublicKey::from_secret_key(&secp, &sk);
-        let t = Token::from_base64(&premade_token()).expect("couldnt parse base64");
+        let t = Token::from_base64(&a_token()).expect("couldnt parse base64");
         let pk2 = t.recover().expect("failed to verify");
         assert_eq!(public_key, pk2);
-        println!("decoded token pubkey recovered!");
     }
-
     #[test]
     fn test_recover_within() {
         let sk = secret_key();
@@ -221,7 +201,6 @@ mod tests {
         let t = Token::from_base64(&token).expect("couldnt parse base64");
         let pk2 = t.recover_within(10).expect("failed to verify");
         assert_eq!(public_key, pk2);
-        println!("decoded token pubkey recovered!");
     }
 
     #[test]
@@ -233,19 +212,19 @@ mod tests {
         let t = Token::from_base64(&token).expect("couldnt parse base64");
         std::thread::sleep(std::time::Duration::from_secs(2));
         if t.recover_within(1).is_ok() {
-            panic!("should fail")
+            panic!("should have expired")
         }
     }
 
     #[test]
     fn test_tribe() {
-        let pk = hex::decode("03e66c6be23b9c7c23131a4237a845bb161aaa3dfbb3917551e78a8ba9829d49fd")
+        let pk = hex::decode("02290714deafd0cb33d2be3b634fc977a98a9c9fa1dd6c53cf17d99b350c08c67b")
             .expect("hex fail");
-        let pubkey = PublicKey::from_slice(&pk[..]);
-        let tribe = "YGRn4CBKUxb6e3ql3MXyQL1VT8B_bYKnQsE_9D1Piq2Ag52cxmK3iUr5Hyb9LyJ92z7YxXlpmoz2Zgl7bBSXQ92014GJ";
+        let pubkey = PublicKey::from_slice(&pk[..]).expect("couldnt extract pubkey");
+        let tribe = "XuOp5B9kC3CcL52svtl_LJJJFbV1OTgnq7thtOjdKJMnOuETIw_hlLkVfonozVIwz5wADlya_i946GiKFZAgMto0cDuk";
         let token = Token::from_base64(tribe).expect("couldnt parse base64");
+        token.verify(&pubkey).expect("nope verify");
         let pk2 = token.recover().expect("recover failed");
-        println!("pk2 {:?}", pk2);
-        println!("token {:?}", token);
+        assert_eq!(pubkey, pk2);
     }
 }
