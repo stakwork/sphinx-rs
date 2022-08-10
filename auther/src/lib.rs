@@ -7,6 +7,7 @@ use secp256k1::hashes::Hash;
 use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
 use std::convert::TryInto;
 
+#[derive(Debug)]
 pub struct Token(u32, Option<[u8; 65]>);
 
 fn now() -> u32 {
@@ -32,6 +33,9 @@ pub fn base64_decode(input: &str) -> Result<Vec<u8>> {
     let r = decode_config(input, URL_SAFE)?;
     Ok(r)
 }
+// 27 for uncompressed
+// 27 + 4 for compressed
+const MAGIC_NUMBER: i32 = 31;
 
 impl Token {
     /// Creates a new token with current timestamp
@@ -42,10 +46,10 @@ impl Token {
         self.1 = Some(sig)
     }
     pub fn from_base64(s: &str) -> Result<Self> {
-        if s.len() < 8 {
-            return Err(anyhow!("too short slice".to_string()));
-        }
         let bytes = base64_decode(s)?;
+        if bytes.len() != 69 {
+            return Err(anyhow!("wrong length".to_string()));
+        }
         let ts: [u8; 4] = bytes[..4].try_into()?;
         let sig: [u8; 65] = bytes[4..].try_into()?;
         Ok(Self(bytes_to_u32(ts), Some(sig)))
@@ -94,9 +98,11 @@ impl Token {
         let secp_ctx = Secp256k1::signing_only();
         let sig = secp_ctx.sign_ecdsa_recoverable(&encmsg, &secret_key);
         let (rid, sig) = sig.serialize_compact();
-        let mut res = sig.to_vec();
-        res.push(rid.to_i32() as u8);
-        Ok(res)
+        // let mut res = sig.to_vec();
+        let mut fin = vec![(rid.to_i32() + MAGIC_NUMBER) as u8];
+        fin.extend_from_slice(&sig[..]);
+        // res.push(rid.to_i32() as u8 + 31);
+        Ok(fin)
     }
     fn verify_message(
         &self,
@@ -107,7 +113,7 @@ impl Token {
         let secp_ctx = Secp256k1::verification_only();
         let encmsg = self.lightning_hash(message)?;
         // remove the rid
-        let s = Signature::from_compact(&sig[..64])?;
+        let s = Signature::from_compact(&sig[1..])?;
         secp_ctx.verify_ecdsa(&encmsg, &s, public_key)?;
         Ok(())
     }
@@ -117,15 +123,16 @@ impl Token {
         }
         let encmsg = self.lightning_hash(message)?;
         let secp = Secp256k1::verification_only();
-        let id = ecdsa::RecoveryId::from_i32(sig[64] as i32)?;
-        let s = ecdsa::RecoverableSignature::from_compact(&sig[..64], id)?;
+        let id = ecdsa::RecoveryId::from_i32(sig[0] as i32 - MAGIC_NUMBER)?;
+        let s = ecdsa::RecoverableSignature::from_compact(&sig[1..], id)?;
         Ok(secp.recover_ecdsa(&encmsg, &s)?)
     }
     fn lightning_hash(&self, message: &Vec<u8>) -> Result<Message> {
         let mut buffer = String::from("Lightning Signed Message:").into_bytes();
         buffer.extend(message);
-        let hash = Sha256dHash::hash(&buffer);
-        let encmsg = secp256k1::Message::from_slice(&hash[..])?;
+        let hash1 = Sha256dHash::hash(&buffer);
+        let hash2 = Sha256dHash::hash(&hash1[..]);
+        let encmsg = secp256k1::Message::from_slice(&hash2[..])?;
         Ok(encmsg)
     }
 }
@@ -154,7 +161,7 @@ mod tests {
     }
 
     fn premade_token() -> String {
-        "7K3uYhxpP-qScsGcSXjBLsBMJ7rGf6mJd4ZPLbic80xmbyUFWpe4XtjbA3cFf08LTDH0ahd0UpOJFaZscFiptZQLaNIB".to_string()
+        "4gDzYiAKt1FvXWbzpXCOZJ_ua0Jo1XAtueC-0yUgxHZd7DpDDjfX1Vd8yM34-ei4h83SfCAC7Mt0POCNACD5WF2TRAT3".to_string()
     }
 
     #[test]
@@ -173,7 +180,7 @@ mod tests {
         let sk = secret_key();
         let mut t = Token::new();
         let res = t.sign(&sk).expect("couldnt make token");
-        // println!("{}", base64_encode(&res));
+        println!("===> {}", base64_encode(&res));
         let secp = Secp256k1::new();
         let public_key = PublicKey::from_secret_key(&secp, &sk);
         let sig: [u8; 65] = res[4..].try_into().expect("wrong sig length");
@@ -228,5 +235,17 @@ mod tests {
         if t.recover_within(1).is_ok() {
             panic!("should fail")
         }
+    }
+
+    #[test]
+    fn test_tribe() {
+        let pk = hex::decode("03e66c6be23b9c7c23131a4237a845bb161aaa3dfbb3917551e78a8ba9829d49fd")
+            .expect("hex fail");
+        let pubkey = PublicKey::from_slice(&pk[..]);
+        let tribe = "YGRn4CBKUxb6e3ql3MXyQL1VT8B_bYKnQsE_9D1Piq2Ag52cxmK3iUr5Hyb9LyJ92z7YxXlpmoz2Zgl7bBSXQ92014GJ";
+        let token = Token::from_base64(tribe).expect("couldnt parse base64");
+        let pk2 = token.recover().expect("recover failed");
+        println!("pk2 {:?}", pk2);
+        println!("token {:?}", token);
     }
 }
