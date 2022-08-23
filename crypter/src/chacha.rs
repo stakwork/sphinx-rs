@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use chacha20poly1305::{
-    aead::{AeadCore, AeadInPlace, KeyInit, OsRng, heapless::Vec},
+    aead::{AeadCore, AeadInPlace, KeyInit, heapless::Vec},
     ChaCha20Poly1305, Nonce,
 };
 
