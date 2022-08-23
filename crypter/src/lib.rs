@@ -5,7 +5,7 @@ pub use secp256k1;
 
 #[cfg(test)]
 mod tests {
-    use crate::chacha::{decrypt, encrypt, MSG_LEN, NONCE_END_LEN};
+    use crate::chacha::{decrypt, encrypt, MSG_LEN, NONCE_LEN};
     use crate::ecdh::derive_shared_secret_from_slice;
     use secp256k1::rand::{rngs::OsRng, thread_rng, RngCore};
     use secp256k1::{PublicKey, Secp256k1, SecretKey};
@@ -24,9 +24,9 @@ mod tests {
 
         // encrypt plaintext with sec1
         let plaintext = [1; MSG_LEN];
-        let mut nonce_end = [0; NONCE_END_LEN];
-        OsRng.fill_bytes(&mut nonce_end);
-        let cipher = encrypt(plaintext, sec1, nonce_end)?;
+        let mut nonce = [0; NONCE_LEN];
+        OsRng.fill_bytes(&mut nonce);
+        let cipher = encrypt(plaintext, sec1, nonce)?;
 
         // decrypt with sec2
         let plain = decrypt(cipher, sec2)?;
