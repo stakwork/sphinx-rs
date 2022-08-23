@@ -54,7 +54,7 @@ pub fn derive_shared_secret(their_pubkey: String, my_secret_key: String) -> Resu
 
 // plaintext: 32 bytes
 // secret: 32 bytes
-// nonce: 8 bytes
+// nonce: 12 bytes
 // return ciphertext: 56 bytes
 pub fn encrypt(plaintext: String, secret: String, nonce: String) -> Result<String> {
     let plain = parse::parse_secret_string(plaintext)?;
@@ -99,7 +99,7 @@ mod tests {
 
         // encrypt plaintext with sec1
         let plaintext = "59ff446bec1d96dc7d1a69232cd69ca409e069294e983df7f1e3e5fb3c95c41c";
-        let nonce = "0da01cc0c0a73ad3";
+        let nonce = "0da01cc0c0a73ad3c0a73ad3";
         let cipher = encrypt(plaintext.to_string(), sec1, nonce.to_string())?;
 
         // decrypt with sec2
