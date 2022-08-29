@@ -59,7 +59,7 @@ impl Token {
     /// Sign a lightning token
     pub fn sign(&self, secret_key: &SecretKey) -> Result<Vec<u8>> {
         let mut ts = u32_to_bytes(self.0).to_vec();
-        let sig = self.sign_message(&ts, secret_key)?;
+        let sig = sign_message(&ts, secret_key)?;
         ts.extend(sig);
         assert_eq!(ts.len(), self.expected_len());
         Ok(ts)
@@ -70,7 +70,7 @@ impl Token {
             return Err(anyhow!("no sig".to_string()));
         }
         let msg = u32_to_bytes(self.0);
-        self.verify_message(&msg.to_vec(), &self.1.unwrap(), public_key)
+        verify_message(&msg.to_vec(), &self.1.unwrap(), public_key)
     }
     /// Recover pubkey from signed token
     pub fn recover(&self) -> Result<PublicKey> {
@@ -78,7 +78,7 @@ impl Token {
             return Err(anyhow!("no sig".to_string()));
         }
         let msg = u32_to_bytes(self.0);
-        self.recover_pubkey(&msg.to_vec(), &self.1.unwrap())
+        recover_pubkey(&msg.to_vec(), &self.1.unwrap())
     }
     /// Recover pubkey from signed token, and check timestamp
     pub fn recover_within(&self, secs: u32) -> Result<PublicKey> {
@@ -89,48 +89,44 @@ impl Token {
             return Err(anyhow!("expired".to_string()));
         }
         let msg = u32_to_bytes(self.0);
-        self.recover_pubkey(&msg.to_vec(), &self.1.unwrap())
+        recover_pubkey(&msg.to_vec(), &self.1.unwrap())
     }
-    fn sign_message(&self, message: &Vec<u8>, secret_key: &SecretKey) -> Result<Vec<u8>> {
-        let encmsg = self.lightning_hash(message)?;
-        let secp_ctx = Secp256k1::signing_only();
-        let sig = secp_ctx.sign_ecdsa_recoverable(&encmsg, &secret_key);
-        let (rid, sig) = sig.serialize_compact();
-        let mut fin = vec![(rid.to_i32() + MAGIC_NUMBER) as u8];
-        fin.extend_from_slice(&sig[..]);
-        Ok(fin)
+}
+
+pub fn sign_message(message: &Vec<u8>, secret_key: &SecretKey) -> Result<Vec<u8>> {
+    let encmsg = lightning_hash(message)?;
+    let secp_ctx = Secp256k1::signing_only();
+    let sig = secp_ctx.sign_ecdsa_recoverable(&encmsg, &secret_key);
+    let (rid, sig) = sig.serialize_compact();
+    let mut fin = vec![(rid.to_i32() + MAGIC_NUMBER) as u8];
+    fin.extend_from_slice(&sig[..]);
+    Ok(fin)
+}
+pub fn verify_message(message: &Vec<u8>, sig: &[u8; 65], public_key: &PublicKey) -> Result<()> {
+    let secp_ctx = Secp256k1::verification_only();
+    let encmsg = lightning_hash(message)?;
+    // remove the rid
+    let s = Signature::from_compact(&sig[1..])?;
+    secp_ctx.verify_ecdsa(&encmsg, &s, public_key)?;
+    Ok(())
+}
+pub fn recover_pubkey(message: &Vec<u8>, sig: &[u8; 65]) -> Result<PublicKey> {
+    if sig.len() < 65 {
+        return Err(anyhow!("too short sig".to_string()));
     }
-    fn verify_message(
-        &self,
-        message: &Vec<u8>,
-        sig: &[u8; 65],
-        public_key: &PublicKey,
-    ) -> Result<()> {
-        let secp_ctx = Secp256k1::verification_only();
-        let encmsg = self.lightning_hash(message)?;
-        // remove the rid
-        let s = Signature::from_compact(&sig[1..])?;
-        secp_ctx.verify_ecdsa(&encmsg, &s, public_key)?;
-        Ok(())
-    }
-    fn recover_pubkey(&self, message: &Vec<u8>, sig: &[u8; 65]) -> Result<PublicKey> {
-        if sig.len() < 65 {
-            return Err(anyhow!("too short sig".to_string()));
-        }
-        let encmsg = self.lightning_hash(message)?;
-        let secp = Secp256k1::verification_only();
-        let id = ecdsa::RecoveryId::from_i32(sig[0] as i32 - MAGIC_NUMBER)?;
-        let s = ecdsa::RecoverableSignature::from_compact(&sig[1..], id)?;
-        Ok(secp.recover_ecdsa(&encmsg, &s)?)
-    }
-    fn lightning_hash(&self, message: &Vec<u8>) -> Result<Message> {
-        let mut buffer = String::from("Lightning Signed Message:").into_bytes();
-        buffer.extend(message);
-        let hash1 = Sha256Hash::hash(&buffer[..]);
-        let hash2 = Sha256Hash::hash(&hash1[..]);
-        let encmsg = secp256k1::Message::from_slice(&hash2[..])?;
-        Ok(encmsg)
-    }
+    let encmsg = lightning_hash(message)?;
+    let secp = Secp256k1::verification_only();
+    let id = ecdsa::RecoveryId::from_i32(sig[0] as i32 - MAGIC_NUMBER)?;
+    let s = ecdsa::RecoverableSignature::from_compact(&sig[1..], id)?;
+    Ok(secp.recover_ecdsa(&encmsg, &s)?)
+}
+pub fn lightning_hash(message: &Vec<u8>) -> Result<Message> {
+    let mut buffer = String::from("Lightning Signed Message:").into_bytes();
+    buffer.extend(message);
+    let hash1 = Sha256Hash::hash(&buffer[..]);
+    let hash2 = Sha256Hash::hash(&hash1[..]);
+    let encmsg = secp256k1::Message::from_slice(&hash2[..])?;
+    Ok(encmsg)
 }
 
 #[cfg(test)]
