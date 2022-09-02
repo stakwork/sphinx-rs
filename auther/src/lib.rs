@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use anyhow::Result;
 use base64::{decode_config, encode_config, URL_SAFE};
+pub use secp256k1;
 use secp256k1::ecdsa::{self, Signature};
 use secp256k1::hashes::sha256::Hash as Sha256Hash;
 use secp256k1::hashes::Hash;
