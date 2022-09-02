@@ -12,28 +12,46 @@ impl Controller {
     pub fn new(sk: SecretKey, pk: PublicKey, nonce: u64) -> Self {
         Self(sk, pk, nonce)
     }
-    pub fn build_msg(&mut self, mut d: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+    pub fn build_msg(&mut self, d: Vec<u8>) -> anyhow::Result<Vec<u8>> {
         self.2 = self.2 + 1;
-        d.extend_from_slice(&self.2.to_be_bytes());
-        let sig = sign_message(&d, &self.0)?;
-        d.extend_from_slice(&sig);
-        Ok(d)
+        Ok(build_msg(d, &self.0, self.2)?)
+    }
+    pub fn build_msg_with_nonce(&mut self, d: Vec<u8>, nonce: u64) -> anyhow::Result<Vec<u8>> {
+        Ok(build_msg(d, &self.0, nonce)?)
     }
     pub fn parse_msg(&mut self, input: Vec<u8>) -> anyhow::Result<Vec<u8>> {
-        let msg_sig = input.split_at(input.len() - SIG_LEN);
-        let sig: [u8; SIG_LEN] = msg_sig.1.try_into()?;
-        let msg_nonce = msg_sig.0.split_at(msg_sig.0.len() - 8);
-        let nonce_bytes: [u8; 8] = msg_nonce.1.try_into()?;
-        let nonce = u64::from_be_bytes(nonce_bytes);
-        if nonce < self.2 {
-            return Err(anyhow!("bad nonce"));
-        }
-        let msg = msg_nonce.0;
-        verify_message(msg_sig.0, &sig, &self.1)?;
-        // increment nonce
+        let res = parse_msg(input, &self.1, self.2)?;
         self.2 = self.2 + 1;
-        Ok(msg.to_vec())
+        Ok(res)
     }
+    pub fn parse_msg_with_nonce(&mut self, input: Vec<u8>, nonce: u64) -> anyhow::Result<Vec<u8>> {
+        let res = parse_msg(input, &self.1, nonce)?;
+        Ok(res)
+    }
+}
+
+pub fn build_msg(input: Vec<u8>, sk: &SecretKey, nonce: u64) -> anyhow::Result<Vec<u8>> {
+    let mut d = input;
+    d.extend_from_slice(&nonce.to_be_bytes());
+    let sig = sign_message(&d, sk)?;
+    d.extend_from_slice(&sig);
+    Ok(d)
+}
+
+pub fn parse_msg(input: Vec<u8>, pk: &PublicKey, last_nonce: u64) -> anyhow::Result<Vec<u8>> {
+    let msg_sig = input.split_at(input.len() - SIG_LEN);
+    let sig: [u8; SIG_LEN] = msg_sig.1.try_into()?;
+    let msg_nonce = msg_sig.0.split_at(msg_sig.0.len() - 8);
+    let nonce_bytes: [u8; 8] = msg_nonce.1.try_into()?;
+    let nonce = u64::from_be_bytes(nonce_bytes);
+    if nonce < last_nonce {
+        println!("nonce {} last_mnone {}", nonce, last_nonce);
+        return Err(anyhow!("bad nonce"));
+    }
+    let msg = msg_nonce.0;
+    verify_message(msg_sig.0, &sig, pk)?;
+    // increment nonce
+    Ok(msg.to_vec())
 }
 
 #[cfg(test)]
@@ -52,7 +70,9 @@ mod tests {
         let public_key = PublicKey::from_secret_key(&secp, &sk);
         let input = vec![1, 2, 3];
         let mut cont = Controller::new(sk, public_key, 0);
-        let msg = cont.build_msg(input.clone()).expect("couldnt sign");
+        let msg = cont
+            .build_msg_with_nonce(input.clone(), 0)
+            .expect("couldnt sign");
         let parsed = cont.parse_msg(msg).expect("couldnt verify");
         assert_eq!(input, parsed, "unequal");
     }
