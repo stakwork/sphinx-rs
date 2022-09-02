@@ -1,6 +1,6 @@
 [package]
 name = "sphinx-auther"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Evan Feenstra <evanfeenstra@gmail.com>"]
 edition = "2018"
 description = "secp256k1 signature-based authentication for sphinx chat"
@@ -8,7 +8,7 @@ repository = "https://github.com/stakwork/sphinx-rs"
 license = "MIT"
 
 [dependencies]
-secp256k1 = { version = "0.22.0", default-features = false, features = ["std", "rand-std", "bitcoin_hashes"] }
+secp256k1 = { version = "0.24.0", default-features = false, features = ["std", "rand-std", "bitcoin_hashes"] }
 anyhow = "1"
 log = "0.4"
 base64 = "0.13.0" 
