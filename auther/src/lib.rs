@@ -1,5 +1,4 @@
-mod nonce;
-pub use nonce::Controller;
+pub mod nonce;
 
 use anyhow::anyhow;
 use anyhow::Result;

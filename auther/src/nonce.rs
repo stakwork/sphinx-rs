@@ -56,7 +56,7 @@ pub fn parse_msg(input: Vec<u8>, pk: &PublicKey, last_nonce: u64) -> anyhow::Res
 
 #[cfg(test)]
 mod tests {
-    use crate::*;
+    use crate::nonce::*;
     use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
     fn secret_key() -> SecretKey {
