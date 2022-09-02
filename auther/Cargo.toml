@@ -1,6 +1,6 @@
 [package]
 name = "sphinx-auther"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Evan Feenstra <evanfeenstra@gmail.com>"]
 edition = "2018"
 description = "secp256k1 signature-based authentication for sphinx chat"

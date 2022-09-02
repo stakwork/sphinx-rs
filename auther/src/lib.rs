@@ -27,7 +27,7 @@ pub fn bytes_to_u32(bytes: [u8; 4]) -> u32 {
     u32::from_be_bytes(bytes)
 }
 
-pub fn base64_encode(input: &Vec<u8>) -> String {
+pub fn base64_encode(input: &[u8]) -> String {
     encode_config(input, URL_SAFE)
 }
 pub fn base64_decode(input: &str) -> Result<Vec<u8>> {
@@ -94,7 +94,7 @@ impl Token {
     }
 }
 
-pub fn sign_message(message: &Vec<u8>, secret_key: &SecretKey) -> Result<Vec<u8>> {
+pub fn sign_message(message: &[u8], secret_key: &SecretKey) -> Result<Vec<u8>> {
     let encmsg = lightning_hash(message)?;
     let secp_ctx = Secp256k1::signing_only();
     let sig = secp_ctx.sign_ecdsa_recoverable(&encmsg, &secret_key);
@@ -103,7 +103,7 @@ pub fn sign_message(message: &Vec<u8>, secret_key: &SecretKey) -> Result<Vec<u8>
     fin.extend_from_slice(&sig[..]);
     Ok(fin)
 }
-pub fn verify_message(message: &Vec<u8>, sig: &[u8; 65], public_key: &PublicKey) -> Result<()> {
+pub fn verify_message(message: &[u8], sig: &[u8; 65], public_key: &PublicKey) -> Result<()> {
     let secp_ctx = Secp256k1::verification_only();
     let encmsg = lightning_hash(message)?;
     // remove the rid
@@ -111,7 +111,7 @@ pub fn verify_message(message: &Vec<u8>, sig: &[u8; 65], public_key: &PublicKey)
     secp_ctx.verify_ecdsa(&encmsg, &s, public_key)?;
     Ok(())
 }
-pub fn recover_pubkey(message: &Vec<u8>, sig: &[u8; 65]) -> Result<PublicKey> {
+pub fn recover_pubkey(message: &[u8], sig: &[u8; 65]) -> Result<PublicKey> {
     if sig.len() < 65 {
         return Err(anyhow!("too short sig".to_string()));
     }
@@ -121,7 +121,7 @@ pub fn recover_pubkey(message: &Vec<u8>, sig: &[u8; 65]) -> Result<PublicKey> {
     let s = ecdsa::RecoverableSignature::from_compact(&sig[1..], id)?;
     Ok(secp.recover_ecdsa(&encmsg, &s)?)
 }
-pub fn lightning_hash(message: &Vec<u8>) -> Result<Message> {
+pub fn lightning_hash(message: &[u8]) -> Result<Message> {
     let mut buffer = String::from("Lightning Signed Message:").into_bytes();
     buffer.extend(message);
     let hash1 = Sha256Hash::hash(&buffer[..]);
