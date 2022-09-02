@@ -44,7 +44,7 @@ pub fn parse_msg(input: Vec<u8>, pk: &PublicKey, last_nonce: u64) -> anyhow::Res
     let msg_nonce = msg_sig.0.split_at(msg_sig.0.len() - 8);
     let nonce_bytes: [u8; 8] = msg_nonce.1.try_into()?;
     let nonce = u64::from_be_bytes(nonce_bytes);
-    if nonce < last_nonce {
+    if nonce <= last_nonce {
         println!("nonce {} last_mnone {}", nonce, last_nonce);
         return Err(anyhow!("bad nonce"));
     }
@@ -70,10 +70,9 @@ mod tests {
         let public_key = PublicKey::from_secret_key(&secp, &sk);
         let input = vec![1, 2, 3];
         let mut cont = Controller::new(sk, public_key, 0);
-        let msg = cont
-            .build_msg_with_nonce(input.clone(), 0)
-            .expect("couldnt sign");
-        let parsed = cont.parse_msg(msg).expect("couldnt verify");
+        let msg = cont.build_msg(input.clone()).expect("couldnt sign");
+        // 0 nonce, this is the first verification
+        let parsed = cont.parse_msg_with_nonce(msg, 0).expect("couldnt verify");
         assert_eq!(input, parsed, "unequal");
     }
 }
