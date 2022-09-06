@@ -4,18 +4,24 @@ version = "0.1.0"
 authors = ["Evan Feenstra <evanfeenstra@gmail.com>"]
 edition = "2018"
 
-[lib]
-name = "crypter"
-crate-type = ["staticlib", "cdylib"]
+# [lib]
+# name = "crypter"
+# crate-type = ["staticlib", "cdylib"]
+
+[features]
+default = ["ffi"]
+ffi = ["uniffi", "uniffi_build"]
+wasm = []
 
 [dependencies]
 sphinx-crypter = { path = "../crypter" }
-uniffi = "0.19.2"
+sphinx-deriver = { path = "../deriver" }
+uniffi = { version = "0.19.2", optional = true }
 hex = "0.4.3"
 thiserror = "1.0.31"
 
 [build-dependencies]
-uniffi_build = "0.19.2"
+uniffi_build = { version = "0.19.2", optional = true }
 
 [profile.release]
 opt-level = 'z'     # Optimize for size.

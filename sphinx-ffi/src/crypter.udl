@@ -8,6 +8,12 @@ enum CrypterError {
   "BadSecret",
   "BadNonce",
   "BadCiper",
+  "InvalidNetwork",
+};
+
+dictionary Keys {
+    string secret;
+    string pubkey;
 };
 
 namespace crypter {
@@ -19,4 +25,10 @@ namespace crypter {
   string encrypt(string plaintext, string secret, string nonce);
   [Throws=CrypterError]
   string decrypt(string ciphertext, string secret);
+  [Throws=CrypterError]
+  Keys node_keys(string net, string seed);
+  [Throws=CrypterError]
+  string mnemonic_from_entropy(string seed);
+  [Throws=CrypterError]
+  string entropy_from_mnemonic(string mnemonic);
 };

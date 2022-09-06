@@ -40,7 +40,7 @@ open class RustBuffer : Structure() {
 
     companion object {
         internal fun alloc(size: Int = 0) = rustCall() { status ->
-            _UniFFILib.INSTANCE.ffi_crypter_9c38_rustbuffer_alloc(size, status).also {
+            _UniFFILib.INSTANCE.ffi_crypter_a1fc_rustbuffer_alloc(size, status).also {
                 if(it.data == null) {
                    throw RuntimeException("RustBuffer.alloc() returned null data pointer (size=${size})")
                }
@@ -48,7 +48,7 @@ open class RustBuffer : Structure() {
         }
 
         internal fun free(buf: RustBuffer.ByValue) = rustCall() { status ->
-            _UniFFILib.INSTANCE.ffi_crypter_9c38_rustbuffer_free(buf, status)
+            _UniFFILib.INSTANCE.ffi_crypter_a1fc_rustbuffer_free(buf, status)
         }
     }
 
@@ -257,35 +257,47 @@ internal interface _UniFFILib : Library {
         }
     }
 
-    fun crypter_9c38_pubkey_from_secret_key(`mySecretKey`: RustBuffer.ByValue,
+    fun crypter_a1fc_pubkey_from_secret_key(`mySecretKey`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun crypter_9c38_derive_shared_secret(`theirPubkey`: RustBuffer.ByValue,`mySecretKey`: RustBuffer.ByValue,
+    fun crypter_a1fc_derive_shared_secret(`theirPubkey`: RustBuffer.ByValue,`mySecretKey`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun crypter_9c38_encrypt(`plaintext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,`nonce`: RustBuffer.ByValue,
+    fun crypter_a1fc_encrypt(`plaintext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,`nonce`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun crypter_9c38_decrypt(`ciphertext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,
+    fun crypter_a1fc_decrypt(`ciphertext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun ffi_crypter_9c38_rustbuffer_alloc(`size`: Int,
+    fun crypter_a1fc_node_keys(`net`: RustBuffer.ByValue,`seed`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun ffi_crypter_9c38_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,
+    fun crypter_a1fc_mnemonic_from_entropy(`seed`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun ffi_crypter_9c38_rustbuffer_free(`buf`: RustBuffer.ByValue,
+    fun crypter_a1fc_entropy_from_mnemonic(`mnemonic`: RustBuffer.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun ffi_crypter_a1fc_rustbuffer_alloc(`size`: Int,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun ffi_crypter_a1fc_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun ffi_crypter_a1fc_rustbuffer_free(`buf`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun ffi_crypter_9c38_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Int,
+    fun ffi_crypter_a1fc_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Int,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
@@ -344,6 +356,35 @@ public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
 
 
 
+data class Keys (
+    var `secret`: String, 
+    var `pubkey`: String
+) {
+    
+}
+
+public object FfiConverterTypeKeys: FfiConverterRustBuffer<Keys> {
+    override fun read(buf: ByteBuffer): Keys {
+        return Keys(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: Keys) = (
+            FfiConverterString.allocationSize(value.`secret`) +
+            FfiConverterString.allocationSize(value.`pubkey`)
+    )
+
+    override fun write(value: Keys, buf: ByteBuffer) {
+            FfiConverterString.write(value.`secret`, buf)
+            FfiConverterString.write(value.`pubkey`, buf)
+    }
+}
+
+
+
+
 
 sealed class CrypterException(message: String): Exception(message) {
         // Each variant is a nested class
@@ -356,6 +397,7 @@ sealed class CrypterException(message: String): Exception(message) {
         class BadSecret(message: String) : CrypterException(message)
         class BadNonce(message: String) : CrypterException(message)
         class BadCiper(message: String) : CrypterException(message)
+        class InvalidNetwork(message: String) : CrypterException(message)
         
 
     companion object ErrorHandler : CallStatusErrorHandler<CrypterException> {
@@ -375,6 +417,7 @@ public object FfiConverterTypeCrypterError : FfiConverterRustBuffer<CrypterExcep
             6 -> CrypterException.BadSecret(FfiConverterString.read(buf))
             7 -> CrypterException.BadNonce(FfiConverterString.read(buf))
             8 -> CrypterException.BadCiper(FfiConverterString.read(buf))
+            9 -> CrypterException.InvalidNetwork(FfiConverterString.read(buf))
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
         }
         
@@ -396,7 +439,7 @@ public object FfiConverterTypeCrypterError : FfiConverterRustBuffer<CrypterExcep
 fun `pubkeyFromSecretKey`(`mySecretKey`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(CrypterException) { _status ->
-    _UniFFILib.INSTANCE.crypter_9c38_pubkey_from_secret_key(FfiConverterString.lower(`mySecretKey`), _status)
+    _UniFFILib.INSTANCE.crypter_a1fc_pubkey_from_secret_key(FfiConverterString.lower(`mySecretKey`), _status)
 })
 }
 
@@ -406,7 +449,7 @@ fun `pubkeyFromSecretKey`(`mySecretKey`: String): String {
 fun `deriveSharedSecret`(`theirPubkey`: String, `mySecretKey`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(CrypterException) { _status ->
-    _UniFFILib.INSTANCE.crypter_9c38_derive_shared_secret(FfiConverterString.lower(`theirPubkey`), FfiConverterString.lower(`mySecretKey`), _status)
+    _UniFFILib.INSTANCE.crypter_a1fc_derive_shared_secret(FfiConverterString.lower(`theirPubkey`), FfiConverterString.lower(`mySecretKey`), _status)
 })
 }
 
@@ -416,7 +459,7 @@ fun `deriveSharedSecret`(`theirPubkey`: String, `mySecretKey`: String): String {
 fun `encrypt`(`plaintext`: String, `secret`: String, `nonce`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(CrypterException) { _status ->
-    _UniFFILib.INSTANCE.crypter_9c38_encrypt(FfiConverterString.lower(`plaintext`), FfiConverterString.lower(`secret`), FfiConverterString.lower(`nonce`), _status)
+    _UniFFILib.INSTANCE.crypter_a1fc_encrypt(FfiConverterString.lower(`plaintext`), FfiConverterString.lower(`secret`), FfiConverterString.lower(`nonce`), _status)
 })
 }
 
@@ -426,7 +469,37 @@ fun `encrypt`(`plaintext`: String, `secret`: String, `nonce`: String): String {
 fun `decrypt`(`ciphertext`: String, `secret`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(CrypterException) { _status ->
-    _UniFFILib.INSTANCE.crypter_9c38_decrypt(FfiConverterString.lower(`ciphertext`), FfiConverterString.lower(`secret`), _status)
+    _UniFFILib.INSTANCE.crypter_a1fc_decrypt(FfiConverterString.lower(`ciphertext`), FfiConverterString.lower(`secret`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `nodeKeys`(`net`: String, `seed`: String): Keys {
+    return FfiConverterTypeKeys.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_a1fc_node_keys(FfiConverterString.lower(`net`), FfiConverterString.lower(`seed`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `mnemonicFromEntropy`(`seed`: String): String {
+    return FfiConverterString.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_a1fc_mnemonic_from_entropy(FfiConverterString.lower(`seed`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `entropyFromMnemonic`(`mnemonic`: String): String {
+    return FfiConverterString.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_a1fc_entropy_from_mnemonic(FfiConverterString.lower(`mnemonic`), _status)
 })
 }
 

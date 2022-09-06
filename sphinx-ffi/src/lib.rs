@@ -3,7 +3,10 @@ mod parse;
 use sphinx_crypter::chacha::{decrypt as chacha_decrypt, encrypt as chacha_encrypt};
 use sphinx_crypter::ecdh::derive_shared_secret_from_slice;
 use sphinx_crypter::secp256k1::{PublicKey, Secp256k1, SecretKey};
+use sphinx_deriver::{self as deriver, vls_core::bitcoin::Network};
+use std::str::FromStr;
 
+#[cfg(not(feature = "wasm"))]
 include!("crypter.uniffi.rs");
 
 pub type Result<T> = std::result::Result<T, CrypterError>;
@@ -26,6 +29,8 @@ pub enum CrypterError {
     BadNonce,
     #[error("Bad cipher")]
     BadCiper,
+    #[error("Invalid network")]
+    InvalidNetwork,
 }
 
 pub fn pubkey_from_secret_key(my_secret_key: String) -> Result<String> {
@@ -80,9 +85,42 @@ pub fn decrypt(ciphertext: String, secret: String) -> Result<String> {
     Ok(hex::encode(plain))
 }
 
+pub struct Keys {
+    pub secret: String,
+    pub pubkey: String,
+}
+
+pub fn node_keys(net: String, seed: String) -> Result<Keys> {
+    let seed = parse::parse_secret_string(seed)?;
+    let network: Network = match Network::from_str(&net) {
+        Ok(n) => n,
+        Err(_) => return Err(CrypterError::InvalidNetwork),
+    };
+    let ks = deriver::node_keys(&network, &seed[..]);
+    Ok(Keys {
+        secret: hex::encode(ks.1.secret_bytes()),
+        pubkey: ks.0.to_string(),
+    })
+}
+
+pub fn mnemonic_from_entropy(seed: String) -> Result<String> {
+    let seed = parse::parse_secret_string(seed)?;
+    match deriver::mnemonic_from_entropy(&seed[..]) {
+        Ok(m) => Ok(m),
+        Err(_) => Err(CrypterError::BadSecret),
+    }
+}
+
+pub fn entropy_from_mnemonic(mnemonic: String) -> Result<String> {
+    match deriver::entropy_from_mnemonic(&mnemonic) {
+        Ok(m) => Ok(hex::encode(m)),
+        Err(_) => Err(CrypterError::BadSecret),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{decrypt, derive_shared_secret, encrypt, pubkey_from_secret_key, Result};
+    use crate::*;
 
     #[test]
     fn test_crypter() -> Result<()> {
@@ -116,6 +154,21 @@ mod tests {
         let pk1 = "0362a684901b8d065fb034bc44ea972619a409aeafc2a698016a74f6eee1008aca";
         let pk = pubkey_from_secret_key(sk1.to_string())?;
         assert_eq!(pk, pk1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_derive_keys() -> Result<()> {
+        let seed = "86c8977989592a97beb409bc27fde76e981ce3543499fd61743755b832e92a3e";
+        let keys = node_keys("regtest".to_string(), seed.to_string()).expect("fail");
+        assert_eq!(
+            keys.pubkey,
+            "02debe869398af7e6ee6b7f25f464da65f50cdc26987a9ac6946b709bc69020472"
+        );
+        assert_eq!(
+            keys.secret,
+            "66a553b3498d7471709184a01b956e3ad837a29f73c277c90329fc08b7a969b3"
+        );
         Ok(())
     }
 }

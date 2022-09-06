@@ -8,7 +8,7 @@ repository = "https://github.com/stakwork/sphinx-rs"
 license = "MIT"
 
 [dependencies]
-secp256k1 = { version = "0.24.0", default-features = false, features = ["std", "rand-std", "bitcoin_hashes"] }
+secp256k1 = { version = "0.24.0", features = ["std", "rand-std", "lowmemory", "bitcoin_hashes"] }
 anyhow = "1"
 log = "0.4"
 base64 = "0.13.0" 

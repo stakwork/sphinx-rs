@@ -12,6 +12,12 @@ impl Controller {
     pub fn new(sk: SecretKey, pk: PublicKey, nonce: u64) -> Self {
         Self(sk, pk, nonce)
     }
+    pub fn nonce(&self) -> u64 {
+        self.2
+    }
+    pub fn pubkey(&self) -> PublicKey {
+        self.1
+    }
     pub fn build_msg(&mut self, d: &[u8]) -> anyhow::Result<Vec<u8>> {
         self.2 = self.2 + 1;
         Ok(build_msg(d, &self.0, self.2)?)

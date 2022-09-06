@@ -1,0 +1,11 @@
+[workspace]
+members = [
+    "auther",
+    "crypter",
+    "deriver",
+]
+
+exclude = [
+    "sphinx-ffi",
+    "sphinx-wasm",
+]

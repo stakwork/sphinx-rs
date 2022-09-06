@@ -19,13 +19,13 @@ fileprivate extension RustBuffer {
     }
 
     static func from(_ ptr: UnsafeBufferPointer<UInt8>) -> RustBuffer {
-        try! rustCall { ffi_crypter_9c38_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
+        try! rustCall { ffi_crypter_a1fc_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
     }
 
     // Frees the buffer in place.
     // The buffer must not be used after this is called.
     func deallocate() {
-        try! rustCall { ffi_crypter_9c38_rustbuffer_free(self, $0) }
+        try! rustCall { ffi_crypter_a1fc_rustbuffer_free(self, $0) }
     }
 }
 
@@ -320,6 +320,52 @@ fileprivate struct FfiConverterString: FfiConverter {
 }
 
 
+public struct Keys {
+    public var secret: String
+    public var pubkey: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(secret: String, pubkey: String) {
+        self.secret = secret
+        self.pubkey = pubkey
+    }
+}
+
+
+extension Keys: Equatable, Hashable {
+    public static func ==(lhs: Keys, rhs: Keys) -> Bool {
+        if lhs.secret != rhs.secret {
+            return false
+        }
+        if lhs.pubkey != rhs.pubkey {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(secret)
+        hasher.combine(pubkey)
+    }
+}
+
+
+fileprivate struct FfiConverterTypeKeys: FfiConverterRustBuffer {
+    fileprivate static func read(from buf: Reader) throws -> Keys {
+        return try Keys(
+            secret: FfiConverterString.read(from: buf), 
+            pubkey: FfiConverterString.read(from: buf)
+        )
+    }
+
+    fileprivate static func write(_ value: Keys, into buf: Writer) {
+        FfiConverterString.write(value.secret, into: buf)
+        FfiConverterString.write(value.pubkey, into: buf)
+    }
+}
+
+
 public enum CrypterError {
 
     
@@ -347,6 +393,9 @@ public enum CrypterError {
     
     // Simple error enums only carry a message
     case BadCiper(message: String)
+    
+    // Simple error enums only carry a message
+    case InvalidNetwork(message: String)
     
 }
 
@@ -392,6 +441,10 @@ fileprivate struct FfiConverterTypeCrypterError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: buf)
         )
         
+        case 9: return .InvalidNetwork(
+            message: try FfiConverterString.read(from: buf)
+        )
+        
 
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -427,6 +480,9 @@ fileprivate struct FfiConverterTypeCrypterError: FfiConverterRustBuffer {
         case let .BadCiper(message):
             buf.writeInt(Int32(8))
             FfiConverterString.write(message, into: buf)
+        case let .InvalidNetwork(message):
+            buf.writeInt(Int32(9))
+            FfiConverterString.write(message, into: buf)
 
         
         }
@@ -444,7 +500,7 @@ public func pubkeyFromSecretKey(mySecretKey: String) throws -> String {
     
     rustCallWithError(FfiConverterTypeCrypterError.self) {
     
-    crypter_9c38_pubkey_from_secret_key(
+    crypter_a1fc_pubkey_from_secret_key(
         FfiConverterString.lower(mySecretKey), $0)
 }
     )
@@ -458,7 +514,7 @@ public func deriveSharedSecret(theirPubkey: String, mySecretKey: String) throws 
     
     rustCallWithError(FfiConverterTypeCrypterError.self) {
     
-    crypter_9c38_derive_shared_secret(
+    crypter_a1fc_derive_shared_secret(
         FfiConverterString.lower(theirPubkey), 
         FfiConverterString.lower(mySecretKey), $0)
 }
@@ -473,7 +529,7 @@ public func encrypt(plaintext: String, secret: String, nonce: String) throws -> 
     
     rustCallWithError(FfiConverterTypeCrypterError.self) {
     
-    crypter_9c38_encrypt(
+    crypter_a1fc_encrypt(
         FfiConverterString.lower(plaintext), 
         FfiConverterString.lower(secret), 
         FfiConverterString.lower(nonce), $0)
@@ -489,9 +545,52 @@ public func decrypt(ciphertext: String, secret: String) throws -> String {
     
     rustCallWithError(FfiConverterTypeCrypterError.self) {
     
-    crypter_9c38_decrypt(
+    crypter_a1fc_decrypt(
         FfiConverterString.lower(ciphertext), 
         FfiConverterString.lower(secret), $0)
+}
+    )
+}
+
+
+
+public func nodeKeys(net: String, seed: String) throws -> Keys {
+    return try FfiConverterTypeKeys.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_a1fc_node_keys(
+        FfiConverterString.lower(net), 
+        FfiConverterString.lower(seed), $0)
+}
+    )
+}
+
+
+
+public func mnemonicFromEntropy(seed: String) throws -> String {
+    return try FfiConverterString.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_a1fc_mnemonic_from_entropy(
+        FfiConverterString.lower(seed), $0)
+}
+    )
+}
+
+
+
+public func entropyFromMnemonic(mnemonic: String) throws -> String {
+    return try FfiConverterString.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_a1fc_entropy_from_mnemonic(
+        FfiConverterString.lower(mnemonic), $0)
 }
     )
 }
