@@ -45,19 +45,28 @@ pub fn build_msg(input: &[u8], sk: &SecretKey, nonce: u64) -> anyhow::Result<Vec
 }
 
 pub fn parse_msg(input: &[u8], pk: &PublicKey, last_nonce: u64) -> anyhow::Result<Vec<u8>> {
+    let (msg, nonce) = parse_msg_no_nonce(input, pk)?;
+    if nonce <= last_nonce {
+        println!("nonce {} last_mnone {}", nonce, last_nonce);
+        return Err(anyhow!("bad nonce"));
+    }
+    Ok(msg.to_vec())
+}
+
+pub fn parse_msg_no_nonce(input: &[u8], pk: &PublicKey) -> anyhow::Result<(Vec<u8>, u64)> {
+    // each msg needs a sig and a nonce and at least 1 byte
+    if input.len() < SIG_LEN + 8 + 1 {
+        return Err(anyhow!("msg too short"));
+    }
     let msg_sig = input.split_at(input.len() - SIG_LEN);
     let sig: [u8; SIG_LEN] = msg_sig.1.try_into()?;
     let msg_nonce = msg_sig.0.split_at(msg_sig.0.len() - 8);
     let nonce_bytes: [u8; 8] = msg_nonce.1.try_into()?;
     let nonce = u64::from_be_bytes(nonce_bytes);
-    if nonce <= last_nonce {
-        println!("nonce {} last_mnone {}", nonce, last_nonce);
-        return Err(anyhow!("bad nonce"));
-    }
     let msg = msg_nonce.0;
     verify_message(msg_sig.0, &sig, pk)?;
     // increment nonce
-    Ok(msg.to_vec())
+    Ok((msg.to_vec(), nonce))
 }
 
 #[cfg(test)]
