@@ -3,7 +3,7 @@ name = "sphinx-glyph"
 version = "0.1.0"
 authors = ["Evan Feenstra <evanfeenstra@gmail.com>"]
 edition = "2018"
-description = "utils for Sphinx lightning hardware signer"
+description = "Sphinx lightning hardware signer"
 repository = "https://github.com/stakwork/sphinx-rs"
 license = "MIT"
 
