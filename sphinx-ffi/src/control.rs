@@ -1,7 +1,9 @@
 use crate::{parse, CrypterError, Result};
 use sphinx_crypter::secp256k1::SecretKey;
 use sphinx_glyph::build_control_msg;
-use sphinx_glyph::types::{ControlMessage, ControlResponse, Interval, Policy as RawPolicy};
+use sphinx_glyph::types::{
+    ControlMessage, ControlResponse, Interval, OtaParams, Policy as RawPolicy,
+};
 use std::str::FromStr;
 
 pub fn get_nonce_request(secret: String, nonce: u64) -> Result<String> {
@@ -105,7 +107,25 @@ pub fn update_allowlist_response(inp: String) -> Result<Vec<String>> {
     }
 }
 
-// UTILS
+pub fn ota_request(secret: String, nonce: u64, version: u64, url: String) -> Result<String> {
+    Ok(build_msg(
+        ControlMessage::Ota(OtaParams { version, url }),
+        nonce,
+        secret,
+    )?)
+}
+
+pub fn ota_response(inp: String) -> Result<u64> {
+    let r = parse_response_bytes(inp)?;
+    match r {
+        ControlResponse::OtaConfirm(p) => Ok(p.version),
+        _ => Err(CrypterError::BadResponse),
+    }
+}
+
+///////////
+// UTILS //
+///////////
 
 pub struct Policy {
     pub sat_limit: u64,

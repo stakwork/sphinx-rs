@@ -2,7 +2,6 @@
 members = [
     "auther",
     "crypter",
-    "deriver",
     "glyph"
 ]
 
