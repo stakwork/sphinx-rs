@@ -1,6 +1,6 @@
 use crate::{parse, CrypterError, Result};
 use sphinx_crypter::secp256k1::SecretKey;
-use sphinx_glyph::build_control_msg;
+use sphinx_glyph::controller::{build_control_msg, parse_control_response};
 use sphinx_glyph::types::{
     ControlMessage, ControlResponse, Interval, OtaParams, Policy as RawPolicy,
 };
@@ -172,7 +172,7 @@ fn parse_response_bytes(inp: String) -> Result<ControlResponse> {
         Ok(s) => s,
         Err(_) => return Err(CrypterError::BadResponse),
     };
-    match sphinx_glyph::parse_control_response(&v) {
+    match parse_control_response(&v) {
         Ok(r) => Ok(r),
         Err(_) => Err(CrypterError::BadResponse),
     }

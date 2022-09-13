@@ -6,7 +6,7 @@ pub use control::*;
 use sphinx_crypter::chacha::{decrypt as chacha_decrypt, encrypt as chacha_encrypt};
 use sphinx_crypter::ecdh::derive_shared_secret_from_slice;
 use sphinx_crypter::secp256k1::{PublicKey, Secp256k1, SecretKey};
-use sphinx_glyph::derive::{self as deriver, vls_core::bitcoin::Network};
+use sphinx_deriver::{self as deriver, vls_core::bitcoin::Network};
 use std::str::FromStr;
 
 #[cfg(not(feature = "wasm"))]
