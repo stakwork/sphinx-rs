@@ -19,5 +19,6 @@ git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git"
 package = "lightning-signer-core"
 version = "0.1.0-5"
 rev = "7e532483693ecf137bb1dfedc9b86a188ec6fac7"
-# default-features = false
+default-features = false
+features = ["std"]
 # features = ["std", "secp-lowmemory"]
