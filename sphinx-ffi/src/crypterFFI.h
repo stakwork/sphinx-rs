@@ -46,47 +46,119 @@ typedef struct RustCallStatus {
 // ⚠️ increment the version suffix in all instances of UNIFFI_SHARED_HEADER_V4 in this file.           ⚠️
 #endif // def UNIFFI_SHARED_H
 
-RustBuffer crypter_a1fc_pubkey_from_secret_key(
+RustBuffer crypter_5b86_pubkey_from_secret_key(
       RustBuffer my_secret_key,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer crypter_a1fc_derive_shared_secret(
+RustBuffer crypter_5b86_derive_shared_secret(
       RustBuffer their_pubkey,RustBuffer my_secret_key,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer crypter_a1fc_encrypt(
+RustBuffer crypter_5b86_encrypt(
       RustBuffer plaintext,RustBuffer secret,RustBuffer nonce,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer crypter_a1fc_decrypt(
+RustBuffer crypter_5b86_decrypt(
       RustBuffer ciphertext,RustBuffer secret,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer crypter_a1fc_node_keys(
+RustBuffer crypter_5b86_node_keys(
       RustBuffer net,RustBuffer seed,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer crypter_a1fc_mnemonic_from_entropy(
+RustBuffer crypter_5b86_mnemonic_from_entropy(
       RustBuffer seed,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer crypter_a1fc_entropy_from_mnemonic(
+RustBuffer crypter_5b86_entropy_from_mnemonic(
       RustBuffer mnemonic,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer ffi_crypter_a1fc_rustbuffer_alloc(
+RustBuffer crypter_5b86_get_nonce_request(
+      RustBuffer secret,uint64_t nonce,
+    RustCallStatus *_Nonnull out_status
+    );
+uint64_t crypter_5b86_get_nonce_response(
+      RustBuffer bytes,
+    RustCallStatus *_Nonnull out_status
+    );
+RustBuffer crypter_5b86_reset_wifi_request(
+      RustBuffer secret,uint64_t nonce,
+    RustCallStatus *_Nonnull out_status
+    );
+void crypter_5b86_reset_wifi_response(
+      RustBuffer bytes,
+    RustCallStatus *_Nonnull out_status
+    );
+RustBuffer crypter_5b86_reset_keys_request(
+      RustBuffer secret,uint64_t nonce,
+    RustCallStatus *_Nonnull out_status
+    );
+void crypter_5b86_reset_keys_response(
+      RustBuffer bytes,
+    RustCallStatus *_Nonnull out_status
+    );
+RustBuffer crypter_5b86_reset_all_request(
+      RustBuffer secret,uint64_t nonce,
+    RustCallStatus *_Nonnull out_status
+    );
+void crypter_5b86_reset_all_response(
+      RustBuffer bytes,
+    RustCallStatus *_Nonnull out_status
+    );
+RustBuffer crypter_5b86_get_policy_request(
+      RustBuffer secret,uint64_t nonce,
+    RustCallStatus *_Nonnull out_status
+    );
+RustBuffer crypter_5b86_get_policy_response(
+      RustBuffer bytes,
+    RustCallStatus *_Nonnull out_status
+    );
+RustBuffer crypter_5b86_update_policy_request(
+      RustBuffer secret,uint64_t nonce,RustBuffer policy,
+    RustCallStatus *_Nonnull out_status
+    );
+RustBuffer crypter_5b86_update_policy_response(
+      RustBuffer bytes,
+    RustCallStatus *_Nonnull out_status
+    );
+RustBuffer crypter_5b86_get_allowlist_request(
+      RustBuffer secret,uint64_t nonce,
+    RustCallStatus *_Nonnull out_status
+    );
+RustBuffer crypter_5b86_get_allowlist_response(
+      RustBuffer bytes,
+    RustCallStatus *_Nonnull out_status
+    );
+RustBuffer crypter_5b86_update_allowlist_request(
+      RustBuffer secret,uint64_t nonce,RustBuffer allowlist,
+    RustCallStatus *_Nonnull out_status
+    );
+RustBuffer crypter_5b86_update_allowlist_response(
+      RustBuffer bytes,
+    RustCallStatus *_Nonnull out_status
+    );
+RustBuffer crypter_5b86_ota_request(
+      RustBuffer secret,uint64_t nonce,uint64_t version,RustBuffer url,
+    RustCallStatus *_Nonnull out_status
+    );
+uint64_t crypter_5b86_ota_response(
+      RustBuffer bytes,
+    RustCallStatus *_Nonnull out_status
+    );
+RustBuffer ffi_crypter_5b86_rustbuffer_alloc(
       int32_t size,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer ffi_crypter_a1fc_rustbuffer_from_bytes(
+RustBuffer ffi_crypter_5b86_rustbuffer_from_bytes(
       ForeignBytes bytes,
     RustCallStatus *_Nonnull out_status
     );
-void ffi_crypter_a1fc_rustbuffer_free(
+void ffi_crypter_5b86_rustbuffer_free(
       RustBuffer buf,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer ffi_crypter_a1fc_rustbuffer_reserve(
+RustBuffer ffi_crypter_5b86_rustbuffer_reserve(
       RustBuffer buf,int32_t additional,
     RustCallStatus *_Nonnull out_status
     );

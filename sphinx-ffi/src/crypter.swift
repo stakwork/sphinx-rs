@@ -19,13 +19,13 @@ fileprivate extension RustBuffer {
     }
 
     static func from(_ ptr: UnsafeBufferPointer<UInt8>) -> RustBuffer {
-        try! rustCall { ffi_crypter_a1fc_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
+        try! rustCall { ffi_crypter_5b86_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
     }
 
     // Frees the buffer in place.
     // The buffer must not be used after this is called.
     func deallocate() {
-        try! rustCall { ffi_crypter_a1fc_rustbuffer_free(self, $0) }
+        try! rustCall { ffi_crypter_5b86_rustbuffer_free(self, $0) }
     }
 }
 
@@ -281,6 +281,19 @@ private func makeRustCall<T>(_ callback: (UnsafeMutablePointer<RustCallStatus>) 
 // Public interface members begin here.
 
 
+fileprivate struct FfiConverterUInt64: FfiConverterPrimitive {
+    typealias FfiType = UInt64
+    typealias SwiftType = UInt64
+
+    static func read(from buf: Reader) throws -> UInt64 {
+        return try lift(buf.readInt())
+    }
+
+    static func write(_ value: SwiftType, into buf: Writer) {
+        buf.writeInt(lower(value))
+    }
+}
+
 fileprivate struct FfiConverterString: FfiConverter {
     typealias SwiftType = String
     typealias FfiType = RustBuffer
@@ -366,6 +379,60 @@ fileprivate struct FfiConverterTypeKeys: FfiConverterRustBuffer {
 }
 
 
+public struct Policy {
+    public var satLimit: UInt64
+    public var interval: String
+    public var htlcLimit: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(satLimit: UInt64, interval: String, htlcLimit: UInt64) {
+        self.satLimit = satLimit
+        self.interval = interval
+        self.htlcLimit = htlcLimit
+    }
+}
+
+
+extension Policy: Equatable, Hashable {
+    public static func ==(lhs: Policy, rhs: Policy) -> Bool {
+        if lhs.satLimit != rhs.satLimit {
+            return false
+        }
+        if lhs.interval != rhs.interval {
+            return false
+        }
+        if lhs.htlcLimit != rhs.htlcLimit {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(satLimit)
+        hasher.combine(interval)
+        hasher.combine(htlcLimit)
+    }
+}
+
+
+fileprivate struct FfiConverterTypePolicy: FfiConverterRustBuffer {
+    fileprivate static func read(from buf: Reader) throws -> Policy {
+        return try Policy(
+            satLimit: FfiConverterUInt64.read(from: buf), 
+            interval: FfiConverterString.read(from: buf), 
+            htlcLimit: FfiConverterUInt64.read(from: buf)
+        )
+    }
+
+    fileprivate static func write(_ value: Policy, into buf: Writer) {
+        FfiConverterUInt64.write(value.satLimit, into: buf)
+        FfiConverterString.write(value.interval, into: buf)
+        FfiConverterUInt64.write(value.htlcLimit, into: buf)
+    }
+}
+
+
 public enum CrypterError {
 
     
@@ -396,6 +463,12 @@ public enum CrypterError {
     
     // Simple error enums only carry a message
     case InvalidNetwork(message: String)
+    
+    // Simple error enums only carry a message
+    case BadRequest(message: String)
+    
+    // Simple error enums only carry a message
+    case BadResponse(message: String)
     
 }
 
@@ -445,6 +518,14 @@ fileprivate struct FfiConverterTypeCrypterError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: buf)
         )
         
+        case 10: return .BadRequest(
+            message: try FfiConverterString.read(from: buf)
+        )
+        
+        case 11: return .BadResponse(
+            message: try FfiConverterString.read(from: buf)
+        )
+        
 
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -483,6 +564,12 @@ fileprivate struct FfiConverterTypeCrypterError: FfiConverterRustBuffer {
         case let .InvalidNetwork(message):
             buf.writeInt(Int32(9))
             FfiConverterString.write(message, into: buf)
+        case let .BadRequest(message):
+            buf.writeInt(Int32(10))
+            FfiConverterString.write(message, into: buf)
+        case let .BadResponse(message):
+            buf.writeInt(Int32(11))
+            FfiConverterString.write(message, into: buf)
 
         
         }
@@ -494,13 +581,35 @@ extension CrypterError: Equatable, Hashable {}
 
 extension CrypterError: Error { }
 
+fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
+    typealias SwiftType = [String]
+
+    static func write(_ value: [String], into buf: Writer) {
+        let len = Int32(value.count)
+        buf.writeInt(len)
+        for item in value {
+            FfiConverterString.write(item, into: buf)
+        }
+    }
+
+    static func read(from buf: Reader) throws -> [String] {
+        let len: Int32 = try buf.readInt()
+        var seq = [String]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterString.read(from: buf))
+        }
+        return seq
+    }
+}
+
 public func pubkeyFromSecretKey(mySecretKey: String) throws -> String {
     return try FfiConverterString.lift(
         try
     
     rustCallWithError(FfiConverterTypeCrypterError.self) {
     
-    crypter_a1fc_pubkey_from_secret_key(
+    crypter_5b86_pubkey_from_secret_key(
         FfiConverterString.lower(mySecretKey), $0)
 }
     )
@@ -514,7 +623,7 @@ public func deriveSharedSecret(theirPubkey: String, mySecretKey: String) throws 
     
     rustCallWithError(FfiConverterTypeCrypterError.self) {
     
-    crypter_a1fc_derive_shared_secret(
+    crypter_5b86_derive_shared_secret(
         FfiConverterString.lower(theirPubkey), 
         FfiConverterString.lower(mySecretKey), $0)
 }
@@ -529,7 +638,7 @@ public func encrypt(plaintext: String, secret: String, nonce: String) throws -> 
     
     rustCallWithError(FfiConverterTypeCrypterError.self) {
     
-    crypter_a1fc_encrypt(
+    crypter_5b86_encrypt(
         FfiConverterString.lower(plaintext), 
         FfiConverterString.lower(secret), 
         FfiConverterString.lower(nonce), $0)
@@ -545,7 +654,7 @@ public func decrypt(ciphertext: String, secret: String) throws -> String {
     
     rustCallWithError(FfiConverterTypeCrypterError.self) {
     
-    crypter_a1fc_decrypt(
+    crypter_5b86_decrypt(
         FfiConverterString.lower(ciphertext), 
         FfiConverterString.lower(secret), $0)
 }
@@ -560,7 +669,7 @@ public func nodeKeys(net: String, seed: String) throws -> Keys {
     
     rustCallWithError(FfiConverterTypeCrypterError.self) {
     
-    crypter_a1fc_node_keys(
+    crypter_5b86_node_keys(
         FfiConverterString.lower(net), 
         FfiConverterString.lower(seed), $0)
 }
@@ -575,7 +684,7 @@ public func mnemonicFromEntropy(seed: String) throws -> String {
     
     rustCallWithError(FfiConverterTypeCrypterError.self) {
     
-    crypter_a1fc_mnemonic_from_entropy(
+    crypter_5b86_mnemonic_from_entropy(
         FfiConverterString.lower(seed), $0)
 }
     )
@@ -589,8 +698,258 @@ public func entropyFromMnemonic(mnemonic: String) throws -> String {
     
     rustCallWithError(FfiConverterTypeCrypterError.self) {
     
-    crypter_a1fc_entropy_from_mnemonic(
+    crypter_5b86_entropy_from_mnemonic(
         FfiConverterString.lower(mnemonic), $0)
+}
+    )
+}
+
+
+
+public func getNonceRequest(secret: String, nonce: UInt64) throws -> String {
+    return try FfiConverterString.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_get_nonce_request(
+        FfiConverterString.lower(secret), 
+        FfiConverterUInt64.lower(nonce), $0)
+}
+    )
+}
+
+
+
+public func getNonceResponse(bytes: String) throws -> UInt64 {
+    return try FfiConverterUInt64.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_get_nonce_response(
+        FfiConverterString.lower(bytes), $0)
+}
+    )
+}
+
+
+
+public func resetWifiRequest(secret: String, nonce: UInt64) throws -> String {
+    return try FfiConverterString.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_reset_wifi_request(
+        FfiConverterString.lower(secret), 
+        FfiConverterUInt64.lower(nonce), $0)
+}
+    )
+}
+
+public func resetWifiResponse(bytes: String) throws {
+    try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_reset_wifi_response(
+        FfiConverterString.lower(bytes), $0)
+}
+}
+
+
+public func resetKeysRequest(secret: String, nonce: UInt64) throws -> String {
+    return try FfiConverterString.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_reset_keys_request(
+        FfiConverterString.lower(secret), 
+        FfiConverterUInt64.lower(nonce), $0)
+}
+    )
+}
+
+public func resetKeysResponse(bytes: String) throws {
+    try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_reset_keys_response(
+        FfiConverterString.lower(bytes), $0)
+}
+}
+
+
+public func resetAllRequest(secret: String, nonce: UInt64) throws -> String {
+    return try FfiConverterString.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_reset_all_request(
+        FfiConverterString.lower(secret), 
+        FfiConverterUInt64.lower(nonce), $0)
+}
+    )
+}
+
+public func resetAllResponse(bytes: String) throws {
+    try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_reset_all_response(
+        FfiConverterString.lower(bytes), $0)
+}
+}
+
+
+public func getPolicyRequest(secret: String, nonce: UInt64) throws -> String {
+    return try FfiConverterString.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_get_policy_request(
+        FfiConverterString.lower(secret), 
+        FfiConverterUInt64.lower(nonce), $0)
+}
+    )
+}
+
+
+
+public func getPolicyResponse(bytes: String) throws -> Policy {
+    return try FfiConverterTypePolicy.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_get_policy_response(
+        FfiConverterString.lower(bytes), $0)
+}
+    )
+}
+
+
+
+public func updatePolicyRequest(secret: String, nonce: UInt64, policy: Policy) throws -> String {
+    return try FfiConverterString.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_update_policy_request(
+        FfiConverterString.lower(secret), 
+        FfiConverterUInt64.lower(nonce), 
+        FfiConverterTypePolicy.lower(policy), $0)
+}
+    )
+}
+
+
+
+public func updatePolicyResponse(bytes: String) throws -> Policy {
+    return try FfiConverterTypePolicy.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_update_policy_response(
+        FfiConverterString.lower(bytes), $0)
+}
+    )
+}
+
+
+
+public func getAllowlistRequest(secret: String, nonce: UInt64) throws -> String {
+    return try FfiConverterString.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_get_allowlist_request(
+        FfiConverterString.lower(secret), 
+        FfiConverterUInt64.lower(nonce), $0)
+}
+    )
+}
+
+
+
+public func getAllowlistResponse(bytes: String) throws -> [String] {
+    return try FfiConverterSequenceString.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_get_allowlist_response(
+        FfiConverterString.lower(bytes), $0)
+}
+    )
+}
+
+
+
+public func updateAllowlistRequest(secret: String, nonce: UInt64, allowlist: [String]) throws -> String {
+    return try FfiConverterString.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_update_allowlist_request(
+        FfiConverterString.lower(secret), 
+        FfiConverterUInt64.lower(nonce), 
+        FfiConverterSequenceString.lower(allowlist), $0)
+}
+    )
+}
+
+
+
+public func updateAllowlistResponse(bytes: String) throws -> [String] {
+    return try FfiConverterSequenceString.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_update_allowlist_response(
+        FfiConverterString.lower(bytes), $0)
+}
+    )
+}
+
+
+
+public func otaRequest(secret: String, nonce: UInt64, version: UInt64, url: String) throws -> String {
+    return try FfiConverterString.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_ota_request(
+        FfiConverterString.lower(secret), 
+        FfiConverterUInt64.lower(nonce), 
+        FfiConverterUInt64.lower(version), 
+        FfiConverterString.lower(url), $0)
+}
+    )
+}
+
+
+
+public func otaResponse(bytes: String) throws -> UInt64 {
+    return try FfiConverterUInt64.lift(
+        try
+    
+    rustCallWithError(FfiConverterTypeCrypterError.self) {
+    
+    crypter_5b86_ota_response(
+        FfiConverterString.lower(bytes), $0)
 }
     )
 }

@@ -40,7 +40,7 @@ open class RustBuffer : Structure() {
 
     companion object {
         internal fun alloc(size: Int = 0) = rustCall() { status ->
-            _UniFFILib.INSTANCE.ffi_crypter_a1fc_rustbuffer_alloc(size, status).also {
+            _UniFFILib.INSTANCE.ffi_crypter_5b86_rustbuffer_alloc(size, status).also {
                 if(it.data == null) {
                    throw RuntimeException("RustBuffer.alloc() returned null data pointer (size=${size})")
                }
@@ -48,7 +48,7 @@ open class RustBuffer : Structure() {
         }
 
         internal fun free(buf: RustBuffer.ByValue) = rustCall() { status ->
-            _UniFFILib.INSTANCE.ffi_crypter_a1fc_rustbuffer_free(buf, status)
+            _UniFFILib.INSTANCE.ffi_crypter_5b86_rustbuffer_free(buf, status)
         }
     }
 
@@ -257,47 +257,119 @@ internal interface _UniFFILib : Library {
         }
     }
 
-    fun crypter_a1fc_pubkey_from_secret_key(`mySecretKey`: RustBuffer.ByValue,
+    fun crypter_5b86_pubkey_from_secret_key(`mySecretKey`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun crypter_a1fc_derive_shared_secret(`theirPubkey`: RustBuffer.ByValue,`mySecretKey`: RustBuffer.ByValue,
+    fun crypter_5b86_derive_shared_secret(`theirPubkey`: RustBuffer.ByValue,`mySecretKey`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun crypter_a1fc_encrypt(`plaintext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,`nonce`: RustBuffer.ByValue,
+    fun crypter_5b86_encrypt(`plaintext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,`nonce`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun crypter_a1fc_decrypt(`ciphertext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,
+    fun crypter_5b86_decrypt(`ciphertext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun crypter_a1fc_node_keys(`net`: RustBuffer.ByValue,`seed`: RustBuffer.ByValue,
+    fun crypter_5b86_node_keys(`net`: RustBuffer.ByValue,`seed`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun crypter_a1fc_mnemonic_from_entropy(`seed`: RustBuffer.ByValue,
+    fun crypter_5b86_mnemonic_from_entropy(`seed`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun crypter_a1fc_entropy_from_mnemonic(`mnemonic`: RustBuffer.ByValue,
+    fun crypter_5b86_entropy_from_mnemonic(`mnemonic`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun ffi_crypter_a1fc_rustbuffer_alloc(`size`: Int,
+    fun crypter_5b86_get_nonce_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun ffi_crypter_a1fc_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,
+    fun crypter_5b86_get_nonce_response(`bytes`: RustBuffer.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): Long
+
+    fun crypter_5b86_reset_wifi_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun ffi_crypter_a1fc_rustbuffer_free(`buf`: RustBuffer.ByValue,
+    fun crypter_5b86_reset_wifi_response(`bytes`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun ffi_crypter_a1fc_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Int,
+    fun crypter_5b86_reset_keys_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun crypter_5b86_reset_keys_response(`bytes`: RustBuffer.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): Unit
+
+    fun crypter_5b86_reset_all_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun crypter_5b86_reset_all_response(`bytes`: RustBuffer.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): Unit
+
+    fun crypter_5b86_get_policy_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun crypter_5b86_get_policy_response(`bytes`: RustBuffer.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun crypter_5b86_update_policy_request(`secret`: RustBuffer.ByValue,`nonce`: Long,`policy`: RustBuffer.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun crypter_5b86_update_policy_response(`bytes`: RustBuffer.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun crypter_5b86_get_allowlist_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun crypter_5b86_get_allowlist_response(`bytes`: RustBuffer.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun crypter_5b86_update_allowlist_request(`secret`: RustBuffer.ByValue,`nonce`: Long,`allowlist`: RustBuffer.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun crypter_5b86_update_allowlist_response(`bytes`: RustBuffer.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun crypter_5b86_ota_request(`secret`: RustBuffer.ByValue,`nonce`: Long,`version`: Long,`url`: RustBuffer.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun crypter_5b86_ota_response(`bytes`: RustBuffer.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): Long
+
+    fun ffi_crypter_5b86_rustbuffer_alloc(`size`: Int,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun ffi_crypter_5b86_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun ffi_crypter_5b86_rustbuffer_free(`buf`: RustBuffer.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): Unit
+
+    fun ffi_crypter_5b86_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Int,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
@@ -306,6 +378,26 @@ internal interface _UniFFILib : Library {
 
 // Public interface members begin here.
 
+
+public object FfiConverterULong: FfiConverter<ULong, Long> {
+    override fun lift(value: Long): ULong {
+        return value.toULong()
+    }
+
+    override fun read(buf: ByteBuffer): ULong {
+        return lift(buf.getLong())
+    }
+
+    override fun lower(value: ULong): Long {
+        return value.toLong()
+    }
+
+    override fun allocationSize(value: ULong) = 8
+
+    override fun write(value: ULong, buf: ByteBuffer) {
+        buf.putLong(value.toLong())
+    }
+}
 
 public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
     // Note: we don't inherit from FfiConverterRustBuffer, because we use a
@@ -385,6 +477,39 @@ public object FfiConverterTypeKeys: FfiConverterRustBuffer<Keys> {
 
 
 
+data class Policy (
+    var `satLimit`: ULong, 
+    var `interval`: String, 
+    var `htlcLimit`: ULong
+) {
+    
+}
+
+public object FfiConverterTypePolicy: FfiConverterRustBuffer<Policy> {
+    override fun read(buf: ByteBuffer): Policy {
+        return Policy(
+            FfiConverterULong.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: Policy) = (
+            FfiConverterULong.allocationSize(value.`satLimit`) +
+            FfiConverterString.allocationSize(value.`interval`) +
+            FfiConverterULong.allocationSize(value.`htlcLimit`)
+    )
+
+    override fun write(value: Policy, buf: ByteBuffer) {
+            FfiConverterULong.write(value.`satLimit`, buf)
+            FfiConverterString.write(value.`interval`, buf)
+            FfiConverterULong.write(value.`htlcLimit`, buf)
+    }
+}
+
+
+
+
 
 sealed class CrypterException(message: String): Exception(message) {
         // Each variant is a nested class
@@ -398,6 +523,8 @@ sealed class CrypterException(message: String): Exception(message) {
         class BadNonce(message: String) : CrypterException(message)
         class BadCiper(message: String) : CrypterException(message)
         class InvalidNetwork(message: String) : CrypterException(message)
+        class BadRequest(message: String) : CrypterException(message)
+        class BadResponse(message: String) : CrypterException(message)
         
 
     companion object ErrorHandler : CallStatusErrorHandler<CrypterException> {
@@ -418,6 +545,8 @@ public object FfiConverterTypeCrypterError : FfiConverterRustBuffer<CrypterExcep
             7 -> CrypterException.BadNonce(FfiConverterString.read(buf))
             8 -> CrypterException.BadCiper(FfiConverterString.read(buf))
             9 -> CrypterException.InvalidNetwork(FfiConverterString.read(buf))
+            10 -> CrypterException.BadRequest(FfiConverterString.read(buf))
+            11 -> CrypterException.BadResponse(FfiConverterString.read(buf))
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
         }
         
@@ -434,12 +563,37 @@ public object FfiConverterTypeCrypterError : FfiConverterRustBuffer<CrypterExcep
     }
 
 }
+
+
+
+
+public object FfiConverterSequenceString: FfiConverterRustBuffer<List<String>> {
+    override fun read(buf: ByteBuffer): List<String> {
+        val len = buf.getInt()
+        return List<String>(len) {
+            FfiConverterString.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<String>): Int {
+        val sizeForLength = 4
+        val sizeForItems = value.map { FfiConverterString.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<String>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.forEach {
+            FfiConverterString.write(it, buf)
+        }
+    }
+}
 @Throws(CrypterException::class)
 
 fun `pubkeyFromSecretKey`(`mySecretKey`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(CrypterException) { _status ->
-    _UniFFILib.INSTANCE.crypter_a1fc_pubkey_from_secret_key(FfiConverterString.lower(`mySecretKey`), _status)
+    _UniFFILib.INSTANCE.crypter_5b86_pubkey_from_secret_key(FfiConverterString.lower(`mySecretKey`), _status)
 })
 }
 
@@ -449,7 +603,7 @@ fun `pubkeyFromSecretKey`(`mySecretKey`: String): String {
 fun `deriveSharedSecret`(`theirPubkey`: String, `mySecretKey`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(CrypterException) { _status ->
-    _UniFFILib.INSTANCE.crypter_a1fc_derive_shared_secret(FfiConverterString.lower(`theirPubkey`), FfiConverterString.lower(`mySecretKey`), _status)
+    _UniFFILib.INSTANCE.crypter_5b86_derive_shared_secret(FfiConverterString.lower(`theirPubkey`), FfiConverterString.lower(`mySecretKey`), _status)
 })
 }
 
@@ -459,7 +613,7 @@ fun `deriveSharedSecret`(`theirPubkey`: String, `mySecretKey`: String): String {
 fun `encrypt`(`plaintext`: String, `secret`: String, `nonce`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(CrypterException) { _status ->
-    _UniFFILib.INSTANCE.crypter_a1fc_encrypt(FfiConverterString.lower(`plaintext`), FfiConverterString.lower(`secret`), FfiConverterString.lower(`nonce`), _status)
+    _UniFFILib.INSTANCE.crypter_5b86_encrypt(FfiConverterString.lower(`plaintext`), FfiConverterString.lower(`secret`), FfiConverterString.lower(`nonce`), _status)
 })
 }
 
@@ -469,7 +623,7 @@ fun `encrypt`(`plaintext`: String, `secret`: String, `nonce`: String): String {
 fun `decrypt`(`ciphertext`: String, `secret`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(CrypterException) { _status ->
-    _UniFFILib.INSTANCE.crypter_a1fc_decrypt(FfiConverterString.lower(`ciphertext`), FfiConverterString.lower(`secret`), _status)
+    _UniFFILib.INSTANCE.crypter_5b86_decrypt(FfiConverterString.lower(`ciphertext`), FfiConverterString.lower(`secret`), _status)
 })
 }
 
@@ -479,7 +633,7 @@ fun `decrypt`(`ciphertext`: String, `secret`: String): String {
 fun `nodeKeys`(`net`: String, `seed`: String): Keys {
     return FfiConverterTypeKeys.lift(
     rustCallWithError(CrypterException) { _status ->
-    _UniFFILib.INSTANCE.crypter_a1fc_node_keys(FfiConverterString.lower(`net`), FfiConverterString.lower(`seed`), _status)
+    _UniFFILib.INSTANCE.crypter_5b86_node_keys(FfiConverterString.lower(`net`), FfiConverterString.lower(`seed`), _status)
 })
 }
 
@@ -489,7 +643,7 @@ fun `nodeKeys`(`net`: String, `seed`: String): Keys {
 fun `mnemonicFromEntropy`(`seed`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(CrypterException) { _status ->
-    _UniFFILib.INSTANCE.crypter_a1fc_mnemonic_from_entropy(FfiConverterString.lower(`seed`), _status)
+    _UniFFILib.INSTANCE.crypter_5b86_mnemonic_from_entropy(FfiConverterString.lower(`seed`), _status)
 })
 }
 
@@ -499,7 +653,175 @@ fun `mnemonicFromEntropy`(`seed`: String): String {
 fun `entropyFromMnemonic`(`mnemonic`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(CrypterException) { _status ->
-    _UniFFILib.INSTANCE.crypter_a1fc_entropy_from_mnemonic(FfiConverterString.lower(`mnemonic`), _status)
+    _UniFFILib.INSTANCE.crypter_5b86_entropy_from_mnemonic(FfiConverterString.lower(`mnemonic`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `getNonceRequest`(`secret`: String, `nonce`: ULong): String {
+    return FfiConverterString.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_get_nonce_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `getNonceResponse`(`bytes`: String): ULong {
+    return FfiConverterULong.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_get_nonce_response(FfiConverterString.lower(`bytes`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `resetWifiRequest`(`secret`: String, `nonce`: ULong): String {
+    return FfiConverterString.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_reset_wifi_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)fun `resetWifiResponse`(`bytes`: String) =
+    
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_reset_wifi_response(FfiConverterString.lower(`bytes`), _status)
+}
+
+@Throws(CrypterException::class)
+
+fun `resetKeysRequest`(`secret`: String, `nonce`: ULong): String {
+    return FfiConverterString.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_reset_keys_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)fun `resetKeysResponse`(`bytes`: String) =
+    
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_reset_keys_response(FfiConverterString.lower(`bytes`), _status)
+}
+
+@Throws(CrypterException::class)
+
+fun `resetAllRequest`(`secret`: String, `nonce`: ULong): String {
+    return FfiConverterString.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_reset_all_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)fun `resetAllResponse`(`bytes`: String) =
+    
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_reset_all_response(FfiConverterString.lower(`bytes`), _status)
+}
+
+@Throws(CrypterException::class)
+
+fun `getPolicyRequest`(`secret`: String, `nonce`: ULong): String {
+    return FfiConverterString.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_get_policy_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `getPolicyResponse`(`bytes`: String): Policy {
+    return FfiConverterTypePolicy.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_get_policy_response(FfiConverterString.lower(`bytes`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `updatePolicyRequest`(`secret`: String, `nonce`: ULong, `policy`: Policy): String {
+    return FfiConverterString.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_update_policy_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), FfiConverterTypePolicy.lower(`policy`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `updatePolicyResponse`(`bytes`: String): Policy {
+    return FfiConverterTypePolicy.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_update_policy_response(FfiConverterString.lower(`bytes`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `getAllowlistRequest`(`secret`: String, `nonce`: ULong): String {
+    return FfiConverterString.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_get_allowlist_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `getAllowlistResponse`(`bytes`: String): List<String> {
+    return FfiConverterSequenceString.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_get_allowlist_response(FfiConverterString.lower(`bytes`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `updateAllowlistRequest`(`secret`: String, `nonce`: ULong, `allowlist`: List<String>): String {
+    return FfiConverterString.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_update_allowlist_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), FfiConverterSequenceString.lower(`allowlist`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `updateAllowlistResponse`(`bytes`: String): List<String> {
+    return FfiConverterSequenceString.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_update_allowlist_response(FfiConverterString.lower(`bytes`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `otaRequest`(`secret`: String, `nonce`: ULong, `version`: ULong, `url`: String): String {
+    return FfiConverterString.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_ota_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), FfiConverterULong.lower(`version`), FfiConverterString.lower(`url`), _status)
+})
+}
+
+
+@Throws(CrypterException::class)
+
+fun `otaResponse`(`bytes`: String): ULong {
+    return FfiConverterULong.lift(
+    rustCallWithError(CrypterException) { _status ->
+    _UniFFILib.INSTANCE.crypter_5b86_ota_response(FfiConverterString.lower(`bytes`), _status)
 })
 }
 
