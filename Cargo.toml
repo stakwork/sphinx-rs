@@ -3,6 +3,7 @@ members = [
     "auther",
     "crypter",
     "deriver",
+    "glyph"
 ]
 
 exclude = [

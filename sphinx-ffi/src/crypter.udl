@@ -9,11 +9,19 @@ enum CrypterError {
   "BadNonce",
   "BadCiper",
   "InvalidNetwork",
+  "BadRequest",
+  "BadResponse",
 };
 
 dictionary Keys {
     string secret;
     string pubkey;
+};
+
+dictionary Policy {
+    u64 sat_limit;
+    string interval;
+    u64 htlc_limit
 };
 
 namespace crypter {

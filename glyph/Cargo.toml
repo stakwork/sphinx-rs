@@ -1,0 +1,16 @@
+[package]
+name = "sphinx-glyph"
+version = "0.1.0"
+authors = ["Evan Feenstra <evanfeenstra@gmail.com>"]
+edition = "2018"
+description = "deriving keys"
+repository = "https://github.com/stakwork/sphinx-rs"
+license = "MIT"
+
+[dependencies]
+lightning-signer-core = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", default-features = false, features = ["std", "secp-lowmemory"] }
+bip39 = "1.0.1"
+anyhow = "1"
+sphinx-auther = { path = "../auther" }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+rmp-serde = "1.1.0"

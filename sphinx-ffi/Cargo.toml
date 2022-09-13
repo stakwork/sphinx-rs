@@ -15,7 +15,7 @@ wasm = []
 
 [dependencies]
 sphinx-crypter = { path = "../crypter" }
-sphinx-deriver = { path = "../deriver" }
+sphinx-glyph = { path = "../glyph" }
 uniffi = { version = "0.19.2", optional = true }
 hex = "0.4.3"
 thiserror = "1.0.31"
