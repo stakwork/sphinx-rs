@@ -21,7 +21,7 @@ dictionary Keys {
 dictionary Policy {
     u64 sat_limit;
     string interval;
-    u64 htlc_limit
+    u64 htlc_limit;
 };
 
 namespace crypter {
@@ -39,4 +39,40 @@ namespace crypter {
   string mnemonic_from_entropy(string seed);
   [Throws=CrypterError]
   string entropy_from_mnemonic(string mnemonic);
+  [Throws=CrypterError]
+  string get_nonce_request(string secret, u64 nonce);
+  [Throws=CrypterError]
+  u64 get_nonce_response(string bytes);
+  [Throws=CrypterError]
+  string reset_wifi_request(string secret, u64 nonce);
+  [Throws=CrypterError]
+  void reset_wifi_response(string bytes);
+  [Throws=CrypterError]
+  string reset_key_request(string secret, u64 nonce);
+  [Throws=CrypterError]
+  void reset_key_response(string bytes);
+  [Throws=CrypterError]
+  string reset_all_request(string secret, u64 nonce);
+  [Throws=CrypterError]
+  void reset_all_response(string bytes);
+  [Throws=CrypterError]
+  string get_policy_request(string secret, u64 nonce);
+  [Throws=CrypterError]
+  Policy get_policy_response(string bytes);
+  [Throws=CrypterError]
+  string update_policy_request(string secret, u64 nonce, Policy policy);
+  [Throws=CrypterError]
+  Policy update_policy_response(string bytes);
+  [Throws=CrypterError]
+  string get_allowlist_request(string secret, u64 nonce);
+  [Throws=CrypterError]
+  sequence<string> get_allowlist_response(string bytes);
+  [Throws=CrypterError]
+  string update_allowlist_request(string secret, u64 nonce, sequence<string> allowlist);
+  [Throws=CrypterError]
+  sequence<string> update_allowlist_response(string bytes);
+  [Throws=CrypterError]
+  string ota_request(string secret, u64 nonce, u64 version, string url);
+  [Throws=CrypterError]
+  u64 ota_response(string bytes);
 };
