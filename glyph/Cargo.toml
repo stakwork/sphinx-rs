@@ -8,7 +8,7 @@ repository = "https://github.com/stakwork/sphinx-rs"
 license = "MIT"
 
 [dependencies]
-lightning-signer-core = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", version = "0.1.0-5", default-features = false, features = ["std", "secp-lowmemory"] }
+lightning-signer-core = { package = "lightning-signer-core", git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", version = "0.1.0-5", default-features = false, features = ["std", "secp-lowmemory"] }
 sphinx-auther = { path = "../auther", version = "0.1.10" }
 bip39 = "1.0.1"
 anyhow = "1"

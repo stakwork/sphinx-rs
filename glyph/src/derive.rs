@@ -1,4 +1,4 @@
-pub use lightning_signer as vls_core;
+pub use lightning_signer_core as vls_core;
 use vls_core::{
     bitcoin::secp256k1::{PublicKey, Secp256k1, SecretKey},
     bitcoin::Network,
@@ -27,7 +27,7 @@ pub fn entropy_from_mnemonic(mn: &str) -> anyhow::Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use crate::derive::*;
-    use lightning_signer::bitcoin::Network;
+    use lightning_signer_core::bitcoin::Network;
 
     fn seed() -> [u8; 32] {
         [1; 32]
