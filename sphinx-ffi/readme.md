@@ -4,7 +4,7 @@ should match the uniffi version in Cargo.toml
 
 ### build the C ffi
 
-uniffi-bindgen scaffolding src/crypter.udl
+uniffi-bindgen scaffolding src/sphinx.udl
 
 ### kotlin
 

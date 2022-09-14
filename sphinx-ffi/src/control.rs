@@ -1,4 +1,4 @@
-use crate::{parse, CrypterError, Result};
+use crate::{parse, Result, SphinxError};
 use sphinx_crypter::secp256k1::SecretKey;
 use sphinx_glyph::controller::{build_control_msg, parse_control_response};
 use sphinx_glyph::types::{
@@ -14,7 +14,7 @@ pub fn get_nonce_response(inp: String) -> Result<u64> {
     let r = parse_response_bytes(inp)?;
     match r {
         ControlResponse::Nonce(n) => Ok(n),
-        _ => Err(CrypterError::BadResponse),
+        _ => Err(SphinxError::BadResponse),
     }
 }
 
@@ -26,7 +26,7 @@ pub fn reset_wifi_response(inp: String) -> Result<()> {
     let r = parse_response_bytes(inp)?;
     match r {
         ControlResponse::ResetWifi => Ok(()),
-        _ => Err(CrypterError::BadResponse),
+        _ => Err(SphinxError::BadResponse),
     }
 }
 
@@ -38,7 +38,7 @@ pub fn reset_keys_response(inp: String) -> Result<()> {
     let r = parse_response_bytes(inp)?;
     match r {
         ControlResponse::ResetKeys => Ok(()),
-        _ => Err(CrypterError::BadResponse),
+        _ => Err(SphinxError::BadResponse),
     }
 }
 
@@ -50,7 +50,7 @@ pub fn reset_all_response(inp: String) -> Result<()> {
     let r = parse_response_bytes(inp)?;
     match r {
         ControlResponse::ResetAll => Ok(()),
-        _ => Err(CrypterError::BadResponse),
+        _ => Err(SphinxError::BadResponse),
     }
 }
 
@@ -62,7 +62,7 @@ pub fn get_policy_response(inp: String) -> Result<Policy> {
     let r = parse_response_bytes(inp)?;
     match r {
         ControlResponse::PolicyCurrent(p) => Ok(policy_to_dto(p)),
-        _ => Err(CrypterError::BadResponse),
+        _ => Err(SphinxError::BadResponse),
     }
 }
 
@@ -75,7 +75,7 @@ pub fn update_policy_response(inp: String) -> Result<Policy> {
     let r = parse_response_bytes(inp)?;
     match r {
         ControlResponse::PolicyUpdated(p) => Ok(policy_to_dto(p)),
-        _ => Err(CrypterError::BadResponse),
+        _ => Err(SphinxError::BadResponse),
     }
 }
 
@@ -87,7 +87,7 @@ pub fn get_allowlist_response(inp: String) -> Result<Vec<String>> {
     let r = parse_response_bytes(inp)?;
     match r {
         ControlResponse::AllowlistCurrent(p) => Ok(p),
-        _ => Err(CrypterError::BadResponse),
+        _ => Err(SphinxError::BadResponse),
     }
 }
 
@@ -103,7 +103,7 @@ pub fn update_allowlist_response(inp: String) -> Result<Vec<String>> {
     let r = parse_response_bytes(inp)?;
     match r {
         ControlResponse::AllowlistUpdated(p) => Ok(p),
-        _ => Err(CrypterError::BadResponse),
+        _ => Err(SphinxError::BadResponse),
     }
 }
 
@@ -119,7 +119,7 @@ pub fn ota_response(inp: String) -> Result<u64> {
     let r = parse_response_bytes(inp)?;
     match r {
         ControlResponse::OtaConfirm(p) => Ok(p.version),
-        _ => Err(CrypterError::BadResponse),
+        _ => Err(SphinxError::BadResponse),
     }
 }
 
@@ -143,7 +143,7 @@ fn policy_to_dto(p: RawPolicy) -> Policy {
 fn dto_to_policy(p: Policy) -> Result<RawPolicy> {
     let interval = match Interval::from_str(&p.interval) {
         Ok(i) => i,
-        Err(_) => return Err(CrypterError::BadRequest),
+        Err(_) => return Err(SphinxError::BadRequest),
     };
     Ok(RawPolicy {
         sat_limit: p.sat_limit,
@@ -156,7 +156,7 @@ fn build_msg(msg: ControlMessage, nonce: u64, secret: String) -> Result<String> 
     let sk = parse_secret_key(secret)?;
     match build_control_msg(msg, nonce, &sk) {
         Ok(r) => Ok(hex::encode(r)),
-        Err(_) => Err(CrypterError::BadRequest),
+        Err(_) => Err(SphinxError::BadRequest),
     }
 }
 
@@ -164,16 +164,16 @@ fn parse_secret_key(secret: String) -> Result<SecretKey> {
     let secret_key = parse::parse_secret_string(secret)?;
     match SecretKey::from_slice(&secret_key[..]) {
         Ok(s) => Ok(s),
-        Err(_) => Err(CrypterError::BadSecret),
+        Err(_) => Err(SphinxError::BadSecret),
     }
 }
 fn parse_response_bytes(inp: String) -> Result<ControlResponse> {
     let v = match hex::decode(inp) {
         Ok(s) => s,
-        Err(_) => return Err(CrypterError::BadResponse),
+        Err(_) => return Err(SphinxError::BadResponse),
     };
     match parse_control_response(&v) {
         Ok(r) => Ok(r),
-        Err(_) => Err(CrypterError::BadResponse),
+        Err(_) => Err(SphinxError::BadResponse),
     }
 }

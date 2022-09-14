@@ -1,11 +1,11 @@
 echo "=> creating C FFI scaffolding"
-uniffi-bindgen scaffolding src/crypter.udl
+uniffi-bindgen scaffolding src/sphinx.udl
 
 echo "=> creating kotlin bindings"
-uniffi-bindgen generate src/crypter.udl --language kotlin
+uniffi-bindgen generate src/sphinx.udl --language kotlin
 
-echo "=> renaming uniffi_crypter to crypter"
-sed -i '' 's/return "uniffi_crypter"/return "crypter"/' src/uniffi/crypter/crypter.kt
+echo "=> renaming uniffi_sphinx to sphinx"
+sed -i '' 's/return "uniffi_sphinx"/return "sphinx"/' src/uniffi/sphinx/sphinx.kt
 
 echo "=> building i686-linux-android"
 cross build --target i686-linux-android --release
@@ -27,11 +27,11 @@ mkdir -p target/out/armeabi
 mkdir -p target/out/armeabi-v7a
 mkdir -p target/out/x86_64
 
-mv target/i686-linux-android/release/libcrypter.so target/out/x86/libcrypter.so
-mv target/aarch64-linux-android/release/libcrypter.so target/out/arm64-v8a/libcrypter.so
-mv target/arm-linux-androideabi/release/libcrypter.so target/out/armeabi/libcrypter.so
-mv target/armv7-linux-androideabi/release/libcrypter.so target/out/armeabi-v7a/libcrypter.so
-mv target/x86_64-linux-android/release/libcrypter.so target/out/x86_64/libcrypter.so
+mv target/i686-linux-android/release/libsphinx.so target/out/x86/libsphinx.so
+mv target/aarch64-linux-android/release/libsphinx.so target/out/arm64-v8a/libsphinx.so
+mv target/arm-linux-androideabi/release/libsphinx.so target/out/armeabi/libsphinx.so
+mv target/armv7-linux-androideabi/release/libsphinx.so target/out/armeabi-v7a/libsphinx.so
+mv target/x86_64-linux-android/release/libsphinx.so target/out/x86_64/libsphinx.so
 
 zip -r target/kotlin-libraries.zip target/out
 
