@@ -10,12 +10,12 @@ use sphinx_deriver::{self as deriver, vls_core::bitcoin::Network};
 use std::str::FromStr;
 
 #[cfg(not(feature = "wasm"))]
-include!("crypter.uniffi.rs");
+include!("sphinx.uniffi.rs");
 
-pub type Result<T> = std::result::Result<T, CrypterError>;
+pub type Result<T> = std::result::Result<T, SphinxError>;
 
 #[derive(Debug, thiserror::Error)]
-pub enum CrypterError {
+pub enum SphinxError {
     #[error("Failed to derive public key")]
     DerivePublicKey,
     #[error("Failed to derive shared secret")]
@@ -44,7 +44,7 @@ pub fn pubkey_from_secret_key(my_secret_key: String) -> Result<String> {
     let secret_key = parse::parse_secret_string(my_secret_key)?;
     let sk = match SecretKey::from_slice(&secret_key[..]) {
         Ok(s) => s,
-        Err(_) => return Err(CrypterError::BadSecret),
+        Err(_) => return Err(SphinxError::BadSecret),
     };
     let ctx = Secp256k1::new();
     let pk = PublicKey::from_secret_key(&ctx, &sk).serialize();
@@ -59,7 +59,7 @@ pub fn derive_shared_secret(their_pubkey: String, my_secret_key: String) -> Resu
     let secret_key = parse::parse_secret_string(my_secret_key)?;
     let secret = match derive_shared_secret_from_slice(pubkey, secret_key) {
         Ok(s) => s,
-        Err(_) => return Err(CrypterError::DeriveSharedSecret),
+        Err(_) => return Err(SphinxError::DeriveSharedSecret),
     };
     Ok(hex::encode(secret))
 }
@@ -74,7 +74,7 @@ pub fn encrypt(plaintext: String, secret: String, nonce: String) -> Result<Strin
     let non = parse::parse_nonce_string(nonce)?;
     let cipher = match chacha_encrypt(plain, sec, non) {
         Ok(c) => c,
-        Err(_) => return Err(CrypterError::Encrypt),
+        Err(_) => return Err(SphinxError::Encrypt),
     };
     Ok(hex::encode(cipher))
 }
@@ -87,7 +87,7 @@ pub fn decrypt(ciphertext: String, secret: String) -> Result<String> {
     let sec = parse::parse_secret_string(secret)?;
     let plain = match chacha_decrypt(cipher, sec) {
         Ok(c) => c,
-        Err(_) => return Err(CrypterError::Decrypt),
+        Err(_) => return Err(SphinxError::Decrypt),
     };
     Ok(hex::encode(plain))
 }
@@ -101,7 +101,7 @@ pub fn node_keys(net: String, seed: String) -> Result<Keys> {
     let seed = parse::parse_secret_string(seed)?;
     let network: Network = match Network::from_str(&net) {
         Ok(n) => n,
-        Err(_) => return Err(CrypterError::InvalidNetwork),
+        Err(_) => return Err(SphinxError::InvalidNetwork),
     };
     let ks = deriver::node_keys(&network, &seed[..]);
     Ok(Keys {
@@ -114,14 +114,14 @@ pub fn mnemonic_from_entropy(seed: String) -> Result<String> {
     let seed = parse::parse_secret_string(seed)?;
     match deriver::mnemonic_from_entropy(&seed[..]) {
         Ok(m) => Ok(m),
-        Err(_) => Err(CrypterError::BadSecret),
+        Err(_) => Err(SphinxError::BadSecret),
     }
 }
 
 pub fn entropy_from_mnemonic(mnemonic: String) -> Result<String> {
     match deriver::entropy_from_mnemonic(&mnemonic) {
         Ok(m) => Ok(hex::encode(m)),
-        Err(_) => Err(CrypterError::BadSecret),
+        Err(_) => Err(SphinxError::BadSecret),
     }
 }
 
@@ -130,7 +130,7 @@ mod tests {
     use crate::*;
 
     #[test]
-    fn test_crypter() -> Result<()> {
+    fn test_sphinx() -> Result<()> {
         let sk1 = "86c8977989592a97beb409bc27fde76e981ce3543499fd61743755b832e92a3e";
         let pk1 = "0362a684901b8d065fb034bc44ea972619a409aeafc2a698016a74f6eee1008aca";
 

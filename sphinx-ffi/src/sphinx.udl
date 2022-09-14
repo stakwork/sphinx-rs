@@ -1,5 +1,5 @@
 [Error]
-enum CrypterError {
+enum SphinxError {
   "DerivePublicKey",
   "DeriveSharedSecret",
   "Encrypt",
@@ -24,55 +24,55 @@ dictionary Policy {
     u64 htlc_limit;
 };
 
-namespace crypter {
-  [Throws=CrypterError]
+namespace sphinx {
+  [Throws=SphinxError]
   string pubkey_from_secret_key(string my_secret_key);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   string derive_shared_secret(string their_pubkey, string my_secret_key);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   string encrypt(string plaintext, string secret, string nonce);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   string decrypt(string ciphertext, string secret);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   Keys node_keys(string net, string seed);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   string mnemonic_from_entropy(string seed);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   string entropy_from_mnemonic(string mnemonic);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   string get_nonce_request(string secret, u64 nonce);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   u64 get_nonce_response(string bytes);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   string reset_wifi_request(string secret, u64 nonce);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   void reset_wifi_response(string bytes);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   string reset_keys_request(string secret, u64 nonce);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   void reset_keys_response(string bytes);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   string reset_all_request(string secret, u64 nonce);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   void reset_all_response(string bytes);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   string get_policy_request(string secret, u64 nonce);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   Policy get_policy_response(string bytes);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   string update_policy_request(string secret, u64 nonce, Policy policy);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   Policy update_policy_response(string bytes);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   string get_allowlist_request(string secret, u64 nonce);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   sequence<string> get_allowlist_response(string bytes);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   string update_allowlist_request(string secret, u64 nonce, sequence<string> allowlist);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   sequence<string> update_allowlist_response(string bytes);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   string ota_request(string secret, u64 nonce, u64 version, string url);
-  [Throws=CrypterError]
+  [Throws=SphinxError]
   u64 ota_response(string bytes);
 };
