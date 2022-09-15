@@ -4,17 +4,17 @@ should match the uniffi version in Cargo.toml
 
 ### build the C ffi
 
-uniffi-bindgen scaffolding src/sphinx.udl
+uniffi-bindgen scaffolding src/sphinxrs.udl
 
 ### kotlin
 
-rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android arm-linux-androideabi 
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android arm-linux-androideabi
 
 ./build-kotlin.sh
 
 ### swift
 
-rustup target add aarch64-apple-ios x86_64-apple-ios 
+rustup target add aarch64-apple-ios x86_64-apple-ios
 
 armv7-apple-ios
 armv7s-apple-ios

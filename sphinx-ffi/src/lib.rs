@@ -10,7 +10,7 @@ use sphinx_deriver::{self as deriver, vls_core::bitcoin::Network};
 use std::str::FromStr;
 
 #[cfg(not(feature = "wasm"))]
-include!("sphinx.uniffi.rs");
+include!("sphinxrs.uniffi.rs");
 
 pub type Result<T> = std::result::Result<T, SphinxError>;
 

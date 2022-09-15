@@ -24,7 +24,7 @@ dictionary Policy {
     u64 htlc_limit;
 };
 
-namespace sphinx {
+namespace sphinxrs {
   [Throws=SphinxError]
   string pubkey_from_secret_key(string my_secret_key);
   [Throws=SphinxError]

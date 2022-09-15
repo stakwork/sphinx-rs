@@ -5,8 +5,8 @@ import Foundation
 // Depending on the consumer's build setup, the low-level FFI code
 // might be in a separate module, or it might be compiled inline into
 // this module. This is a bit of light hackery to work with both.
-#if canImport(sphinxFFI)
-import sphinxFFI
+#if canImport(sphinxrsFFI)
+import sphinxrsFFI
 #endif
 
 fileprivate extension RustBuffer {
@@ -19,13 +19,13 @@ fileprivate extension RustBuffer {
     }
 
     static func from(_ ptr: UnsafeBufferPointer<UInt8>) -> RustBuffer {
-        try! rustCall { ffi_sphinx_c775_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
+        try! rustCall { ffi_sphinxrs_b6a8_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
     }
 
     // Frees the buffer in place.
     // The buffer must not be used after this is called.
     func deallocate() {
-        try! rustCall { ffi_sphinx_c775_rustbuffer_free(self, $0) }
+        try! rustCall { ffi_sphinxrs_b6a8_rustbuffer_free(self, $0) }
     }
 }
 
@@ -609,7 +609,7 @@ public func pubkeyFromSecretKey(mySecretKey: String) throws -> String {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_pubkey_from_secret_key(
+    sphinxrs_b6a8_pubkey_from_secret_key(
         FfiConverterString.lower(mySecretKey), $0)
 }
     )
@@ -623,7 +623,7 @@ public func deriveSharedSecret(theirPubkey: String, mySecretKey: String) throws 
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_derive_shared_secret(
+    sphinxrs_b6a8_derive_shared_secret(
         FfiConverterString.lower(theirPubkey), 
         FfiConverterString.lower(mySecretKey), $0)
 }
@@ -638,7 +638,7 @@ public func encrypt(plaintext: String, secret: String, nonce: String) throws -> 
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_encrypt(
+    sphinxrs_b6a8_encrypt(
         FfiConverterString.lower(plaintext), 
         FfiConverterString.lower(secret), 
         FfiConverterString.lower(nonce), $0)
@@ -654,7 +654,7 @@ public func decrypt(ciphertext: String, secret: String) throws -> String {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_decrypt(
+    sphinxrs_b6a8_decrypt(
         FfiConverterString.lower(ciphertext), 
         FfiConverterString.lower(secret), $0)
 }
@@ -669,7 +669,7 @@ public func nodeKeys(net: String, seed: String) throws -> Keys {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_node_keys(
+    sphinxrs_b6a8_node_keys(
         FfiConverterString.lower(net), 
         FfiConverterString.lower(seed), $0)
 }
@@ -684,7 +684,7 @@ public func mnemonicFromEntropy(seed: String) throws -> String {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_mnemonic_from_entropy(
+    sphinxrs_b6a8_mnemonic_from_entropy(
         FfiConverterString.lower(seed), $0)
 }
     )
@@ -698,7 +698,7 @@ public func entropyFromMnemonic(mnemonic: String) throws -> String {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_entropy_from_mnemonic(
+    sphinxrs_b6a8_entropy_from_mnemonic(
         FfiConverterString.lower(mnemonic), $0)
 }
     )
@@ -712,7 +712,7 @@ public func getNonceRequest(secret: String, nonce: UInt64) throws -> String {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_get_nonce_request(
+    sphinxrs_b6a8_get_nonce_request(
         FfiConverterString.lower(secret), 
         FfiConverterUInt64.lower(nonce), $0)
 }
@@ -727,7 +727,7 @@ public func getNonceResponse(bytes: String) throws -> UInt64 {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_get_nonce_response(
+    sphinxrs_b6a8_get_nonce_response(
         FfiConverterString.lower(bytes), $0)
 }
     )
@@ -741,7 +741,7 @@ public func resetWifiRequest(secret: String, nonce: UInt64) throws -> String {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_reset_wifi_request(
+    sphinxrs_b6a8_reset_wifi_request(
         FfiConverterString.lower(secret), 
         FfiConverterUInt64.lower(nonce), $0)
 }
@@ -753,7 +753,7 @@ public func resetWifiResponse(bytes: String) throws {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_reset_wifi_response(
+    sphinxrs_b6a8_reset_wifi_response(
         FfiConverterString.lower(bytes), $0)
 }
 }
@@ -765,7 +765,7 @@ public func resetKeysRequest(secret: String, nonce: UInt64) throws -> String {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_reset_keys_request(
+    sphinxrs_b6a8_reset_keys_request(
         FfiConverterString.lower(secret), 
         FfiConverterUInt64.lower(nonce), $0)
 }
@@ -777,7 +777,7 @@ public func resetKeysResponse(bytes: String) throws {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_reset_keys_response(
+    sphinxrs_b6a8_reset_keys_response(
         FfiConverterString.lower(bytes), $0)
 }
 }
@@ -789,7 +789,7 @@ public func resetAllRequest(secret: String, nonce: UInt64) throws -> String {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_reset_all_request(
+    sphinxrs_b6a8_reset_all_request(
         FfiConverterString.lower(secret), 
         FfiConverterUInt64.lower(nonce), $0)
 }
@@ -801,7 +801,7 @@ public func resetAllResponse(bytes: String) throws {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_reset_all_response(
+    sphinxrs_b6a8_reset_all_response(
         FfiConverterString.lower(bytes), $0)
 }
 }
@@ -813,7 +813,7 @@ public func getPolicyRequest(secret: String, nonce: UInt64) throws -> String {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_get_policy_request(
+    sphinxrs_b6a8_get_policy_request(
         FfiConverterString.lower(secret), 
         FfiConverterUInt64.lower(nonce), $0)
 }
@@ -828,7 +828,7 @@ public func getPolicyResponse(bytes: String) throws -> Policy {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_get_policy_response(
+    sphinxrs_b6a8_get_policy_response(
         FfiConverterString.lower(bytes), $0)
 }
     )
@@ -842,7 +842,7 @@ public func updatePolicyRequest(secret: String, nonce: UInt64, policy: Policy) t
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_update_policy_request(
+    sphinxrs_b6a8_update_policy_request(
         FfiConverterString.lower(secret), 
         FfiConverterUInt64.lower(nonce), 
         FfiConverterTypePolicy.lower(policy), $0)
@@ -858,7 +858,7 @@ public func updatePolicyResponse(bytes: String) throws -> Policy {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_update_policy_response(
+    sphinxrs_b6a8_update_policy_response(
         FfiConverterString.lower(bytes), $0)
 }
     )
@@ -872,7 +872,7 @@ public func getAllowlistRequest(secret: String, nonce: UInt64) throws -> String 
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_get_allowlist_request(
+    sphinxrs_b6a8_get_allowlist_request(
         FfiConverterString.lower(secret), 
         FfiConverterUInt64.lower(nonce), $0)
 }
@@ -887,7 +887,7 @@ public func getAllowlistResponse(bytes: String) throws -> [String] {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_get_allowlist_response(
+    sphinxrs_b6a8_get_allowlist_response(
         FfiConverterString.lower(bytes), $0)
 }
     )
@@ -901,7 +901,7 @@ public func updateAllowlistRequest(secret: String, nonce: UInt64, allowlist: [St
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_update_allowlist_request(
+    sphinxrs_b6a8_update_allowlist_request(
         FfiConverterString.lower(secret), 
         FfiConverterUInt64.lower(nonce), 
         FfiConverterSequenceString.lower(allowlist), $0)
@@ -917,7 +917,7 @@ public func updateAllowlistResponse(bytes: String) throws -> [String] {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_update_allowlist_response(
+    sphinxrs_b6a8_update_allowlist_response(
         FfiConverterString.lower(bytes), $0)
 }
     )
@@ -931,7 +931,7 @@ public func otaRequest(secret: String, nonce: UInt64, version: UInt64, url: Stri
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_ota_request(
+    sphinxrs_b6a8_ota_request(
         FfiConverterString.lower(secret), 
         FfiConverterUInt64.lower(nonce), 
         FfiConverterUInt64.lower(version), 
@@ -948,7 +948,7 @@ public func otaResponse(bytes: String) throws -> UInt64 {
     
     rustCallWithError(FfiConverterTypeSphinxError.self) {
     
-    sphinx_c775_ota_response(
+    sphinxrs_b6a8_ota_response(
         FfiConverterString.lower(bytes), $0)
 }
     )
@@ -961,7 +961,7 @@ public func otaResponse(bytes: String) throws -> UInt64 {
  *
  * This is generated by uniffi.
  */
-public enum SphinxLifecycle {
+public enum SphinxrsLifecycle {
     /**
      * Initialize the FFI and Rust library. This should be only called once per application.
      */

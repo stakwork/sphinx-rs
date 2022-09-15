@@ -3,7 +3,7 @@
 
 @file:Suppress("NAME_SHADOWING")
 
-package uniffi.sphinx;
+package uniffi.sphinxrs;
 
 // Common helper code.
 //
@@ -40,7 +40,7 @@ open class RustBuffer : Structure() {
 
     companion object {
         internal fun alloc(size: Int = 0) = rustCall() { status ->
-            _UniFFILib.INSTANCE.ffi_sphinx_c775_rustbuffer_alloc(size, status).also {
+            _UniFFILib.INSTANCE.ffi_sphinxrs_b6a8_rustbuffer_alloc(size, status).also {
                 if(it.data == null) {
                    throw RuntimeException("RustBuffer.alloc() returned null data pointer (size=${size})")
                }
@@ -48,7 +48,7 @@ open class RustBuffer : Structure() {
         }
 
         internal fun free(buf: RustBuffer.ByValue) = rustCall() { status ->
-            _UniFFILib.INSTANCE.ffi_sphinx_c775_rustbuffer_free(buf, status)
+            _UniFFILib.INSTANCE.ffi_sphinxrs_b6a8_rustbuffer_free(buf, status)
         }
     }
 
@@ -237,7 +237,7 @@ private fun findLibraryName(componentName: String): String {
     if (libOverride != null) {
         return libOverride
     }
-    return "sphinx"
+    return "sphinxrs"
 }
 
 private inline fun <reified Lib : Library> loadIndirect(
@@ -252,124 +252,124 @@ private inline fun <reified Lib : Library> loadIndirect(
 internal interface _UniFFILib : Library {
     companion object {
         internal val INSTANCE: _UniFFILib by lazy {
-            loadIndirect<_UniFFILib>(componentName = "sphinx")
+            loadIndirect<_UniFFILib>(componentName = "sphinxrs")
             
         }
     }
 
-    fun sphinx_c775_pubkey_from_secret_key(`mySecretKey`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_pubkey_from_secret_key(`mySecretKey`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_derive_shared_secret(`theirPubkey`: RustBuffer.ByValue,`mySecretKey`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_derive_shared_secret(`theirPubkey`: RustBuffer.ByValue,`mySecretKey`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_encrypt(`plaintext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,`nonce`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_encrypt(`plaintext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,`nonce`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_decrypt(`ciphertext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_decrypt(`ciphertext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_node_keys(`net`: RustBuffer.ByValue,`seed`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_node_keys(`net`: RustBuffer.ByValue,`seed`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_mnemonic_from_entropy(`seed`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_mnemonic_from_entropy(`seed`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_entropy_from_mnemonic(`mnemonic`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_entropy_from_mnemonic(`mnemonic`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_get_nonce_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
+    fun sphinxrs_b6a8_get_nonce_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_get_nonce_response(`bytes`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_get_nonce_response(`bytes`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Long
 
-    fun sphinx_c775_reset_wifi_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
+    fun sphinxrs_b6a8_reset_wifi_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_reset_wifi_response(`bytes`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_reset_wifi_response(`bytes`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun sphinx_c775_reset_keys_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
+    fun sphinxrs_b6a8_reset_keys_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_reset_keys_response(`bytes`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_reset_keys_response(`bytes`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun sphinx_c775_reset_all_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
+    fun sphinxrs_b6a8_reset_all_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_reset_all_response(`bytes`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_reset_all_response(`bytes`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun sphinx_c775_get_policy_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
+    fun sphinxrs_b6a8_get_policy_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_get_policy_response(`bytes`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_get_policy_response(`bytes`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_update_policy_request(`secret`: RustBuffer.ByValue,`nonce`: Long,`policy`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_update_policy_request(`secret`: RustBuffer.ByValue,`nonce`: Long,`policy`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_update_policy_response(`bytes`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_update_policy_response(`bytes`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_get_allowlist_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
+    fun sphinxrs_b6a8_get_allowlist_request(`secret`: RustBuffer.ByValue,`nonce`: Long,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_get_allowlist_response(`bytes`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_get_allowlist_response(`bytes`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_update_allowlist_request(`secret`: RustBuffer.ByValue,`nonce`: Long,`allowlist`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_update_allowlist_request(`secret`: RustBuffer.ByValue,`nonce`: Long,`allowlist`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_update_allowlist_response(`bytes`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_update_allowlist_response(`bytes`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_ota_request(`secret`: RustBuffer.ByValue,`nonce`: Long,`version`: Long,`url`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_ota_request(`secret`: RustBuffer.ByValue,`nonce`: Long,`version`: Long,`url`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun sphinx_c775_ota_response(`bytes`: RustBuffer.ByValue,
+    fun sphinxrs_b6a8_ota_response(`bytes`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Long
 
-    fun ffi_sphinx_c775_rustbuffer_alloc(`size`: Int,
+    fun ffi_sphinxrs_b6a8_rustbuffer_alloc(`size`: Int,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun ffi_sphinx_c775_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,
+    fun ffi_sphinxrs_b6a8_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun ffi_sphinx_c775_rustbuffer_free(`buf`: RustBuffer.ByValue,
+    fun ffi_sphinxrs_b6a8_rustbuffer_free(`buf`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun ffi_sphinx_c775_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Int,
+    fun ffi_sphinxrs_b6a8_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Int,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
@@ -593,7 +593,7 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<String>> {
 fun `pubkeyFromSecretKey`(`mySecretKey`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_pubkey_from_secret_key(FfiConverterString.lower(`mySecretKey`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_pubkey_from_secret_key(FfiConverterString.lower(`mySecretKey`), _status)
 })
 }
 
@@ -603,7 +603,7 @@ fun `pubkeyFromSecretKey`(`mySecretKey`: String): String {
 fun `deriveSharedSecret`(`theirPubkey`: String, `mySecretKey`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_derive_shared_secret(FfiConverterString.lower(`theirPubkey`), FfiConverterString.lower(`mySecretKey`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_derive_shared_secret(FfiConverterString.lower(`theirPubkey`), FfiConverterString.lower(`mySecretKey`), _status)
 })
 }
 
@@ -613,7 +613,7 @@ fun `deriveSharedSecret`(`theirPubkey`: String, `mySecretKey`: String): String {
 fun `encrypt`(`plaintext`: String, `secret`: String, `nonce`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_encrypt(FfiConverterString.lower(`plaintext`), FfiConverterString.lower(`secret`), FfiConverterString.lower(`nonce`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_encrypt(FfiConverterString.lower(`plaintext`), FfiConverterString.lower(`secret`), FfiConverterString.lower(`nonce`), _status)
 })
 }
 
@@ -623,7 +623,7 @@ fun `encrypt`(`plaintext`: String, `secret`: String, `nonce`: String): String {
 fun `decrypt`(`ciphertext`: String, `secret`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_decrypt(FfiConverterString.lower(`ciphertext`), FfiConverterString.lower(`secret`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_decrypt(FfiConverterString.lower(`ciphertext`), FfiConverterString.lower(`secret`), _status)
 })
 }
 
@@ -633,7 +633,7 @@ fun `decrypt`(`ciphertext`: String, `secret`: String): String {
 fun `nodeKeys`(`net`: String, `seed`: String): Keys {
     return FfiConverterTypeKeys.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_node_keys(FfiConverterString.lower(`net`), FfiConverterString.lower(`seed`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_node_keys(FfiConverterString.lower(`net`), FfiConverterString.lower(`seed`), _status)
 })
 }
 
@@ -643,7 +643,7 @@ fun `nodeKeys`(`net`: String, `seed`: String): Keys {
 fun `mnemonicFromEntropy`(`seed`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_mnemonic_from_entropy(FfiConverterString.lower(`seed`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_mnemonic_from_entropy(FfiConverterString.lower(`seed`), _status)
 })
 }
 
@@ -653,7 +653,7 @@ fun `mnemonicFromEntropy`(`seed`: String): String {
 fun `entropyFromMnemonic`(`mnemonic`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_entropy_from_mnemonic(FfiConverterString.lower(`mnemonic`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_entropy_from_mnemonic(FfiConverterString.lower(`mnemonic`), _status)
 })
 }
 
@@ -663,7 +663,7 @@ fun `entropyFromMnemonic`(`mnemonic`: String): String {
 fun `getNonceRequest`(`secret`: String, `nonce`: ULong): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_get_nonce_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_get_nonce_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
 })
 }
 
@@ -673,7 +673,7 @@ fun `getNonceRequest`(`secret`: String, `nonce`: ULong): String {
 fun `getNonceResponse`(`bytes`: String): ULong {
     return FfiConverterULong.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_get_nonce_response(FfiConverterString.lower(`bytes`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_get_nonce_response(FfiConverterString.lower(`bytes`), _status)
 })
 }
 
@@ -683,7 +683,7 @@ fun `getNonceResponse`(`bytes`: String): ULong {
 fun `resetWifiRequest`(`secret`: String, `nonce`: ULong): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_reset_wifi_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_reset_wifi_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
 })
 }
 
@@ -691,7 +691,7 @@ fun `resetWifiRequest`(`secret`: String, `nonce`: ULong): String {
 @Throws(SphinxException::class)fun `resetWifiResponse`(`bytes`: String) =
     
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_reset_wifi_response(FfiConverterString.lower(`bytes`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_reset_wifi_response(FfiConverterString.lower(`bytes`), _status)
 }
 
 @Throws(SphinxException::class)
@@ -699,7 +699,7 @@ fun `resetWifiRequest`(`secret`: String, `nonce`: ULong): String {
 fun `resetKeysRequest`(`secret`: String, `nonce`: ULong): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_reset_keys_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_reset_keys_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
 })
 }
 
@@ -707,7 +707,7 @@ fun `resetKeysRequest`(`secret`: String, `nonce`: ULong): String {
 @Throws(SphinxException::class)fun `resetKeysResponse`(`bytes`: String) =
     
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_reset_keys_response(FfiConverterString.lower(`bytes`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_reset_keys_response(FfiConverterString.lower(`bytes`), _status)
 }
 
 @Throws(SphinxException::class)
@@ -715,7 +715,7 @@ fun `resetKeysRequest`(`secret`: String, `nonce`: ULong): String {
 fun `resetAllRequest`(`secret`: String, `nonce`: ULong): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_reset_all_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_reset_all_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
 })
 }
 
@@ -723,7 +723,7 @@ fun `resetAllRequest`(`secret`: String, `nonce`: ULong): String {
 @Throws(SphinxException::class)fun `resetAllResponse`(`bytes`: String) =
     
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_reset_all_response(FfiConverterString.lower(`bytes`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_reset_all_response(FfiConverterString.lower(`bytes`), _status)
 }
 
 @Throws(SphinxException::class)
@@ -731,7 +731,7 @@ fun `resetAllRequest`(`secret`: String, `nonce`: ULong): String {
 fun `getPolicyRequest`(`secret`: String, `nonce`: ULong): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_get_policy_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_get_policy_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
 })
 }
 
@@ -741,7 +741,7 @@ fun `getPolicyRequest`(`secret`: String, `nonce`: ULong): String {
 fun `getPolicyResponse`(`bytes`: String): Policy {
     return FfiConverterTypePolicy.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_get_policy_response(FfiConverterString.lower(`bytes`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_get_policy_response(FfiConverterString.lower(`bytes`), _status)
 })
 }
 
@@ -751,7 +751,7 @@ fun `getPolicyResponse`(`bytes`: String): Policy {
 fun `updatePolicyRequest`(`secret`: String, `nonce`: ULong, `policy`: Policy): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_update_policy_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), FfiConverterTypePolicy.lower(`policy`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_update_policy_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), FfiConverterTypePolicy.lower(`policy`), _status)
 })
 }
 
@@ -761,7 +761,7 @@ fun `updatePolicyRequest`(`secret`: String, `nonce`: ULong, `policy`: Policy): S
 fun `updatePolicyResponse`(`bytes`: String): Policy {
     return FfiConverterTypePolicy.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_update_policy_response(FfiConverterString.lower(`bytes`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_update_policy_response(FfiConverterString.lower(`bytes`), _status)
 })
 }
 
@@ -771,7 +771,7 @@ fun `updatePolicyResponse`(`bytes`: String): Policy {
 fun `getAllowlistRequest`(`secret`: String, `nonce`: ULong): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_get_allowlist_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_get_allowlist_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), _status)
 })
 }
 
@@ -781,7 +781,7 @@ fun `getAllowlistRequest`(`secret`: String, `nonce`: ULong): String {
 fun `getAllowlistResponse`(`bytes`: String): List<String> {
     return FfiConverterSequenceString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_get_allowlist_response(FfiConverterString.lower(`bytes`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_get_allowlist_response(FfiConverterString.lower(`bytes`), _status)
 })
 }
 
@@ -791,7 +791,7 @@ fun `getAllowlistResponse`(`bytes`: String): List<String> {
 fun `updateAllowlistRequest`(`secret`: String, `nonce`: ULong, `allowlist`: List<String>): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_update_allowlist_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), FfiConverterSequenceString.lower(`allowlist`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_update_allowlist_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), FfiConverterSequenceString.lower(`allowlist`), _status)
 })
 }
 
@@ -801,7 +801,7 @@ fun `updateAllowlistRequest`(`secret`: String, `nonce`: ULong, `allowlist`: List
 fun `updateAllowlistResponse`(`bytes`: String): List<String> {
     return FfiConverterSequenceString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_update_allowlist_response(FfiConverterString.lower(`bytes`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_update_allowlist_response(FfiConverterString.lower(`bytes`), _status)
 })
 }
 
@@ -811,7 +811,7 @@ fun `updateAllowlistResponse`(`bytes`: String): List<String> {
 fun `otaRequest`(`secret`: String, `nonce`: ULong, `version`: ULong, `url`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_ota_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), FfiConverterULong.lower(`version`), FfiConverterString.lower(`url`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_ota_request(FfiConverterString.lower(`secret`), FfiConverterULong.lower(`nonce`), FfiConverterULong.lower(`version`), FfiConverterString.lower(`url`), _status)
 })
 }
 
@@ -821,7 +821,7 @@ fun `otaRequest`(`secret`: String, `nonce`: ULong, `version`: ULong, `url`: Stri
 fun `otaResponse`(`bytes`: String): ULong {
     return FfiConverterULong.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.sphinx_c775_ota_response(FfiConverterString.lower(`bytes`), _status)
+    _UniFFILib.INSTANCE.sphinxrs_b6a8_ota_response(FfiConverterString.lower(`bytes`), _status)
 })
 }
 

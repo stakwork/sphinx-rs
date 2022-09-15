@@ -1,4 +1,4 @@
-use crypter_ffi as cy;
+use sphinx_ffi as cy;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
