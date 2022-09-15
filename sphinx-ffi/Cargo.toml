@@ -5,7 +5,7 @@ authors = ["Evan Feenstra <evanfeenstra@gmail.com>"]
 edition = "2018"
 
 [lib]
-name = "sphinx"
+name = "sphinxrs"
 crate-type = ["staticlib", "cdylib"]
 
 [features]
