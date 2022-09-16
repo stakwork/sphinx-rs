@@ -60,6 +60,11 @@ impl Token {
         assert_eq!(ts.len(), self.expected_len());
         Ok(ts)
     }
+    /// Sign a lightning token
+    pub fn sign_to_base64(&self, secret_key: &SecretKey) -> Result<String> {
+        let s = self.sign(secret_key)?;
+        Ok(base64_encode(&s))
+    }
     /// Verify signed token
     pub fn verify(&self, public_key: &PublicKey) -> Result<()> {
         if let None = self.1 {
@@ -150,8 +155,8 @@ mod tests {
     fn test_check_timestamp() {
         let sk = secret_key();
         let t1 = Token::new();
-        let res = t1.sign(&sk).expect("couldnt make token");
-        let token = base64_encode(&res);
+        let token = t1.sign_to_base64(&sk).expect("couldnt make token");
+        // let token = base64_encode(&res);
         let t = Token::from_base64(&token).expect("couldnt parse base64");
         std::thread::sleep(std::time::Duration::from_secs(2));
         if t.recover_within(1).is_ok() {
