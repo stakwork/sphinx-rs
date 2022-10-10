@@ -175,4 +175,19 @@ mod tests {
         let pk2 = token.recover().expect("recover failed");
         assert_eq!(pubkey, pk2);
     }
+
+    #[test]
+    fn test_decode_again() {
+        use std::str::FromStr;
+        let public_key = PublicKey::from_str(
+            "03a769efb79e88f7b6ec0db2d02187cb7dd1b52f930289d0a16849e55f573f2261",
+        )
+        .expect("boo");
+        let tok = "Yy3k2R-sD5A0XDzoHewiYxUu4xC7ArV7hYkE67wG_zxiMJKA7Vz26z9lNEbklPOAoNQlEqG6TlE-SUDgaxLnAceT1SDq";
+        let bytes = base64_decode(tok).expect("asdfasdf");
+        let ts: [u8; 4] = bytes[..4].try_into().expect("ASDFASDFASDF");
+        println!("TIME {}", bytes_to_u32(ts));
+        let t = Token::from_base64(tok).expect("couldnt parse base64");
+        t.verify(&public_key).expect("failed to verify");
+    }
 }

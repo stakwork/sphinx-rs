@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type", content = "content")]
 pub enum ControlMessage {
     Nonce,
     ResetWifi,
@@ -54,6 +55,7 @@ impl Default for Policy {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
 pub enum Interval {
     Hourly,
     Daily,
