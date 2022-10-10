@@ -35,45 +35,9 @@
 
 ### control messages
 
-Each Control message must be signed by the private key (derived from seed). Each control message must have a higher nonce than the previous one. 
+**`build_request`**
 
-**`get_nonce_request(secret: String, nonce: u64)`**
-
-**`get_nonce_response(inp: String)`**
-
-**`reset_wifi_request(secret: String, nonce: u64)`**
-
-**`reset_wifi_response(inp: String)`**
-
-**`reset_keys_request(secret: String, nonce: u64)`**
-
-**`reset_keys_response(inp: String)`**
-
-**`reset_all_request(secret: String, nonce: u64)`**
-
-**`reset_all_response(inp: String)`**
-
-**`get_policy_request(secret: String, nonce: u64)`**
-
-**`get_policy_response(inp: String)`**
-
-**`update_policy_request(secret: String, nonce: u64, policy: Policy)`**
-- Policy{sat_limit: u64, interval: String, htlc_limit: u64}
-- interval must be "hourly" or "daily"
-
-**`update_policy_response(inp: String)`**
-
-**`get_allowlist_request(secret: String, nonce: u64)`**
-
-**`get_allowlist_response(inp: String)`**
-
-**`update_allowlist_request(secret: String, nonce: u64, al: Vec<String>)`**
-
-**`update_allowlist_response(inp: String)`**
-
-**`ota_request(secret: String, nonce: u64, version: u64, url: String)`**
-
-**`ota_response(inp: String)`**
+**`parse_response`**
 
 # build
 

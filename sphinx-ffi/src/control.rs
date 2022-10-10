@@ -1,156 +1,32 @@
 use crate::{parse, Result, SphinxError};
 use sphinx_crypter::secp256k1::SecretKey;
-use sphinx_glyph::controller::{build_control_msg, parse_control_response};
-use sphinx_glyph::types::{
-    ControlMessage, ControlResponse, Interval, OtaParams, Policy as RawPolicy,
+use sphinx_glyph::controller::{
+    build_control_msg, control_msg_from_json, parse_control_response_to_json,
 };
-use std::str::FromStr;
+use sphinx_glyph::types::ControlMessage;
 
-pub fn get_nonce_request(secret: String, nonce: u64) -> Result<String> {
-    Ok(build_msg(ControlMessage::Nonce, nonce, secret)?)
+pub fn build_request(msg: String, secret: String, nonce: u64) -> Result<String> {
+    let cm = match control_msg_from_json(msg.as_bytes()) {
+        Ok(s) => s,
+        Err(_) => return Err(SphinxError::BadRequest),
+    };
+    Ok(build_msg(cm, nonce, secret)?)
 }
 
-pub fn get_nonce_response(inp: String) -> Result<u64> {
-    let r = parse_response_bytes(inp)?;
-    match r {
-        ControlResponse::Nonce(n) => Ok(n),
-        _ => Err(SphinxError::BadResponse),
-    }
-}
-
-pub fn reset_wifi_request(secret: String, nonce: u64) -> Result<String> {
-    Ok(build_msg(ControlMessage::ResetWifi, nonce, secret)?)
-}
-
-pub fn reset_wifi_response(inp: String) -> Result<()> {
-    let r = parse_response_bytes(inp)?;
-    match r {
-        ControlResponse::ResetWifi => Ok(()),
-        _ => Err(SphinxError::BadResponse),
-    }
-}
-
-pub fn reset_keys_request(secret: String, nonce: u64) -> Result<String> {
-    Ok(build_msg(ControlMessage::ResetKeys, nonce, secret)?)
-}
-
-pub fn reset_keys_response(inp: String) -> Result<()> {
-    let r = parse_response_bytes(inp)?;
-    match r {
-        ControlResponse::ResetKeys => Ok(()),
-        _ => Err(SphinxError::BadResponse),
-    }
-}
-
-pub fn reset_all_request(secret: String, nonce: u64) -> Result<String> {
-    Ok(build_msg(ControlMessage::ResetAll, nonce, secret)?)
-}
-
-pub fn reset_all_response(inp: String) -> Result<()> {
-    let r = parse_response_bytes(inp)?;
-    match r {
-        ControlResponse::ResetAll => Ok(()),
-        _ => Err(SphinxError::BadResponse),
-    }
-}
-
-pub fn get_policy_request(secret: String, nonce: u64) -> Result<String> {
-    Ok(build_msg(ControlMessage::QueryPolicy, nonce, secret)?)
-}
-
-pub fn get_policy_response(inp: String) -> Result<Policy> {
-    let r = parse_response_bytes(inp)?;
-    match r {
-        ControlResponse::PolicyCurrent(p) => Ok(policy_to_dto(p)),
-        _ => Err(SphinxError::BadResponse),
-    }
-}
-
-pub fn update_policy_request(secret: String, nonce: u64, policy: Policy) -> Result<String> {
-    let rp = dto_to_policy(policy)?;
-    Ok(build_msg(ControlMessage::UpdatePolicy(rp), nonce, secret)?)
-}
-
-pub fn update_policy_response(inp: String) -> Result<Policy> {
-    let r = parse_response_bytes(inp)?;
-    match r {
-        ControlResponse::PolicyUpdated(p) => Ok(policy_to_dto(p)),
-        _ => Err(SphinxError::BadResponse),
-    }
-}
-
-pub fn get_allowlist_request(secret: String, nonce: u64) -> Result<String> {
-    Ok(build_msg(ControlMessage::QueryAllowlist, nonce, secret)?)
-}
-
-pub fn get_allowlist_response(inp: String) -> Result<Vec<String>> {
-    let r = parse_response_bytes(inp)?;
-    match r {
-        ControlResponse::AllowlistCurrent(p) => Ok(p),
-        _ => Err(SphinxError::BadResponse),
-    }
-}
-
-pub fn update_allowlist_request(secret: String, nonce: u64, al: Vec<String>) -> Result<String> {
-    Ok(build_msg(
-        ControlMessage::UpdateAllowlist(al),
-        nonce,
-        secret,
-    )?)
-}
-
-pub fn update_allowlist_response(inp: String) -> Result<Vec<String>> {
-    let r = parse_response_bytes(inp)?;
-    match r {
-        ControlResponse::AllowlistUpdated(p) => Ok(p),
-        _ => Err(SphinxError::BadResponse),
-    }
-}
-
-pub fn ota_request(secret: String, nonce: u64, version: u64, url: String) -> Result<String> {
-    Ok(build_msg(
-        ControlMessage::Ota(OtaParams { version, url }),
-        nonce,
-        secret,
-    )?)
-}
-
-pub fn ota_response(inp: String) -> Result<u64> {
-    let r = parse_response_bytes(inp)?;
-    match r {
-        ControlResponse::OtaConfirm(p) => Ok(p.version),
-        _ => Err(SphinxError::BadResponse),
+pub fn parse_response(inp: String) -> Result<String> {
+    let v = match hex::decode(inp) {
+        Ok(s) => s,
+        Err(_) => return Err(SphinxError::BadResponse),
+    };
+    match parse_control_response_to_json(&v) {
+        Ok(r) => Ok(r),
+        Err(_) => Err(SphinxError::BadResponse),
     }
 }
 
 ///////////
 // UTILS //
-///////////
-
-pub struct Policy {
-    pub sat_limit: u64,
-    pub interval: String,
-    pub htlc_limit: u64,
-}
-
-fn policy_to_dto(p: RawPolicy) -> Policy {
-    Policy {
-        sat_limit: p.sat_limit,
-        interval: p.interval.as_str().to_string(),
-        htlc_limit: p.htlc_limit,
-    }
-}
-fn dto_to_policy(p: Policy) -> Result<RawPolicy> {
-    let interval = match Interval::from_str(&p.interval) {
-        Ok(i) => i,
-        Err(_) => return Err(SphinxError::BadRequest),
-    };
-    Ok(RawPolicy {
-        sat_limit: p.sat_limit,
-        interval,
-        htlc_limit: p.htlc_limit,
-    })
-}
+///////////Policy
 
 fn build_msg(msg: ControlMessage, nonce: u64, secret: String) -> Result<String> {
     let sk = parse_secret_key(secret)?;
@@ -165,15 +41,5 @@ fn parse_secret_key(secret: String) -> Result<SecretKey> {
     match SecretKey::from_slice(&secret_key[..]) {
         Ok(s) => Ok(s),
         Err(_) => Err(SphinxError::BadSecret),
-    }
-}
-fn parse_response_bytes(inp: String) -> Result<ControlResponse> {
-    let v = match hex::decode(inp) {
-        Ok(s) => s,
-        Err(_) => return Err(SphinxError::BadResponse),
-    };
-    match parse_control_response(&v) {
-        Ok(r) => Ok(r),
-        Err(_) => Err(SphinxError::BadResponse),
     }
 }
