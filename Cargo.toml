@@ -9,4 +9,5 @@ members = [
 exclude = [
     "sphinx-ffi",
     "sphinx-wasm",
+    "vls-signer"
 ]
