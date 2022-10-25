@@ -1,7 +1,17 @@
 pub mod derive;
-pub mod persist;
 pub mod policy;
 mod rst;
+
+#[cfg(feature = "fspersist")]
+pub mod persist;
+
+pub use derive::node_keys as derive_node_keys;
+use parser::MsgDriver;
+use policy::make_policy;
+use sphinx_glyph::{parser, types};
+use types::Policy;
+
+pub use sphinx_glyph;
 
 use anyhow::anyhow;
 use lightning_signer::bitcoin::blockdata::constants::ChainHash;
@@ -18,12 +28,6 @@ pub use vls_protocol_signer::lightning_signer;
 use vls_protocol_signer::lightning_signer::bitcoin::Network;
 use vls_protocol_signer::lightning_signer::wallet::Wallet;
 pub use vls_protocol_signer::vls_protocol;
-
-pub use derive::node_keys as derive_node_keys;
-use parser::MsgDriver;
-use policy::make_policy;
-use sphinx_glyph::{parser, types};
-use types::Policy;
 
 pub struct InitResponse {
     pub root_handler: RootHandler,

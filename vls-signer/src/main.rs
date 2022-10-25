@@ -1,94 +1,45 @@
-mod signer;
+mod mqtt;
+mod routes;
 
-use crate::env::check_env;
-use crate::logs::{get_log_tx, LogChans, LOGS};
-use fairing::{Fairing, Info, Kind};
-use fs::{relative, FileServer};
-use response::stream::{Event, EventStream};
-use rocket::serde::json::json;
-use rocket::*;
-use std::sync::Arc;
-use tokio::sync::{broadcast::error::RecvError, mpsc, oneshot, Mutex};
+use crate::routes::ChannelRequest;
+use dotenv::dotenv;
+use glyph::control::Controller;
+use rocket::tokio::sync::{broadcast, mpsc};
+use sphinx_signer::lightning_signer::bitcoin::Network;
+use sphinx_signer::sphinx_glyph as glyph;
 
-pub type Result<T> = std::result::Result<T, Error>;
+#[rocket::launch]
+async fn rocket() -> _ {
+    dotenv().ok();
 
+    let (ctrl_tx, ctrl_rx) = mpsc::channel(1000);
+    let (error_tx, _error_rx) = broadcast::channel(1000);
 
-/// Responses are received on the oneshot sender
-#[derive(Debug)]
-pub struct CmdRequest {
-    pub tag: String,
-    pub message: String,
-    pub reply_tx: oneshot::Sender<String>,
+    let network = Network::Regtest;
+    let seed_string: String = std::env::var("SEED").expect("no seed");
+    let seed = hex::decode(seed_string).expect("couldnt decode seed");
+    let (pk, sk) = sphinx_signer::derive_node_keys(&network, &seed);
+    let mut ctrlr = Controller::new(sk, pk, 0);
+
+    let error_tx_ = error_tx.clone();
+    rocket::tokio::spawn(async move {
+        mqtt::start(&seed, network, &pk, &sk, error_tx_)
+            .await
+            .expect("mqtt crash");
+    });
+
+    rocket::tokio::spawn(async move { listen_for_commands(&mut ctrlr, ctrl_rx).await });
+
+    routes::launch_rocket(ctrl_tx, error_tx)
 }
-impl CmdRequest {
-    pub fn new(tag: &str, message: &str) -> (Self, oneshot::Receiver<String>) {
-        let (reply_tx, reply_rx) = oneshot::channel();
-        let cr = CmdRequest {
-            tag: tag.to_string(),
-            message: message.to_string(),
-            reply_tx,
+
+async fn listen_for_commands(ctrlr: &mut Controller, mut ctrl_rx: mpsc::Receiver<ChannelRequest>) {
+    while let Some(msg) = ctrl_rx.recv().await {
+        match ctrlr.handle(&msg.message) {
+            Ok((_msg, res)) => {
+                let _res_data = rmp_serde::to_vec(&res).expect("could not build control response");
+            }
+            Err(e) => log::warn!("error parsing ctrl msg {:?}", e),
         };
-        (cr, reply_rx)
     }
-}
-
-#[get("/cmd?<tag>&<txt>")]
-pub async fn cmd(sender: &State<mpsc::Sender<CmdRequest>>, tag: &str, txt: &str) -> Result<String> {
-    let (request, reply_rx) = CmdRequest::new(tag, &txt);
-    let _ = sender.send(request).await.map_err(|_| Error::Fail)?;
-    let reply = reply_rx.await.map_err(|_| Error::Fail)?;
-    Ok(reply)
-}
-
-
-#[get("/logs?<tag>")]
-async fn logs(tag: &str) -> Result<String> {
-    let lgs = LOGS.lock().await;
-    let ret = lgs.get(tag).unwrap_or(&Vec::new()).clone();
-    Ok(json!(ret).to_string())
-}
-
-#[get("/logstream?<tag>")]
-async fn logstream(
-    log_txs: &State<Arc<Mutex<LogChans>>>,
-    mut end: Shutdown,
-    tag: &str,
-) -> EventStream![] {
-    let log_tx = get_log_tx(tag, log_txs).await;
-    let mut rx = log_tx.subscribe();
-    EventStream! {
-        loop {
-            let msg = tokio::select! {
-                msg = rx.recv() => match msg {
-                    Ok(lo) => lo,
-                    Err(RecvError::Closed) => break,
-                    Err(RecvError::Lagged(_)) => continue,
-                },
-                _ = &mut end => break,
-            };
-
-            yield Event::json(&msg);
-        }
-    }
-}
-
-
-// {tag: [log]}
-pub type LogStore = HashMap<String, Vec<String>>;
-
-pub static LOGS: Lazy<Mutex<LogStore>> = Lazy::new(|| Mutex::new(HashMap::new()));
-
-pub type LogChans = HashMap<String, broadcast::Sender<String>>;
-
-pub async fn launch_rocket(
-    tx: mpsc::Sender<CmdRequest>,
-    log_txs: Arc<Mutex<LogChans>>,
-) -> Result<Rocket<Ignite>> {
-    Ok(rocket::build()
-        .mount("/", FileServer::from(relative!("app/public")))
-        .mount("/api/", routes![cmd, logstream, logs])
-        .manage(tx)
-        .manage(log_txs)
-        .launch()
-        .await?)
 }
