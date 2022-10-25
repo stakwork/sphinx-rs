@@ -6,7 +6,7 @@ pub use control::*;
 use sphinx_crypter::chacha::{decrypt as chacha_decrypt, encrypt as chacha_encrypt};
 use sphinx_crypter::ecdh::derive_shared_secret_from_slice;
 use sphinx_crypter::secp256k1::{PublicKey, Secp256k1, SecretKey};
-use sphinx_deriver::{self as deriver, vls_core::bitcoin::Network};
+use sphinx_signer::{derive, lightning_signer::bitcoin::Network};
 use std::str::FromStr;
 
 #[cfg(not(feature = "wasm"))]
@@ -103,7 +103,7 @@ pub fn node_keys(net: String, seed: String) -> Result<Keys> {
         Ok(n) => n,
         Err(_) => return Err(SphinxError::InvalidNetwork),
     };
-    let ks = deriver::node_keys(&network, &seed[..]);
+    let ks = derive::node_keys(&network, &seed[..]);
     Ok(Keys {
         secret: hex::encode(ks.1.secret_bytes()),
         pubkey: ks.0.to_string(),
@@ -112,14 +112,14 @@ pub fn node_keys(net: String, seed: String) -> Result<Keys> {
 
 pub fn mnemonic_from_entropy(seed: String) -> Result<String> {
     let seed = parse::parse_secret_string(seed)?;
-    match deriver::mnemonic_from_entropy(&seed[..]) {
+    match derive::mnemonic_from_entropy(&seed[..]) {
         Ok(m) => Ok(m),
         Err(_) => Err(SphinxError::BadSecret),
     }
 }
 
 pub fn entropy_from_mnemonic(mnemonic: String) -> Result<String> {
-    match deriver::entropy_from_mnemonic(&mnemonic) {
+    match derive::entropy_from_mnemonic(&mnemonic) {
         Ok(m) => Ok(hex::encode(m)),
         Err(_) => Err(SphinxError::BadSecret),
     }

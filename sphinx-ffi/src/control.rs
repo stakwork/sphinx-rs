@@ -1,6 +1,6 @@
 use crate::{parse, Result, SphinxError};
 use sphinx_crypter::secp256k1::SecretKey;
-use sphinx_glyph::controller::{
+use sphinx_glyph::control::{
     build_control_msg, control_msg_from_json, parse_control_response_to_json,
 };
 use sphinx_glyph::types::ControlMessage;

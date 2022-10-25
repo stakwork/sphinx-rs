@@ -1,0 +1,19 @@
+[package]
+name = "sphinx-signer"
+version = "0.1.0"
+authors = ["Evan Feenstra <evanfeenstra@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+sphinx-glyph = { path = '../glyph' }
+vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git" }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", default-features = false, features = ["std", "secp-lowmemory"] }
+anyhow = {version = "1", features = ["backtrace"]}
+log = "0.4"
+rand = { version = "0.8" }
+# serde_bolt = { version = "0.2", default-features = false }
+serde = { version = "1.0.105" }
+hex = "0.4.3"
+fsdb = "0.1.11"
+bip39 = "1.0.1"
+

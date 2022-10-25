@@ -8,8 +8,10 @@ repository = "https://github.com/stakwork/sphinx-rs"
 license = "MIT"
 
 [dependencies]
-sphinx-auther = { path = "../auther", version = "0.1.10" }
+sphinx-auther = { path = "../auther", version = "0.1.12" }
 anyhow = "1"
+vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", features = ["std"] }
+serde_json = "1.0"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 rmp-serde = "1.1.0"
-serde_json = "1.0.86"
+# serde_bolt = { version = "0.2", default-features = false }
