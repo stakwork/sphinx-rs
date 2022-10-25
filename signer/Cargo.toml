@@ -3,14 +3,19 @@ name = "sphinx-signer"
 version = "0.1.0"
 authors = ["Evan Feenstra <evanfeenstra@gmail.com>"]
 edition = "2018"
+description = "Sphinx lightning hardware signer"
+repository = "https://github.com/stakwork/sphinx-rs"
+license = "MIT"
 
 [features]
 default = ["fspersist"]
 fspersist = ["fsdb", "vls-persist"]
 
 [dependencies]
-sphinx-glyph = { path = '../glyph' }
+# sphinx-glyph = { path = '../glyph' }
+sphinx-glyph = "0.1.2"
 vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", default-features = false, features = ["std", "secp-lowmemory"] }
+vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", features = ["std"] }
 log = "0.4"
 rand = "0.8"
 serde = "1.0.1"

@@ -9,12 +9,12 @@ use lightning_signer::persist::model::{
 };
 use lightning_signer::persist::Persist;
 use lightning_signer::policy::validator::EnforcementState;
+use lightning_signer::SendSync;
 use std::string::String;
 use vls_persist::model::{
     AllowlistItemEntry, ChainTrackerEntry, ChannelEntry, NodeEntry, NodeStateEntry,
 };
 use vls_protocol_signer::lightning_signer;
-
 pub struct FsPersister {
     nodes: Bucket<NodeEntry>,
     states: Bucket<NodeStateEntry>,
@@ -23,6 +23,8 @@ pub struct FsPersister {
     chaintracker: Bucket<ChainTrackerEntry>,
     pubkeys: Bucket<PublicKey>,
 }
+
+impl SendSync for FsPersister {}
 
 impl FsPersister {
     pub fn new(dir: &str, maxsize: Option<usize>) -> Self {

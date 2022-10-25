@@ -1,19 +1,14 @@
 [package]
 name = "sphinx-glyph"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Evan Feenstra <evanfeenstra@gmail.com>"]
 edition = "2018"
 description = "Sphinx lightning hardware signer"
 repository = "https://github.com/stakwork/sphinx-rs"
 license = "MIT"
 
-[features]
-default = ["parser"]
-parser = ["vls-protocol"]
-
 [dependencies]
 sphinx-auther = { path = "../auther", version = "0.1.12" }
-vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", features = ["std"], optional = true }
 anyhow = "1"
 serde_json = "1.0"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
