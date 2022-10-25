@@ -1,0 +1,23 @@
+[package]
+name = "sphinx-signer"
+version = "0.1.0"
+authors = ["Evan Feenstra <evanfeenstra@gmail.com>"]
+edition = "2018"
+
+[features]
+default = ["fspersist"]
+fspersist = ["fsdb", "vls-persist"]
+
+[dependencies]
+sphinx-glyph = { path = '../glyph' }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", default-features = false, features = ["std", "secp-lowmemory"] }
+log = "0.4"
+rand = "0.8"
+serde = "1.0.1"
+hex = "0.4.3"
+bip39 = "1.0.1"
+anyhow = "1"
+fsdb = { version = "0.1.11", optional = true }
+vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", optional = true }
+
+

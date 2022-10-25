@@ -2,12 +2,12 @@
 members = [
     "auther",
     "crypter",
-    "deriver",
-    "glyph"
+    "glyph",
+    "signer",
+    "vls-signer"
 ]
 
 exclude = [
     "sphinx-ffi",
     "sphinx-wasm",
-    "vls-signer"
 ]

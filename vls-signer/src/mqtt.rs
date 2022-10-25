@@ -1,0 +1,148 @@
+use sphinx_auther::secp256k1::{PublicKey, SecretKey};
+use sphinx_auther::token::Token;
+use sphinx_signer::lightning_signer::bitcoin::Network;
+use sphinx_signer::lightning_signer::persist::Persist;
+use sphinx_signer::persist::FsPersister;
+use sphinx_signer::sphinx_glyph::{sphinx_auther, topics};
+
+use rocket::tokio::sync::broadcast;
+use rumqttc::{self, AsyncClient, Event, EventLoop, MqttOptions, Packet, QoS};
+use sphinx_signer::vls_protocol::model::PubKey;
+use sphinx_signer::{self, InitResponse};
+use std::convert::TryInto;
+use std::env;
+use std::error::Error;
+use std::sync::Arc;
+use std::time::Duration;
+
+pub const ROOT_STORE: &str = "teststore";
+
+pub async fn start(
+    seed: &[u8],
+    network: Network,
+    pubkey: &PublicKey,
+    secret: &SecretKey,
+    error_tx: broadcast::Sender<Vec<u8>>,
+) -> Result<(), Box<dyn Error>> {
+    // alternate between "reconnection" and "handler"
+    loop {
+        let mut try_i = 0;
+
+        let pubkey = hex::encode(pubkey.serialize());
+        let t = Token::new();
+        let token = t.sign_to_base64(&secret)?;
+
+        let client_id = "sphinx-1";
+        let broker: String = env::var("BROKER").unwrap_or("localhost:1883".to_string());
+        let broker_: Vec<&str> = broker.split(":").collect();
+        let broker_port = broker_[1].parse::<u16>().expect("NaN");
+        let (client, eventloop) = loop {
+            println!("connect to {}:{}", broker_[0], broker_port);
+            let mut mqttoptions = MqttOptions::new(client_id, broker_[0], broker_port);
+            mqttoptions.set_credentials(pubkey.clone(), token.clone());
+            mqttoptions.set_keep_alive(Duration::from_secs(5));
+            let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
+            match eventloop.poll().await {
+                Ok(event) => {
+                    if let Some(_) = incoming_conn_ack(event) {
+                        println!("==========> MQTT connected!");
+                        break (client, eventloop);
+                    }
+                }
+                Err(e) => {
+                    try_i = try_i + 1;
+                    println!("reconnect.... {} {:?}", try_i, e);
+                    rocket::tokio::time::sleep(Duration::from_secs(1)).await;
+                }
+            }
+        };
+
+        client
+            .subscribe(topics::VLS, QoS::AtMostOnce)
+            .await
+            .expect("could not mqtt subscribe");
+
+        run_main(eventloop, &client, seed, network, error_tx.clone()).await;
+    }
+}
+
+async fn run_main(
+    mut eventloop: EventLoop,
+    client: &AsyncClient,
+    seed: &[u8],
+    network: Network,
+    error_tx: broadcast::Sender<Vec<u8>>,
+) {
+    let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
+
+    let seed32: [u8; 32] = seed.try_into().expect("wrong seed");
+    let init_msg = sphinx_signer::make_init_msg(network, seed32).expect("failed to make init msg");
+    let persister: Arc<dyn Persist> = Arc::new(FsPersister::new(&store_path, None));
+    let InitResponse {
+        root_handler,
+        init_reply: _,
+    } = sphinx_signer::init(init_msg, network, &Default::default(), persister)
+        .expect("failed to init signer");
+    // the actual handler loop
+    loop {
+        match eventloop.poll().await {
+            Ok(event) => {
+                let dummy_peer = PubKey([0; 33]);
+                if let Some((topic, msg_bytes)) = incoming_bytes(event) {
+                    match topic.as_str() {
+                        topics::VLS => {
+                            match sphinx_signer::handle(
+                                &root_handler,
+                                msg_bytes,
+                                dummy_peer.clone(),
+                                false,
+                            ) {
+                                Ok(b) => client
+                                    .publish(topics::VLS_RETURN, QoS::AtMostOnce, false, b)
+                                    .await
+                                    .expect("could not publish init response"),
+                                Err(e) => {
+                                    client
+                                        .publish(
+                                            topics::ERROR,
+                                            QoS::AtMostOnce,
+                                            false,
+                                            e.to_string().as_bytes(),
+                                        )
+                                        .await
+                                        .expect("could not publish error response");
+                                    let _ = error_tx.send(e.to_string().as_bytes().to_vec());
+                                }
+                            };
+                        }
+                        topics::CONTROL => (),
+                        _ => log::info!("invalid topic"),
+                    }
+                }
+            }
+            Err(e) => {
+                log::warn!("diconnected {:?}", e);
+                rocket::tokio::time::sleep(Duration::from_secs(1)).await;
+                break; // break out of this loop to reconnect
+            }
+        }
+    }
+}
+
+fn incoming_bytes(event: Event) -> Option<(String, Vec<u8>)> {
+    if let Event::Incoming(packet) = event {
+        if let Packet::Publish(p) = packet {
+            return Some((p.topic, p.payload.to_vec()));
+        }
+    }
+    None
+}
+
+fn incoming_conn_ack(event: Event) -> Option<()> {
+    if let Event::Incoming(packet) = event {
+        if let Packet::ConnAck(_) = packet {
+            return Some(());
+        }
+    }
+    None
+}
