@@ -1,10 +1,13 @@
 use lightning_signer::signer::StartingTimeFactory;
+use lightning_signer::SendSync;
 use rand::{rngs::OsRng, RngCore};
 use std::sync::Arc;
 use vls_protocol_signer::lightning_signer;
 
 /// A starting time factory which uses entropy from the RNG
 pub(crate) struct RandomStartingTimeFactory {}
+
+impl SendSync for RandomStartingTimeFactory {}
 
 impl StartingTimeFactory for RandomStartingTimeFactory {
     fn starting_time(&self) -> (u64, u32) {

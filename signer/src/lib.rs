@@ -2,6 +2,8 @@ pub mod derive;
 pub mod parser;
 pub mod policy;
 pub mod rst;
+
+pub use sphinx_glyph;
 pub use vls_protocol;
 
 #[cfg(feature = "fspersist")]
@@ -12,8 +14,6 @@ pub use derive::node_keys as derive_node_keys;
 use policy::make_policy;
 use sphinx_glyph::types;
 use types::Policy;
-
-pub use sphinx_glyph;
 
 use anyhow::anyhow;
 use lightning_signer::bitcoin::blockdata::constants::ChainHash;
