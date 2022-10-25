@@ -155,3 +155,18 @@ pub fn make_init_msg(network: Network, seed: [u8; 32]) -> anyhow::Result<Vec<u8>
 fn from_wire_string(s: &WireString) -> String {
     String::from_utf8(s.0.to_vec()).expect("malformed string")
 }
+
+pub fn parse_ping_and_form_response(msg_bytes: Vec<u8>) -> Vec<u8> {
+    let mut m = MsgDriver::new(msg_bytes);
+    let (sequence, _dbid) = msgs::read_serial_request_header(&mut m).expect("read ping header");
+    let ping: msgs::Ping = msgs::read_message(&mut m).expect("failed to read ping message");
+    let mut md = MsgDriver::new_empty();
+    msgs::write_serial_response_header(&mut md, sequence)
+        .expect("failed to write_serial_request_header");
+    let pong = msgs::Pong {
+        id: ping.id,
+        message: ping.message,
+    };
+    msgs::write(&mut md, pong).expect("failed to serial write");
+    md.bytes()
+}
