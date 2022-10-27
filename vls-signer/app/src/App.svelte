@@ -72,7 +72,7 @@
     flex-direction: column;
   }
   header {
-    height: 4rem;
+    height: 4.2rem;
     display: flex;
     align-items: center;
     border-bottom: 1px dashed #bfbfbf;

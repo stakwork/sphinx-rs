@@ -5,10 +5,42 @@ use lightning_signer::policy::simple_validator::{
     make_simple_policy, SimplePolicy, SimpleValidatorFactory,
 };
 use lightning_signer::util::velocity::{VelocityControlIntervalType, VelocityControlSpec};
+use sphinx_glyph::control::{ControlMessage, ControlResponse};
 use std::sync::Arc;
 use vls_protocol_signer::handler::RootHandler;
 use vls_protocol_signer::lightning_signer;
 use vls_protocol_signer::lightning_signer::bitcoin::Network;
+
+pub fn update_controls(
+    rh: &RootHandler,
+    network: Network,
+    msg: ControlMessage,
+    mut res: ControlResponse,
+) -> ControlResponse {
+    match msg {
+        ControlMessage::UpdatePolicy(new_policy) => {
+            if let Err(e) = set_policy(rh, network, new_policy) {
+                log::error!("set policy failed {:?}", e);
+                res = ControlResponse::Error(format!("set policy failed {:?}", e))
+            }
+        }
+        ControlMessage::UpdateAllowlist(al) => {
+            if let Err(e) = set_allowlist(rh, &al) {
+                log::error!("set allowlist failed {:?}", e);
+                res = ControlResponse::Error(format!("set allowlist failed {:?}", e))
+            }
+        }
+        ControlMessage::QueryAllowlist => match get_allowlist(rh) {
+            Ok(al) => res = ControlResponse::AllowlistCurrent(al),
+            Err(e) => {
+                log::error!("read allowlist failed {:?}", e);
+                res = ControlResponse::Error(format!("read allowlist failed {:?}", e))
+            }
+        },
+        _ => (),
+    }
+    res
+}
 
 pub fn set_allowlist(root_handler: &RootHandler, allowlist: &Vec<String>) -> anyhow::Result<()> {
     if let Err(e) = root_handler.node.set_allowlist(allowlist) {

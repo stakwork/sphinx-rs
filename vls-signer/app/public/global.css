@@ -27,56 +27,6 @@ html {
 	}
 }
 
-a {
-	color: rgb(0,100,200);
-	text-decoration: none;
-}
-
-a:hover {
-	text-decoration: underline;
-}
-
-a:visited {
-	color: rgb(0,80,160);
-}
-
-label {
-	display: block;
-}
-
-input, button, select, textarea {
-	font-family: inherit;
-	font-size: inherit;
-	-webkit-padding: 0.4em 0;
-	padding: 0.4em;
-	margin: 0 0 0.5em 0;
-	box-sizing: border-box;
-	border: 1px solid #ccc;
-	border-radius: 2px;
-}
-
-input:disabled {
-	color: #ccc;
-}
-
-button {
-	color: #333;
-	background-color: #f4f4f4;
-	outline: none;
-}
-
-button:disabled {
-	color: #999;
-}
-
-button:not(:disabled):active {
-	background-color: #ddd;
-}
-
-button:focus {
-	border-color: #666;
-}
-
 .lefty .bx--assistive-text {
 	display: none !important;
 }
@@ -84,5 +34,21 @@ button:focus {
 	display: none !important;
 }
 .bx--btn--selected {
+	background:#7d89ff !important;
+}
+.bx--btn--selected:focus {
+	border-color: transparent !important;
+    box-shadow: none !important;
+}
+.bx--btn--primary {
+	background:#7d89ff !important;
+}
+.bx--btn--primary:hover {
+	background:#646fd4 !important;
+}
+.bx--btn--primary:disabled {
+	background:#525252 !important;
+}
+.bx--toggle-input:checked+.bx--toggle-input__label>.bx--toggle__switch::before{
 	background:#7d89ff !important;
 }

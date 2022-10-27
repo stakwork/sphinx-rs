@@ -1,25 +1,17 @@
 use sphinx_auther::secp256k1::{PublicKey, SecretKey};
 use sphinx_auther::token::Token;
-use sphinx_signer::lightning_signer::bitcoin::Network;
-use sphinx_signer::lightning_signer::persist::Persist;
-use sphinx_signer::persist::FsPersister;
 use sphinx_signer::sphinx_glyph::{sphinx_auther, topics};
 
 use rocket::tokio::sync::broadcast;
 use rumqttc::{self, AsyncClient, Event, EventLoop, MqttOptions, Packet, QoS};
 use sphinx_signer::vls_protocol::model::PubKey;
-use sphinx_signer::{self, InitResponse};
-use std::convert::TryInto;
+use sphinx_signer::{self, RootHandler};
 use std::env;
 use std::error::Error;
-use std::sync::Arc;
 use std::time::Duration;
 
-pub const ROOT_STORE: &str = "teststore";
-
 pub async fn start(
-    seed: &[u8],
-    network: Network,
+    root_handler: &RootHandler,
     pubkey: &PublicKey,
     secret: &SecretKey,
     error_tx: broadcast::Sender<Vec<u8>>,
@@ -62,27 +54,26 @@ pub async fn start(
             .await
             .expect("could not mqtt subscribe");
 
-        run_main(eventloop, &client, seed, network, error_tx.clone()).await;
+        run_main(root_handler, eventloop, &client, error_tx.clone()).await;
     }
 }
 
 async fn run_main(
+    root_handler: &RootHandler,
     mut eventloop: EventLoop,
     client: &AsyncClient,
-    seed: &[u8],
-    network: Network,
     error_tx: broadcast::Sender<Vec<u8>>,
 ) {
-    let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
+    // let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
 
-    let seed32: [u8; 32] = seed.try_into().expect("wrong seed");
-    let init_msg = sphinx_signer::make_init_msg(network, seed32).expect("failed to make init msg");
-    let persister: Arc<dyn Persist> = Arc::new(FsPersister::new(&store_path, None));
-    let InitResponse {
-        root_handler,
-        init_reply: _,
-    } = sphinx_signer::init(init_msg, network, &Default::default(), persister)
-        .expect("failed to init signer");
+    // let seed32: [u8; 32] = seed.try_into().expect("wrong seed");
+    // let init_msg = sphinx_signer::make_init_msg(network, seed32).expect("failed to make init msg");
+    // let persister: Arc<dyn Persist> = Arc::new(FsPersister::new(&store_path, None));
+    // let InitResponse {
+    //     root_handler,
+    //     init_reply: _,
+    // } = sphinx_signer::init(init_msg, network, &Default::default(), persister)
+    //     .expect("failed to init signer");
     // the actual handler loop
     loop {
         match eventloop.poll().await {
@@ -92,7 +83,7 @@ async fn run_main(
                     match topic.as_str() {
                         topics::VLS => {
                             match sphinx_signer::handle(
-                                &root_handler,
+                                root_handler,
                                 msg_bytes,
                                 dummy_peer.clone(),
                                 false,
