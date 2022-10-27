@@ -37,14 +37,11 @@ pub struct ChannelReply {
 #[post("/control?<msg>")]
 pub async fn control(sender: &State<mpsc::Sender<ChannelRequest>>, msg: &str) -> Result<String> {
     let message = hex::decode(msg)?;
-    // FIXME validate?
     if message.len() < 65 {
         return Err(Error::Fail);
     }
     let (request, reply_rx) = ChannelRequest::new(topics::CONTROL, message);
-    // send to ESP
     let _ = sender.send(request).await.map_err(|_| Error::Fail)?;
-    // wait for reply
     let reply = reply_rx.await.map_err(|_| Error::Fail)?;
     Ok(hex::encode(reply.reply).to_string())
 }
