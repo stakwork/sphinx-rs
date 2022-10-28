@@ -1,3 +1,4 @@
+use fs::{relative, FileServer};
 use rocket::response::stream::{Event, EventStream};
 use rocket::tokio::select;
 use rocket::tokio::sync::{
@@ -69,13 +70,8 @@ pub fn launch_rocket(
     tx: mpsc::Sender<ChannelRequest>,
     error_tx: broadcast::Sender<Vec<u8>>,
 ) -> Rocket<Build> {
-    let config = Config {
-        // address: V4(Ipv4Addr::UNSPECIFIED),
-        // port: settings.http_port,
-        ..Config::debug_default()
-    };
     rocket::build()
-        .configure(config)
+        .mount("/", FileServer::from(relative!("app/public")))
         .mount("/api/", routes![control, errors])
         .manage(tx)
         .manage(error_tx)

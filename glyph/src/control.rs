@@ -97,18 +97,9 @@ impl Controller {
                 store.write_policy(np.clone())?;
                 ControlResponse::PolicyUpdated(np)
             }
-            ControlMessage::QueryAllowlist => {
-                // this response is overwritten in the event handler
-                ControlResponse::AllowlistCurrent(vec![])
-            }
-            ControlMessage::UpdateAllowlist(na) => {
-                // the actual writing happens in the event handler
-                ControlResponse::AllowlistUpdated(na)
-            }
-            ControlMessage::Ota(params) => {
-                // same as above comments, actually done in core/events.rs
-                ControlResponse::OtaConfirm(params)
-            }
+            ControlMessage::QueryAllowlist => ControlResponse::AllowlistCurrent(vec![]),
+            ControlMessage::UpdateAllowlist(na) => ControlResponse::AllowlistUpdated(na),
+            ControlMessage::Ota(params) => ControlResponse::OtaConfirm(params),
         };
         Ok((msg, res))
     }

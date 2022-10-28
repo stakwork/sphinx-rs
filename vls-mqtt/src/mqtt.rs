@@ -5,7 +5,7 @@ use sphinx_signer::sphinx_glyph::{sphinx_auther, topics};
 use rocket::tokio::sync::broadcast;
 use rumqttc::{self, AsyncClient, Event, EventLoop, MqttOptions, Packet, QoS};
 use sphinx_signer::vls_protocol::model::PubKey;
-use sphinx_signer::{self, RootHandler};
+use sphinx_signer::{self, root, RootHandler};
 use std::env;
 use std::error::Error;
 use std::time::Duration;
@@ -24,7 +24,7 @@ pub async fn start(
         let t = Token::new();
         let token = t.sign_to_base64(&secret)?;
 
-        let client_id = format!("sphinx-{}", pubkey);
+        let client_id = format!("sphinx-{}", &pubkey[..12]);
         let broker: String = env::var("BROKER").unwrap_or("localhost:1883".to_string());
         let broker_: Vec<&str> = broker.split(":").collect();
         let broker_port = broker_
@@ -75,12 +75,7 @@ async fn run_main(
                 if let Some((topic, msg_bytes)) = incoming_bytes(event) {
                     match topic.as_str() {
                         topics::VLS => {
-                            match sphinx_signer::handle(
-                                root_handler,
-                                msg_bytes,
-                                dummy_peer.clone(),
-                                false,
-                            ) {
+                            match root::handle(root_handler, msg_bytes, dummy_peer.clone(), false) {
                                 Ok(b) => client
                                     .publish(topics::VLS_RETURN, QoS::AtMostOnce, false, b)
                                     .await

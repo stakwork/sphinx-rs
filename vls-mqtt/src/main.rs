@@ -10,7 +10,7 @@ use sphinx_signer::lightning_signer::bitcoin::Network;
 use sphinx_signer::lightning_signer::persist::Persist;
 use sphinx_signer::persist::FsPersister;
 use sphinx_signer::policy::update_controls;
-use sphinx_signer::{self, sphinx_glyph as glyph, InitResponse, RootHandler};
+use sphinx_signer::{self, root, sphinx_glyph as glyph, RootHandler};
 use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -34,14 +34,10 @@ async fn rocket() -> _ {
     let mut ctrlr = Controller::new(sk, pk, 0);
 
     let seed32: [u8; 32] = seed.try_into().expect("invalid seed");
-    let init_msg = sphinx_signer::make_init_msg(network, seed32).expect("failed to make init msg");
     let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
     let persister: Arc<dyn Persist> = Arc::new(FsPersister::new(&store_path, None));
-    let InitResponse {
-        root_handler,
-        init_reply: _,
-    } = sphinx_signer::init(init_msg, network, &Default::default(), persister)
-        .expect("failed to init signer");
+    let root_handler =
+        root::init(seed32, network, &Default::default(), persister).expect("failed to init signer");
 
     logger::log_errors(error_rx);
 

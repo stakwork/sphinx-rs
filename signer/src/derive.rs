@@ -1,9 +1,8 @@
-use lightning_signer::{
+use vls_protocol_signer::lightning_signer::{
     bitcoin::secp256k1::{PublicKey, Secp256k1, SecretKey},
     bitcoin::Network,
     signer::derive::{key_derive, KeyDerivationStyle},
 };
-use vls_protocol_signer::lightning_signer;
 
 pub fn node_keys(network: &Network, seed: &[u8]) -> (PublicKey, SecretKey) {
     let style = KeyDerivationStyle::Native;
@@ -27,7 +26,6 @@ pub fn entropy_from_mnemonic(mn: &str) -> anyhow::Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use crate::derive::*;
-    use lightning_signer::bitcoin::Network;
 
     fn seed() -> [u8; 32] {
         [1; 32]
@@ -44,6 +42,7 @@ mod tests {
 
     #[test]
     fn test_derive() {
+        use vls_protocol_signer::lightning_signer::bitcoin::Network;
         let net = Network::Regtest;
         let ks = node_keys(&net, &seed());
         // let pk = ks.0.serialize();
