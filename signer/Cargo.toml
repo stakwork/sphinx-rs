@@ -8,7 +8,7 @@ repository = "https://github.com/stakwork/sphinx-rs"
 license = "MIT"
 
 [features]
-default = ["fspersist"]
+default = ["bip39", "fspersist"]
 fspersist = ["fsdb", "vls-persist"]
 
 [dependencies]
@@ -20,7 +20,7 @@ log = "0.4"
 rand = "0.8"
 serde = "1.0.1"
 hex = "0.4.3"
-bip39 = "1.0.1"
+bip39 = { version = "1.0.1", optional = true }
 anyhow = "1"
 fsdb = { version = "0.1.11", optional = true }
 vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", optional = true }

@@ -11,6 +11,7 @@ pub fn node_keys(network: &Network, seed: &[u8]) -> (PublicKey, SecretKey) {
     deriver.node_keys(seed, &ctx)
 }
 
+#[cfg(feature = "bip39")]
 pub fn mnemonic_from_entropy(entropy: &[u8]) -> anyhow::Result<String> {
     let mn = bip39::Mnemonic::from_entropy(entropy)?;
     let mut ret = Vec::new();
@@ -18,6 +19,7 @@ pub fn mnemonic_from_entropy(entropy: &[u8]) -> anyhow::Result<String> {
     Ok(ret.join(" "))
 }
 
+#[cfg(feature = "bip39")]
 pub fn entropy_from_mnemonic(mn: &str) -> anyhow::Result<Vec<u8>> {
     let mn = bip39::Mnemonic::parse_normalized(mn)?;
     Ok(mn.to_entropy())
@@ -32,6 +34,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bip39")]
     fn test_mnemonic() {
         let entropy = seed();
         let mn = mnemonic_from_entropy(&entropy).expect("nope");
