@@ -46,13 +46,14 @@ pub fn init(
 
 pub fn handle(
     root_handler: &RootHandler,
-    bytes: Vec<u8>,
+    mut bytes: Vec<u8>,
     dummy_peer: PubKey,
     do_log: bool,
-) -> anyhow::Result<Vec<u8>> {
-    let mut md = MsgDriver::new(bytes);
-    let (sequence, dbid) = read_serial_request_header(&mut md).expect("read request header");
-    let mut message = msgs::read(&mut md).expect("message read failed");
+    mut out_buffer: &mut Vec<u8>,
+) -> anyhow::Result<()> {
+    //let mut md = MsgDriver::new(bytes);
+    let (sequence, dbid) = read_serial_request_header(&mut bytes).expect("read request header");
+    let mut message = msgs::read(&mut bytes).expect("message read failed");
 
     // Override the peerid when it is passed in certain messages
     match message {
@@ -72,9 +73,11 @@ pub fn handle(
         }
     }
 
+/*
     if do_log {
         log::info!("VLS msg: {:?}", message);
     }
+*/
     let reply = if dbid > 0 {
         let handler = root_handler.for_new_client(dbid, dummy_peer.clone(), dbid);
         match handler.handle(message) {
@@ -87,13 +90,21 @@ pub fn handle(
             Err(e) => return Err(anyhow!("root handler error: {:?}", e)),
         }
     };
+/*
     if do_log {
         log::info!("VLS msg handled");
     }
-    let mut out_md = MsgDriver::new_empty();
-    write_serial_response_header(&mut out_md, sequence).expect("write reply header");
-    msgs::write_vec(&mut out_md, reply.0.as_vec()).expect("write reply");
-    Ok(out_md.bytes())
+*/
+
+    //let mut out_md: Vec<u8>= Vec::with_capacity(reply.0.as_vec().len() + 8);
+
+    let mut reference: &mut Vec<u8> = &mut out_buffer;
+    write_serial_response_header(&mut reference, sequence).expect("write reply header");
+    //log::info!("Wrote serial_response_header, length of out_md: {}, capacity: {}", reference.len(), reference.capacity());
+    //log::info!("About to write reply of length: {}", reply.0.as_vec().len());
+    msgs::write_vec(&mut reference, reply.0.as_vec()).expect("write reply");
+    //log::info!("Wrote reply, length of out_buffer: {}, capacity: {}", out_buffer.len(), out_buffer.capacity());
+    Ok(())
 }
 
 pub fn parse_ping_and_form_response(msg_bytes: Vec<u8>) -> Vec<u8> {
