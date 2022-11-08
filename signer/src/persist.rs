@@ -128,7 +128,7 @@ impl Persist for FsPersister {
         Ok(ret.into())
     }
     fn update_channel(&self, node_id: &PublicKey, channel: &Channel) -> Result<(), Error> {
-        log::info!("=> update_channel");
+        //log::info!("=> update_channel");
         let pk = hex::encode(node_id.serialize());
         let chan_id = hex::encode(get_channel_key(channel.id0.as_slice()));
         // this breaks things...
@@ -143,7 +143,7 @@ impl Persist for FsPersister {
             enforcement_state: channel.enforcement_state.clone(),
         };
         let _ = self.channels.put(&pk, &chan_id, entry);
-        log::info!("=> update_channel complete!");
+        //log::info!("=> update_channel complete!");
         Ok(())
     }
     fn get_channel(
