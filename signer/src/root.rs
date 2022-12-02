@@ -64,7 +64,7 @@ pub fn handle(
     };
 
     if let Message::HsmdInit(ref m) = message {
-        if ChainHash::using_genesis_block(root_handler.node.network()).as_bytes()
+        if ChainHash::using_genesis_block(root_handler.node().network()).as_bytes()
             != &m.chain_params.0
         {
             log::error!("The network setting of CLN and VLS don't match!");
