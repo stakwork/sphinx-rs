@@ -48,7 +48,12 @@ fn get_channel_key(channel_id: &[u8]) -> &[u8] {
 }
 
 impl Persist for FsPersister {
-    fn new_node(&self, node_id: &PublicKey, config: &NodeConfig, state: &CoreNodeState) -> Result<(), Error> {
+    fn new_node(
+        &self,
+        node_id: &PublicKey,
+        config: &NodeConfig,
+        state: &CoreNodeState,
+    ) -> Result<(), Error> {
         let pk = hex::encode(node_id.serialize());
         let state_entry = state.into();
         let _ = self.states.put(&pk, state_entry);
@@ -91,7 +96,11 @@ impl Persist for FsPersister {
         let _ = self.channels.put(&pk, &chan_id, entry);
         Ok(())
     }
-    fn new_chain_tracker(&self, node_id: &PublicKey, tracker: &ChainTracker<ChainMonitor>) -> Result<(), Error> {
+    fn new_chain_tracker(
+        &self,
+        node_id: &PublicKey,
+        tracker: &ChainTracker<ChainMonitor>,
+    ) -> Result<(), Error> {
         let pk = hex::encode(node_id.serialize());
         let _ = self.chaintracker.put(&pk, tracker.into());
         Ok(())
@@ -153,7 +162,10 @@ impl Persist for FsPersister {
         };
         Ok(ret.into())
     }
-    fn get_node_channels(&self, node_id: &PublicKey) -> Result<Vec<(ChannelId, CoreChannelEntry)>, Error> {
+    fn get_node_channels(
+        &self,
+        node_id: &PublicKey,
+    ) -> Result<Vec<(ChannelId, CoreChannelEntry)>, Error> {
         let mut res = Vec::new();
         let pk = hex::encode(node_id.serialize());
         let list = match self.channels.list(&pk) {
@@ -168,7 +180,11 @@ impl Persist for FsPersister {
         }
         Ok(res)
     }
-    fn update_node_allowlist(&self, node_id: &PublicKey, allowlist: Vec<String>) -> Result<(), Error> {
+    fn update_node_allowlist(
+        &self,
+        node_id: &PublicKey,
+        allowlist: Vec<String>,
+    ) -> Result<(), Error> {
         let pk = hex::encode(node_id.serialize());
         let entry = AllowlistItemEntry { allowlist };
         let _ = self.allowlist.put(&pk, entry);
