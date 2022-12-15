@@ -31,6 +31,7 @@ async fn rocket() -> _ {
     let seed_string: String = env::var("SEED").expect("no seed");
     let seed = hex::decode(seed_string).expect("couldnt decode seed");
     let (pk, sk) = sphinx_signer::derive_node_keys(&network, &seed);
+    println!("PUBKEY {}", hex::encode(pk.serialize()));
     let mut ctrlr = Controller::new(sk, pk, 0);
 
     let seed32: [u8; 32] = seed.try_into().expect("invalid seed");

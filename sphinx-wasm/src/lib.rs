@@ -18,6 +18,11 @@ pub fn build_control_request(msg: &str, secret: &str, nonce: u64) -> Result<Stri
 }
 
 #[wasm_bindgen]
+pub fn parse_control_response(msg: &str) -> Result<String> {
+    Ok(cy::parse_response(msg.to_string())?)
+}
+
+#[wasm_bindgen]
 pub struct Keys {
     secret: String,
     pubkey: String,

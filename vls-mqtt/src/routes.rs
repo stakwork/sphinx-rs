@@ -1,3 +1,4 @@
+use fairing::{Fairing, Info, Kind};
 use fs::{relative, FileServer};
 use rocket::response::stream::{Event, EventStream};
 use rocket::tokio::select;
@@ -70,9 +71,11 @@ pub fn launch_rocket(
     tx: mpsc::Sender<ChannelRequest>,
     error_tx: broadcast::Sender<Vec<u8>>,
 ) -> Rocket<Build> {
+    println!("=> launch_rocket");
     rocket::build()
         .mount("/", FileServer::from(relative!("app/public")))
         .mount("/api/", routes![control, errors])
+        .attach(CORS)
         .manage(tx)
         .manage(error_tx)
 }
@@ -97,5 +100,30 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for Error {
             // in our simplistic example, we're happy to respond with the default 500 responder in all cases
             _ => Status::InternalServerError.respond_to(req),
         }
+    }
+}
+
+pub struct CORS;
+
+#[rocket::async_trait]
+impl Fairing for CORS {
+    fn info(&self) -> Info {
+        Info {
+            name: "Add CORS headers to responses",
+            kind: Kind::Response,
+        }
+    }
+
+    async fn on_response<'r>(&self, _request: &'r Request<'_>, response: &mut Response<'r>) {
+        response.set_header(http::Header::new("Access-Control-Allow-Origin", "*"));
+        response.set_header(http::Header::new(
+            "Access-Control-Allow-Methods",
+            "POST, GET, PATCH, OPTIONS",
+        ));
+        response.set_header(http::Header::new("Access-Control-Allow-Headers", "*"));
+        response.set_header(http::Header::new(
+            "Access-Control-Allow-Credentials",
+            "true",
+        ));
     }
 }

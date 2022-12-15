@@ -7,31 +7,12 @@
   import Allowlist from "./Allowlist.svelte";
   import Policy from "./Policy.svelte";
 
-  function test() {
-    // let sk = "86c8977989592a97beb409bc27fde76e981ce3543499fd61743755b832e92a3e";
-    // let pk = sphinx.pubkey_from_secret_key(sk);
-    // console.log(pk);
+  let loaded = false;
 
-    // let msg = { type: "Nonce" };
-    // let req = sphinx.build_control_request(JSON.stringify(msg), sk, BigInt(0));
-    // console.log(req);
-
-    let mnemonic =
-      "man dwarf taxi bargain naive envelope width license rotate divide keep tag limb immune express nasty word arm assist problem lobster innocent pottery sweet";
-
-    let seed = sphinx.entropy_from_mnemonic(mnemonic);
-    console.log("seed", seed);
-
-    // let asdf = sphinx.mnemonic_from_entropy(seed);
-    // console.log(asdf);
-
-    let hi = sphinx.node_keys("regtest", seed);
-    console.log("secret", hi.secret);
-  }
   async function loadWasm() {
     try {
       await sphinx.default("/sphinx_wasm_bg.wasm");
-      test();
+      loaded = true;
     } catch (e) {
       console.log(e);
     }
@@ -59,7 +40,9 @@
   </header>
   <div class="body">
     <div class="lefty"><Sidebar /></div>
-    <svelte:component this={component} />
+    {#if loaded}
+      <svelte:component this={component} />
+    {/if}
   </div>
 </main>
 

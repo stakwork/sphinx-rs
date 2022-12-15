@@ -10,7 +10,9 @@ console.log(get(nonce));
 export const keys = derived([seed], ([$seed]) => {
   try {
     return sphinx.node_keys("regtest", $seed);
-  } catch (e) {}
+  } catch (e) {
+    console.error(e);
+  }
 });
 
 interface Control {
@@ -40,8 +42,8 @@ interface WifiParams {
 
 export function root() {
   let root = "/api/";
-  if (window.location.host === "localhost:3000") {
-    root = "http://localhost:8000/api/";
+  if (window.location.host === "localhost:8080") {
+    root = "http://localhost:8008/api/";
   }
   if (window.location.host === "localhost:3001") {
     root = "https://vls.sphinx.chat/api/";
@@ -52,22 +54,33 @@ export function root() {
 async function sendCmd(type: Cmd, content?: any) {
   const j = JSON.stringify({ type, ...(content && { content }) });
   const ks: sphinx.Keys = get(keys);
+  console.log("PUBKEY", ks.pubkey, j);
   let msg;
   try {
     msg = sphinx.build_control_request(j, ks.secret, BigInt(get(nonce)));
   } catch (e) {
+    console.error(e);
     return null;
   }
+  console.log("msg to ssend", `${root()}control?msg=${msg}`);
   const r = await fetch(`${root()}control?msg=${msg}`, {
     method: "POST",
   });
   const res = await r.text();
-  let ret;
-  try {
-    // return sphinx.
-  } catch (e) {}
+  return res;
 }
 
-export function getNonce() {
-  const req = sendCmd("Nonce");
+export async function getNonce() {
+  console.log("get nonce");
+  try {
+    console.log("-");
+    const res = await sendCmd("Nonce");
+    console.log("1", res);
+    const msg = sphinx.parse_control_response(res);
+    console.log("2");
+    console.log(msg);
+    return msg;
+  } catch (e) {
+    return null;
+  }
 }

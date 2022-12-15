@@ -3,8 +3,11 @@
   import { seed } from "./store";
   import { sphinx } from "./wasm";
   import { getNonce } from "./api";
+  import { onMount } from "svelte";
 
-  getNonce();
+  onMount(() => {
+    getNonce();
+  });
 
   function split(s: string) {
     let a = s.split(" ");
