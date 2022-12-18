@@ -33,13 +33,13 @@ impl Controller {
         self.2
     }
     pub fn build_msg(&mut self, msg: ControlMessage) -> anyhow::Result<Vec<u8>> {
-        let data = rmp_serde::to_vec(&msg)?;
+        let data = rmp_serde::to_vec_named(&msg)?;
         self.2 = self.2 + 1;
         let ret = nonce::build_msg(&data, &self.0, self.2)?;
         Ok(ret)
     }
     pub fn build_response(&self, msg: ControlResponse) -> anyhow::Result<Vec<u8>> {
-        Ok(rmp_serde::to_vec(&msg)?)
+        Ok(rmp_serde::to_vec_named(&msg)?)
     }
     pub fn parse_msg(&mut self, input: &[u8]) -> anyhow::Result<ControlMessage> {
         let msg = nonce::parse_msg(input, &self.1, self.2)?;
@@ -110,7 +110,7 @@ pub fn build_control_msg(
     nonce: u64,
     secret: &SecretKey,
 ) -> anyhow::Result<Vec<u8>> {
-    let data = rmp_serde::to_vec(&msg)?;
+    let data = rmp_serde::to_vec_named(&msg)?;
     let ret = nonce::build_msg(&data, secret, nonce)?;
     Ok(ret)
 }
@@ -202,6 +202,10 @@ impl ControlPersist for DummyPersister {
 // cargo test controller::tests::test_ctrl_json -- --exact
 mod tests {
 
+    use crate::control::*;
+    use sphinx_auther::secp256k1::rand::rngs::OsRng;
+    use sphinx_auther::secp256k1::Secp256k1;
+
     #[test]
     fn test_ctrl_json() {
         use crate::control::control_msg_from_json;
@@ -213,9 +217,33 @@ mod tests {
         }
 
         let msg = "{\"type\":\"Nonce\"}";
-        control_msg_from_json(msg.as_bytes()).expect("Nonce failed");
+        let m1 = control_msg_from_json(msg.as_bytes()).expect("Nonce failed");
 
         let msg = "{\"type\":\"UpdatePolicy\", \"content\":{\"sat_limit\":0, \"interval\":\"hourly\", \"htlc_limit\":10}}";
         control_msg_from_json(msg.as_bytes()).expect("Nonce failed");
+    }
+
+    #[test]
+    fn test_ctrl_msg() {
+        let msg = ControlMessage::Nonce;
+        let data = rmp_serde::to_vec_named(&msg).unwrap();
+        let msg: ControlMessage =
+            rmp_serde::from_slice(&data).expect("failed to parse ControlMessage from slice");
+    }
+
+    #[test]
+    fn test_controller() {
+        let secp = Secp256k1::new();
+        let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
+
+        let msg = "{\"type\":\"Nonce\"}";
+        let m1 = control_msg_from_json(msg.as_bytes()).expect("Nonce failed");
+        let m2 = build_control_msg(m1, 1, &secret_key).expect("FAIL");
+
+        let mut ctrlr = Controller::new(secret_key, public_key, 0);
+
+        let (_, res) = ctrlr.handle(&m2).expect("failed to handle");
+        let built_res = ctrlr.build_response(res).expect("failed to build res");
+        let r = parse_control_response(&built_res).expect("cant parse res");
     }
 }

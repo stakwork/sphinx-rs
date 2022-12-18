@@ -68,7 +68,8 @@ async fn listen_for_commands(
         match ctrlr.handle(&msg.message) {
             Ok((cmsg, cres)) => {
                 let res2 = update_controls(rh, network, cmsg, cres);
-                let reply = rmp_serde::to_vec(&res2).expect("could not build control response");
+                let reply =
+                    rmp_serde::to_vec_named(&res2).expect("could not build control response");
                 msg.reply_tx
                     .send(ChannelReply { reply })
                     .expect("couldnt send ctrl reply");

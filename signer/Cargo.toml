@@ -12,8 +12,8 @@ default = ["fspersist"]
 fspersist = ["fsdb", "vls-persist"]
 
 [dependencies]
-# sphinx-glyph = { path = '../glyph' }
-sphinx-glyph = "0.1.2"
+sphinx-glyph = { path = '../glyph' }
+# sphinx-glyph = "0.1.2"
 vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", default-features = false, features = ["std", "secp-lowmemory"] }
 vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", features = ["std"] }
 log = "0.4"

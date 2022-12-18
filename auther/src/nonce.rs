@@ -47,7 +47,6 @@ pub fn build_msg(input: &[u8], sk: &SecretKey, nonce: u64) -> anyhow::Result<Vec
 pub fn parse_msg(input: &[u8], pk: &PublicKey, last_nonce: u64) -> anyhow::Result<Vec<u8>> {
     let (msg, nonce) = parse_msg_no_nonce(input, pk)?;
     if nonce <= last_nonce {
-        println!("nonce {} last_mnone {}", nonce, last_nonce);
         return Err(anyhow!("bad nonce"));
     }
     Ok(msg.to_vec())

@@ -5,7 +5,11 @@ import { derived, get } from "svelte/store";
 
 const nonce = localStorageStore("nonce", 0);
 
-console.log(get(nonce));
+function newNonce(): bigint {
+  let n = get(nonce);
+  // nonce.update((n) => n + 1);
+  return BigInt(n + 1);
+}
 
 export const keys = derived([seed], ([$seed]) => {
   try {
@@ -54,15 +58,13 @@ export function root() {
 async function sendCmd(type: Cmd, content?: any) {
   const j = JSON.stringify({ type, ...(content && { content }) });
   const ks: sphinx.Keys = get(keys);
-  console.log("PUBKEY", ks.pubkey, j);
   let msg;
   try {
-    msg = sphinx.build_control_request(j, ks.secret, BigInt(get(nonce)));
+    msg = sphinx.build_control_request(j, ks.secret, newNonce());
   } catch (e) {
     console.error(e);
     return null;
   }
-  console.log("msg to ssend", `${root()}control?msg=${msg}`);
   const r = await fetch(`${root()}control?msg=${msg}`, {
     method: "POST",
   });
@@ -71,14 +73,10 @@ async function sendCmd(type: Cmd, content?: any) {
 }
 
 export async function getNonce() {
-  console.log("get nonce");
   try {
-    console.log("-");
     const res = await sendCmd("Nonce");
-    console.log("1", res);
     const msg = sphinx.parse_control_response(res);
-    console.log("2");
-    console.log(msg);
+    console.log("nonce response:", msg);
     return msg;
   } catch (e) {
     return null;
