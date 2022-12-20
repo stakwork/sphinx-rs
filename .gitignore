@@ -4,3 +4,4 @@ Cargo.lock
 teststore
 .env
 error.log
+vls_mqtt_data

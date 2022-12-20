@@ -7,29 +7,42 @@
     Button,
   } from "carbon-components-svelte";
   import Save from "carbon-icons-svelte/lib/Save.svelte";
-
+  import { onMount } from "svelte";
+  import * as api from "./api";
   import { policy } from "./store";
 
   let sat_limit = $policy.sat_limit;
   let interval = $policy.interval;
   let htlc_limit = $policy.htlc_limit;
+
+  async function initPolicy() {
+    const p = await api.getPolicy();
+    sat_limit = p.sat_limit;
+    interval = p.interval;
+    htlc_limit = p.htlc_limit;
+  }
+  onMount(() => {
+    initPolicy();
+  });
+
   // dirty = ready to be saved
   $: dirty =
     htlc_limit !== $policy.htlc_limit ||
     interval !== $policy.interval ||
     sat_limit !== $policy.sat_limit;
+
+  async function submit(e) {
+    e.preventDefault();
+    await api.setPolicy({
+      sat_limit,
+      htlc_limit,
+      interval,
+    });
+  }
 </script>
 
 <main>
-  <Form
-    on:submit={(e) => {
-      e.preventDefault();
-      policy.set({
-        sat_limit,
-        htlc_limit,
-        interval,
-      });
-    }}
+  <Form on:submit={submit}
     ><FormGroup>
       <NumberInput label="Satoshi Limit Per Interval" bind:value={sat_limit} />
       <br />

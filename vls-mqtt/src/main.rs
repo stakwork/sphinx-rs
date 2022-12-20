@@ -1,5 +1,6 @@
 mod logger;
 mod mqtt;
+mod persist;
 mod routes;
 
 use crate::routes::{ChannelReply, ChannelRequest};
@@ -13,7 +14,7 @@ use sphinx_signer::policy::update_controls;
 use sphinx_signer::{self, root, sphinx_glyph as glyph, RootHandler};
 use std::env;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub const ROOT_STORE: &str = "teststore";
 
@@ -32,7 +33,10 @@ async fn rocket() -> _ {
     let seed = hex::decode(seed_string).expect("couldnt decode seed");
     let (pk, sk) = sphinx_signer::derive_node_keys(&network, &seed);
     println!("PUBKEY {}", hex::encode(pk.serialize()));
-    let mut ctrlr = Controller::new(sk, pk, 0);
+
+    let pers = persist::ControlPersister::new("vls_mqtt_data");
+    let pers_arc = Arc::new(Mutex::new(pers));
+    let mut ctrlr = Controller::new_with_persister(sk, pk, pers_arc);
 
     let seed32: [u8; 32] = seed.try_into().expect("invalid seed");
     let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());

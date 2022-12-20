@@ -24,7 +24,7 @@ export interface Policy {
 }
 
 export const defaultPolicy: Policy = {
-  sat_limit: 1000000,
+  sat_limit: 1100000,
   interval: "daily",
   htlc_limit: 1000000,
 };

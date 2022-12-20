@@ -203,8 +203,6 @@ impl ControlPersist for DummyPersister {
 mod tests {
 
     use crate::control::*;
-    use sphinx_auther::secp256k1::rand::rngs::OsRng;
-    use sphinx_auther::secp256k1::Secp256k1;
 
     #[test]
     fn test_ctrl_json() {
@@ -233,6 +231,9 @@ mod tests {
 
     #[test]
     fn test_controller() {
+        use sphinx_auther::secp256k1::rand::rngs::OsRng;
+        use sphinx_auther::secp256k1::Secp256k1;
+
         let secp = Secp256k1::new();
         let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
 

@@ -1,6 +1,6 @@
 import { sphinx } from "./wasm";
 import { localStorageStore } from "./storage";
-import { seed } from "./store";
+import { seed, policy, Policy } from "./store";
 import { derived, get } from "svelte/store";
 
 const nonce = localStorageStore("nonce", 0);
@@ -80,5 +80,35 @@ export async function getNonce() {
     return msg;
   } catch (e) {
     return null;
+  }
+}
+
+export async function getPolicy(): Promise<Policy> {
+  try {
+    const res = await sendCmd("QueryPolicy");
+    const msg = sphinx.parse_control_response(res);
+    const j = JSON.parse(msg);
+    if (j.PolicyCurrent) {
+      console.log(j.PolicyCurrent);
+      policy.set(j.PolicyCurrent);
+      return j.PolicyCurrent;
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+export async function setPolicy(p: Policy): Promise<Policy> {
+  try {
+    const res = await sendCmd("UpdatePolicy", p);
+    const msg = sphinx.parse_control_response(res);
+    const j = JSON.parse(msg);
+    if (j.PolicyUpdated) {
+      console.log(j.PolicyUpdated);
+      policy.set(j.PolicyUpdated);
+      return j.PolicyUpdated;
+    }
+  } catch (e) {
+    console.error(e);
   }
 }
