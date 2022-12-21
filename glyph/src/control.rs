@@ -202,8 +202,6 @@ impl ControlPersist for DummyPersister {
 // cargo test controller::tests::test_ctrl_json -- --exact
 mod tests {
 
-    use crate::control::*;
-
     #[test]
     fn test_ctrl_json() {
         use crate::control::control_msg_from_json;
@@ -215,7 +213,7 @@ mod tests {
         }
 
         let msg = "{\"type\":\"Nonce\"}";
-        let m1 = control_msg_from_json(msg.as_bytes()).expect("Nonce failed");
+        let _m1 = control_msg_from_json(msg.as_bytes()).expect("Nonce failed");
 
         let msg = "{\"type\":\"UpdatePolicy\", \"content\":{\"sat_limit\":0, \"interval\":\"hourly\", \"htlc_limit\":10}}";
         control_msg_from_json(msg.as_bytes()).expect("Nonce failed");
@@ -223,14 +221,16 @@ mod tests {
 
     #[test]
     fn test_ctrl_msg() {
+        use crate::types::ControlMessage;
         let msg = ControlMessage::Nonce;
         let data = rmp_serde::to_vec_named(&msg).unwrap();
-        let msg: ControlMessage =
+        let _msg: ControlMessage =
             rmp_serde::from_slice(&data).expect("failed to parse ControlMessage from slice");
     }
 
     #[test]
     fn test_controller() {
+        use crate::control::*;
         use sphinx_auther::secp256k1::rand::rngs::OsRng;
         use sphinx_auther::secp256k1::Secp256k1;
 
@@ -245,6 +245,6 @@ mod tests {
 
         let (_, res) = ctrlr.handle(&m2).expect("failed to handle");
         let built_res = ctrlr.build_response(res).expect("failed to build res");
-        let r = parse_control_response(&built_res).expect("cant parse res");
+        let _r = parse_control_response(&built_res).expect("cant parse res");
     }
 }
