@@ -4,7 +4,8 @@ members = [
     "crypter",
     "glyph",
     "signer",
-    "vls-mqtt"
+    "sphinx-frost",
+    "vls-mqtt",
 ]
 
 exclude = [
