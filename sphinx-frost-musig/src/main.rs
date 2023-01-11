@@ -124,7 +124,7 @@ fn main() {
 
 
 
-// ************** CREATE FROST AGGREGATE NONCE AND SIGNATURE ***************** //
+// ************** MERGE FROST NONCE AND SIGNATURE INTO MUSIG2 ***************** //
 
 
     let mut nonce_rng_0: ChaCha20Rng =
