@@ -1,6 +1,7 @@
 use rand_chacha::ChaCha20Rng;
 use schnorr_fun::{frost, Message};
 use sha2::Sha256;
+use std::ops::MulAssign;
 
 fn main() {
     let frost = frost::new_with_deterministic_nonces::<Sha256>();
@@ -65,6 +66,17 @@ fn main() {
     // share the public nonces with the other signing participant(s)
     // receive public nonces from other signers
     let nonces = vec![(0, nonce_0.public()), (2, nonce_2.public())];
+
+    let nonce_a = nonce_0.clone();
+    let nonce_b = nonce_2.clone();
+    let a_secret = nonce_a.secret();
+    let b_secret = nonce_b.secret();
+    let mut a_scalar = a_secret[0].clone();
+    let b_scalar = b_secret[0].clone();
+
+    a_scalar.mul_assign(b_scalar);
+
+    //nonce_0.secret()[0].mul_assign(nonce_2.secret()[0]);
 
     // start a sign session with these nonces for a message
     let session = frost.start_sign_session(&frost_key, nonces.clone(), message);
