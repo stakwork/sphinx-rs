@@ -5,6 +5,7 @@ members = [
     "glyph",
     "signer",
     "sphinx-frost",
+    "sphinx-musig",
     "vls-mqtt",
 ]
 

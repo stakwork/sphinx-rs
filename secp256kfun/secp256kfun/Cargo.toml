@@ -1,0 +1,57 @@
+[package]
+name = "secp256kfun"
+version = "0.8.2"
+authors = ["LLFourn <lloyd.fourn@gmail.com>"]
+license = "0BSD"
+homepage = "https://github.com/LLFourn/secp256kfun"
+repository = "https://github.com/LLFourn/secp256kfun"
+documentation = "https://docs.rs/secp256kfun"
+description = "A mid-level secp256k1 library optimized for fun!"
+edition = "2021"
+rust-version = "1.60"
+categories = ["cryptography", "cryptography::cryptocurrencies"]
+readme = "README.md"
+keywords = ["bitcoin", "secp256k1"]
+
+
+[dependencies]
+digest = { version = "0.10", default-features = false }
+subtle = { package = "subtle-ng", version = "2", default-features = false }
+rand_core = { version = "0.6", default-features = false }
+
+# optional
+serde = { version = "1.0",  optional = true, default-features = false, features = ["derive"] }
+secp256k1 = { version = "0.25", optional = true, default-features = false }
+proptest = { version = "1", optional = true }
+
+[dev-dependencies]
+serde_json = "1"
+rand = { version = "0.8" }
+lazy_static = "1.4"
+sha2 = "0.10"
+proptest = "1"
+bincode = "1.0"
+criterion = "0.3"
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[features]
+default = ["std"]
+alloc = ["serde?/alloc", "digest/alloc", "secp256k1?/alloc"]
+std = ["alloc", "subtle/std", "digest/std"]
+libsecp_compat = ["dep:secp256k1"]
+serde = [ "dep:serde", "secp256k1?/serde" ]
+
+[[bench]]
+name = "bench_ecmult"
+harness = false
+
+[[bench]]
+name = "bench_point"
+harness = false
+
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

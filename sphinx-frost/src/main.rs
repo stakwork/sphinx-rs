@@ -2,6 +2,8 @@ use rand_chacha::ChaCha20Rng;
 use schnorr_fun::{frost, Message};
 use sha2::Sha256;
 use std::ops::MulAssign;
+use schnorr_fun::binonce::Nonce;
+use secp256kfun::marker::Zero;
 
 fn main() {
     let frost = frost::new_with_deterministic_nonces::<Sha256>();
@@ -80,6 +82,15 @@ fn main() {
 
     // start a sign session with these nonces for a message
     let session = frost.start_sign_session(&frost_key, nonces.clone(), message);
+
+    let x = session.agg_nonce;
+    let y = x.to_bytes();
+
+    let mut z = [0u8; 66];
+    for i in 0..66 {
+        z[i] = y[i%33];
+    }
+    Nonce::<Zero>::from_bytes(z);
 
     // create a partial signature using our secret share and secret nonce
     let sig_0 = frost.sign(&frost_key, &session, 0, &secret_share_0, nonce_0);
