@@ -10,3 +10,8 @@ rand = "0.8.5"
 rand_chacha = "0.3.1"
 schnorr_fun = {version = "0.8.2"}
 sha2 = "0.10.6"
+hex = "0.4.3"
+
+[dev-dependencies]
+crossbeam = "0.8.2"
+
