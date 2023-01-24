@@ -17,6 +17,8 @@ use vls_persist::model::{
 use vls_protocol_signer::lightning_signer;
 use vls_protocol_signer::lightning_signer::persist::Error;
 
+pub use lightning_signer::persist::DummyPersister;
+
 pub struct FsPersister {
     nodes: Bucket<NodeEntry>,
     states: Bucket<NodeStateEntry>,
