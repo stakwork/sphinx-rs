@@ -60,22 +60,20 @@ impl Write for MsgDriver {
 
 pub fn raw_request_from_bytes(
     message: Vec<u8>,
-    sequence: u16,
-    dbid: u64,
+    srh: &msgs::SerialRequestHeader,
 ) -> vls_protocol::Result<Vec<u8>> {
     let mut md = MsgDriver::new_empty();
-    msgs::write_serial_request_header(&mut md, sequence, dbid)?;
+    msgs::write_serial_request_header(&mut md, srh)?;
     msgs::write_vec(&mut md, message)?;
     Ok(md.bytes())
 }
 
 pub fn request_from_msg<T: ser::Serialize + DeBolt>(
     msg: T,
-    sequence: u16,
-    dbid: u64,
+    srh: &msgs::SerialRequestHeader,
 ) -> vls_protocol::Result<Vec<u8>> {
     let mut md = MsgDriver::new_empty();
-    msgs::write_serial_request_header(&mut md, sequence, dbid)?;
+    msgs::write_serial_request_header(&mut md, srh)?;
     msgs::write(&mut md, msg)?;
     Ok(md.bytes())
 }
@@ -90,11 +88,11 @@ pub fn raw_response_from_msg<T: ser::Serialize + DeBolt>(
     Ok(m.bytes())
 }
 
-pub fn request_from_bytes<T: DeBolt>(msg: Vec<u8>) -> vls_protocol::Result<(T, u16, u64)> {
+pub fn request_from_bytes<T: DeBolt>(msg: Vec<u8>) -> vls_protocol::Result<(T, msgs::SerialRequestHeader)> {
     let mut m = MsgDriver::new(msg);
-    let (sequence, dbid) = msgs::read_serial_request_header(&mut m)?;
+    let srh: msgs::SerialRequestHeader = msgs::read_serial_request_header(&mut m)?;
     let reply: T = msgs::read_message(&mut m)?;
-    Ok((reply, sequence, dbid))
+    Ok((reply, srh))
 }
 
 pub fn raw_response_from_bytes(
