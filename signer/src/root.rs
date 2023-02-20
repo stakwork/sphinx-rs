@@ -47,21 +47,11 @@ pub fn init(
 pub fn handle(
     root_handler: &RootHandler,
     bytes: Vec<u8>,
-    dummy_peer: PubKey,
     do_log: bool,
 ) -> anyhow::Result<Vec<u8>> {
     let mut md = MsgDriver::new(bytes);
-    let (sequence, dbid) = read_serial_request_header(&mut md).expect("read request header");
-    let mut message = msgs::read(&mut md).expect("message read failed");
-
-    // Override the peerid when it is passed in certain messages
-    match message {
-        Message::NewChannel(ref mut m) => m.node_id = dummy_peer.clone(),
-        Message::ClientHsmFd(ref mut m) => m.peer_id = dummy_peer.clone(),
-        Message::GetChannelBasepoints(ref mut m) => m.node_id = dummy_peer.clone(),
-        Message::SignCommitmentTx(ref mut m) => m.peer_id = dummy_peer.clone(),
-        _ => {}
-    };
+    let msgs::SerialRequestHeader { sequence, peer_id, dbid } = read_serial_request_header(&mut md).expect("read request header");
+    let message = msgs::read(&mut md).expect("message read failed");
 
     if let Message::HsmdInit(ref m) = message {
         if ChainHash::using_genesis_block(root_handler.node().network()).as_bytes()
@@ -76,7 +66,7 @@ pub fn handle(
         log::info!("VLS msg: {:?}", message);
     }
     let reply = if dbid > 0 {
-        let handler = root_handler.for_new_client(dbid, dummy_peer.clone(), dbid);
+        let handler = root_handler.for_new_client(dbid, PubKey(peer_id), dbid);
         match handler.handle(message) {
             Ok(r) => r,
             Err(e) => return Err(anyhow!("client {} handler error: {:?}", dbid, e)),
@@ -98,7 +88,7 @@ pub fn handle(
 
 pub fn parse_ping_and_form_response(msg_bytes: Vec<u8>) -> Vec<u8> {
     let mut m = MsgDriver::new(msg_bytes);
-    let (sequence, _dbid) = msgs::read_serial_request_header(&mut m).expect("read ping header");
+    let msgs::SerialRequestHeader { sequence, peer_id: _, dbid: _ } = msgs::read_serial_request_header(&mut m).expect("read ping header");
     let ping: msgs::Ping = msgs::read_message(&mut m).expect("failed to read ping message");
     let mut md = MsgDriver::new_empty();
     msgs::write_serial_response_header(&mut md, sequence)

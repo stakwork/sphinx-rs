@@ -4,7 +4,6 @@ use sphinx_signer::sphinx_glyph::{sphinx_auther, topics};
 
 use rocket::tokio::sync::broadcast;
 use rumqttc::{self, AsyncClient, Event, EventLoop, MqttOptions, Packet, QoS};
-use sphinx_signer::vls_protocol::model::PubKey;
 use sphinx_signer::{self, root, RootHandler};
 use std::env;
 use std::error::Error;
@@ -71,11 +70,10 @@ async fn run_main(
     loop {
         match eventloop.poll().await {
             Ok(event) => {
-                let dummy_peer = PubKey([0; 33]);
                 if let Some((topic, msg_bytes)) = incoming_bytes(event) {
                     match topic.as_str() {
                         topics::VLS => {
-                            match root::handle(root_handler, msg_bytes, dummy_peer.clone(), false) {
+                            match root::handle(root_handler, msg_bytes, false) {
                                 Ok(b) => client
                                     .publish(topics::VLS_RETURN, QoS::AtMostOnce, false, b)
                                     .await
