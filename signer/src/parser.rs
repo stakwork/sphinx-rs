@@ -60,20 +60,34 @@ impl Write for MsgDriver {
 
 pub fn raw_request_from_bytes(
     message: Vec<u8>,
-    srh: &msgs::SerialRequestHeader,
+    sequence: u16,
+    peer_id: [u8; 33],
+    dbid: u64,
 ) -> vls_protocol::Result<Vec<u8>> {
     let mut md = MsgDriver::new_empty();
-    msgs::write_serial_request_header(&mut md, srh)?;
+    let srh = msgs::SerialRequestHeader {
+        sequence,
+        peer_id,
+        dbid,
+    };
+    msgs::write_serial_request_header(&mut md, &srh)?;
     msgs::write_vec(&mut md, message)?;
     Ok(md.bytes())
 }
 
 pub fn request_from_msg<T: ser::Serialize + DeBolt>(
     msg: T,
-    srh: &msgs::SerialRequestHeader,
+    sequence: u16,
+    peer_id: [u8; 33],
+    dbid: u64,
 ) -> vls_protocol::Result<Vec<u8>> {
     let mut md = MsgDriver::new_empty();
-    msgs::write_serial_request_header(&mut md, srh)?;
+    let srh = msgs::SerialRequestHeader {
+        sequence,
+        peer_id,
+        dbid,
+    };
+    msgs::write_serial_request_header(&mut md, &srh)?;
     msgs::write(&mut md, msg)?;
     Ok(md.bytes())
 }
@@ -88,7 +102,9 @@ pub fn raw_response_from_msg<T: ser::Serialize + DeBolt>(
     Ok(m.bytes())
 }
 
-pub fn request_from_bytes<T: DeBolt>(msg: Vec<u8>) -> vls_protocol::Result<(T, msgs::SerialRequestHeader)> {
+pub fn request_from_bytes<T: DeBolt>(
+    msg: Vec<u8>,
+) -> vls_protocol::Result<(T, msgs::SerialRequestHeader)> {
     let mut m = MsgDriver::new(msg);
     let srh: msgs::SerialRequestHeader = msgs::read_serial_request_header(&mut m)?;
     let reply: T = msgs::read_message(&mut m)?;
@@ -116,6 +132,7 @@ mod tests {
     use vls_protocol::msgs;
     use vls_protocol::serde_bolt::WireString;
 
+    // cargo test parser::tests::test_parser -- --exact
     #[test]
     fn test_parser() {
         let msg = "hello";
@@ -124,12 +141,17 @@ mod tests {
             message: WireString(msg.as_bytes().to_vec()),
         };
         let mut md = MsgDriver::new_empty();
-        msgs::write_serial_request_header(&mut md, 0, 0)
+        let srh = msgs::SerialRequestHeader {
+            sequence: 0,
+            peer_id: [0u8; 33],
+            dbid: 0,
+        };
+        msgs::write_serial_request_header(&mut md, &srh)
             .expect("failed to write_serial_request_header");
         msgs::write(&mut md, ping).expect("failed to serial write");
         let mut m = MsgDriver::new(md.bytes());
-        let (_sequence, _dbid) =
-            msgs::read_serial_request_header(&mut m).expect("read ping header");
+        let _srh2 = msgs::read_serial_request_header(&mut m).expect("read ping header");
+        println!("{:?}", _srh2);
         let parsed_ping: msgs::Ping =
             msgs::read_message(&mut m).expect("failed to read ping message");
         assert_eq!(parsed_ping.id, 0);
