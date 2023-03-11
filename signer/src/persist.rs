@@ -8,9 +8,10 @@ use lightning_signer::persist::model::{
     ChannelEntry as CoreChannelEntry, NodeEntry as CoreNodeEntry,
 };
 use lightning_signer::persist::Persist;
-use lightning_signer::policy::validator::EnforcementState;
+use lightning_signer::policy::validator::{EnforcementState, ValidatorFactory};
 use lightning_signer::SendSync;
 use std::string::String;
+use std::sync::Arc;
 use vls_persist::model::{
     AllowlistItemEntry, ChainTrackerEntry, ChannelEntry, NodeEntry, NodeStateEntry,
 };
@@ -116,7 +117,11 @@ impl Persist for FsPersister {
         log::info!("=> update_tracker complete");
         Ok(())
     }
-    fn get_tracker(&self, node_id: &PublicKey) -> Result<ChainTracker<ChainMonitor>, Error> {
+    fn get_tracker(
+        &self,
+        node_id: PublicKey,
+        validator_factory: Arc<dyn ValidatorFactory>,
+    ) -> Result<ChainTracker<ChainMonitor>, Error> {
         let pk = hex::encode(node_id.serialize());
         let ret: ChainTrackerEntry = match self.chaintracker.get(&pk) {
             Ok(ct) => ct,
@@ -125,7 +130,7 @@ impl Persist for FsPersister {
                 return Err(Error::NotFound("Failed on get_tracker".to_string()));
             }
         };
-        Ok(ret.into())
+        Ok(ret.into_tracker(node_id.clone(), validator_factory))
     }
     fn update_channel(&self, node_id: &PublicKey, channel: &Channel) -> Result<(), Error> {
         log::info!("=> update_channel");

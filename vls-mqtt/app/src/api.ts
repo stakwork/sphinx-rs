@@ -8,6 +8,7 @@ const nonce = localStorageStore("nonce", 0);
 function newNonce(): bigint {
   let n = get(nonce);
   // nonce.update((n) => n + 1);
+  log("newNonce", n);
   return BigInt(n + 1);
 }
 
@@ -56,6 +57,7 @@ export function root() {
 }
 
 async function sendCmd(type: Cmd, content?: any) {
+  log("sendCmd", type, content);
   const j = JSON.stringify({ type, ...(content && { content }) });
   const ks: sphinx.Keys = get(keys);
   let msg;
@@ -73,6 +75,7 @@ async function sendCmd(type: Cmd, content?: any) {
 }
 
 export async function getNonce() {
+  log("getNonce");
   try {
     const res = await sendCmd("Nonce");
     const msg = sphinx.parse_control_response(res);
@@ -84,6 +87,7 @@ export async function getNonce() {
 }
 
 export async function getPolicy(): Promise<Policy> {
+  log("getPolicy");
   try {
     const res = await sendCmd("QueryPolicy");
     const msg = sphinx.parse_control_response(res);
@@ -112,3 +116,5 @@ export async function setPolicy(p: Policy): Promise<Policy> {
     console.error(e);
   }
 }
+
+const log = false ? console.log : () => {};

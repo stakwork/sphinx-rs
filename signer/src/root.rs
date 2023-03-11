@@ -44,13 +44,14 @@ pub fn init(
     Ok(root_handler)
 }
 
-pub fn handle(
-    root_handler: &RootHandler,
-    bytes: Vec<u8>,
-    do_log: bool,
-) -> anyhow::Result<Vec<u8>> {
+pub fn handle(root_handler: &RootHandler, bytes: Vec<u8>, do_log: bool) -> anyhow::Result<Vec<u8>> {
     let mut md = MsgDriver::new(bytes);
-    let msgs::SerialRequestHeader { sequence, peer_id, dbid } = read_serial_request_header(&mut md).expect("read request header");
+    let msgs::SerialRequestHeader {
+        sequence,
+        peer_id,
+        dbid,
+    } = read_serial_request_header(&mut md).expect("read request header");
+    println!("bytes len {}", md.bytes().len());
     let message = msgs::read(&mut md).expect("message read failed");
 
     if let Message::HsmdInit(ref m) = message {
@@ -88,7 +89,11 @@ pub fn handle(
 
 pub fn parse_ping_and_form_response(msg_bytes: Vec<u8>) -> Vec<u8> {
     let mut m = MsgDriver::new(msg_bytes);
-    let msgs::SerialRequestHeader { sequence, peer_id: _, dbid: _ } = msgs::read_serial_request_header(&mut m).expect("read ping header");
+    let msgs::SerialRequestHeader {
+        sequence,
+        peer_id: _,
+        dbid: _,
+    } = msgs::read_serial_request_header(&mut m).expect("read ping header");
     let ping: msgs::Ping = msgs::read_message(&mut m).expect("failed to read ping message");
     let mut md = MsgDriver::new_empty();
     msgs::write_serial_response_header(&mut md, sequence)
