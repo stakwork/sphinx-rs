@@ -23,7 +23,8 @@ pub async fn start(
         let t = Token::new();
         let token = t.sign_to_base64(&secret)?;
 
-        let client_id = format!("sphinx-{}", &pubkey[..12]);
+        // let client_id = format!("sphinx-{}", &pubkey[..12]);
+        let client_id = format!("sphinx-1");
         let broker: String = env::var("BROKER").unwrap_or("localhost:1883".to_string());
         let broker_: Vec<&str> = broker.split(":").collect();
         let broker_port = broker_
@@ -73,6 +74,7 @@ async fn run_main(
                 if let Some((topic, msg_bytes)) = incoming_bytes(event) {
                     match topic.as_str() {
                         topics::VLS => {
+                            println!("Got VLS message of length: {}", msg_bytes.len());
                             match root::handle(root_handler, msg_bytes, false) {
                                 Ok(b) => client
                                     .publish(topics::VLS_RETURN, QoS::AtMostOnce, false, b)
