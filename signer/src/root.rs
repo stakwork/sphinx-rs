@@ -51,7 +51,6 @@ pub fn handle(root_handler: &RootHandler, bytes: Vec<u8>, do_log: bool) -> anyho
         peer_id,
         dbid,
     } = read_serial_request_header(&mut md).expect("read request header");
-    println!("bytes len {}", md.bytes().len());
     let message = msgs::read(&mut md).expect("message read failed");
 
     if let Message::HsmdInit(ref m) = message {
@@ -65,6 +64,7 @@ pub fn handle(root_handler: &RootHandler, bytes: Vec<u8>, do_log: bool) -> anyho
 
     if do_log {
         log::info!("VLS msg: {:?}", message);
+        // println!("VLS msg: {:?}", message);
     }
     let reply = if dbid > 0 {
         let handler = root_handler.for_new_client(dbid, PubKey(peer_id), dbid);
@@ -78,9 +78,6 @@ pub fn handle(root_handler: &RootHandler, bytes: Vec<u8>, do_log: bool) -> anyho
             Err(e) => return Err(anyhow!("root handler error: {:?}", e)),
         }
     };
-    if do_log {
-        log::info!("VLS msg handled");
-    }
     let mut out_md = MsgDriver::new_empty();
     write_serial_response_header(&mut out_md, sequence).expect("write reply header");
     msgs::write_vec(&mut out_md, reply.0.as_vec()).expect("write reply");

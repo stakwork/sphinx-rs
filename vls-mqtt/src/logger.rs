@@ -67,6 +67,7 @@ pub fn setup_logs(error_tx: broadcast::Sender<Vec<u8>>) {
         .level(LevelFilter::Warn)
         .level_for("lightning_signer", LevelFilter::Info)
         .level_for("rocket", LevelFilter::Info)
+        .level_for("sphinx_signer", LevelFilter::Info)
         .chain(elog1) // Chaining two logs
         .chain(elog2)
         .apply()

@@ -54,7 +54,7 @@ pub async fn start(
         };
 
         client
-            .subscribe(topics::VLS, QoS::AtMostOnce)
+            .subscribe(topics::VLS, QoS::ExactlyOnce)
             .await
             .expect("could not mqtt subscribe");
 
@@ -74,10 +74,10 @@ async fn run_main(
                 if let Some((topic, msg_bytes)) = incoming_bytes(event) {
                     match topic.as_str() {
                         topics::VLS => {
-                            println!("Got VLS message of length: {}", msg_bytes.len());
-                            match root::handle(root_handler, msg_bytes, false) {
+                            // println!("Got VLS message of length: {}", msg_bytes.len());
+                            match root::handle(root_handler, msg_bytes, true) {
                                 Ok(b) => client
-                                    .publish(topics::VLS_RETURN, QoS::AtMostOnce, false, b)
+                                    .publish(topics::VLS_RETURN, QoS::ExactlyOnce, false, b)
                                     .await
                                     .expect("could not publish init response"),
                                 Err(e) => {
@@ -85,7 +85,7 @@ async fn run_main(
                                     client
                                         .publish(
                                             topics::ERROR,
-                                            QoS::AtMostOnce,
+                                            QoS::ExactlyOnce,
                                             false,
                                             e.to_string().as_bytes(),
                                         )
