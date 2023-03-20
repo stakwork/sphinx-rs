@@ -23,8 +23,8 @@ pub async fn start(
         let t = Token::new();
         let token = t.sign_to_base64(&secret)?;
 
-        // let client_id = format!("sphinx-{}", &pubkey[..12]);
-        let client_id = format!("sphinx-1");
+        let client_id = format!("sphinx-{}", random_word(8));
+        // let client_id = format!("sphinx-1");
         let broker: String = env::var("BROKER").unwrap_or("localhost:1883".to_string());
         let broker_: Vec<&str> = broker.split(":").collect();
         let broker_port = broker_
@@ -54,12 +54,21 @@ pub async fn start(
         };
 
         client
-            .subscribe(topics::VLS, QoS::ExactlyOnce)
+            .subscribe(topics::VLS, QoS::AtMostOnce)
             .await
             .expect("could not mqtt subscribe");
 
         run_main(root_handler, eventloop, &client, error_tx.clone()).await;
     }
+}
+
+use rand::{distributions::Alphanumeric, Rng};
+pub fn random_word(n: usize) -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(n)
+        .map(char::from)
+        .collect()
 }
 
 async fn run_main(

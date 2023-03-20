@@ -2,6 +2,7 @@ target
 .DS_Store
 Cargo.lock
 teststore
+teststore2
 .env
 error.log
 vls_mqtt_data
