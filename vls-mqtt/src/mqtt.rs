@@ -53,12 +53,13 @@ pub async fn start(
             }
         };
 
+        let vls_topic = format!("{}/{}", client_id, topics::VLS);
         client
-            .subscribe(topics::VLS, QoS::AtMostOnce)
+            .subscribe(vls_topic, QoS::AtMostOnce)
             .await
             .expect("could not mqtt subscribe");
 
-        run_main(root_handler, eventloop, &client, error_tx.clone()).await;
+        run_main(root_handler, eventloop, &client, error_tx.clone(), client_id).await;
     }
 }
 
@@ -76,36 +77,41 @@ async fn run_main(
     mut eventloop: EventLoop,
     client: &AsyncClient,
     error_tx: broadcast::Sender<Vec<u8>>,
+    client_id: String,
 ) {
     loop {
         match eventloop.poll().await {
             Ok(event) => {
                 if let Some((topic, msg_bytes)) = incoming_bytes(event) {
-                    match topic.as_str() {
-                        topics::VLS => {
-                            // println!("Got VLS message of length: {}", msg_bytes.len());
-                            match root::handle(root_handler, msg_bytes, true) {
-                                Ok(b) => client
-                                    .publish(topics::VLS_RETURN, QoS::ExactlyOnce, false, b)
+                    if topic.ends_with(topics::VLS) {
+                        // println!("Got VLS message of length: {}", msg_bytes.len());
+                        match root::handle(root_handler, msg_bytes, true) {
+                            Ok(b) => {
+                                let return_topic = format!("{}/{}", &client_id, topics::VLS_RETURN);
+                                client
+                                    .publish(return_topic, QoS::AtLeastOnce, false, b)
                                     .await
-                                    .expect("could not publish init response"),
-                                Err(e) => {
-                                    // publish errors back to broker AND locally
-                                    client
-                                        .publish(
-                                            topics::ERROR,
-                                            QoS::ExactlyOnce,
-                                            false,
-                                            e.to_string().as_bytes(),
-                                        )
-                                        .await
-                                        .expect("could not publish error response");
-                                    let _ = error_tx.send(e.to_string().as_bytes().to_vec());
-                                }
-                            };
-                        }
-                        topics::CONTROL => (),
-                        _ => log::info!("invalid topic"),
+                                    .expect("could not publish init response")
+                            },
+                            Err(e) => {
+                                let error_topic = format!("{}/{}", &client_id, topics::ERROR);
+                                // publish errors back to broker AND locally
+                                client
+                                    .publish(
+                                        error_topic,
+                                        QoS::AtLeastOnce,
+                                        false,
+                                        e.to_string().as_bytes(),
+                                    )
+                                    .await
+                                    .expect("could not publish error response");
+                                let _ = error_tx.send(e.to_string().as_bytes().to_vec());
+                            }
+                        };
+                    } else if topic.ends_with(topics::CONTROL) {
+                        //
+                    } else {
+                        log::info!("invalid topic");
                     }
                 }
             }
