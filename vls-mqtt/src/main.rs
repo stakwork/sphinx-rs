@@ -5,7 +5,7 @@ mod routes;
 
 use crate::routes::{ChannelReply, ChannelRequest};
 use dotenv::dotenv;
-use glyph::control::Controller;
+use glyph::control::{ControlPersist, Controller};
 use rocket::tokio::sync::{broadcast, mpsc};
 use sphinx_signer::lightning_signer::bitcoin::Network;
 use sphinx_signer::lightning_signer::persist::Persist;
@@ -35,6 +35,7 @@ async fn rocket() -> _ {
     println!("PUBKEY {}", hex::encode(pk.serialize()));
 
     let pers = persist::ControlPersister::new("vls_mqtt_data");
+    let initial_policy = pers.read_policy().unwrap_or_default();
     let pers_arc = Arc::new(Mutex::new(pers));
     let mut ctrlr = Controller::new_with_persister(sk, pk, pers_arc);
 
@@ -42,7 +43,7 @@ async fn rocket() -> _ {
     let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
     let persister: Arc<dyn Persist> = Arc::new(FsPersister::new(&store_path, None));
     let root_handler =
-        root::init(seed32, network, &Default::default(), persister).expect("failed to init signer");
+        root::init(seed32, network, &initial_policy, persister).expect("failed to init signer");
 
     logger::log_errors(error_rx);
 
