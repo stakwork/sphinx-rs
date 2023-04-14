@@ -75,7 +75,7 @@ pub fn make_policy(network: Network, po: &Policy) -> SimplePolicy {
     p
 }
 
-fn policy_interval(int: Interval) -> VelocityControlIntervalType {
+pub fn policy_interval(int: Interval) -> VelocityControlIntervalType {
     match int {
         Interval::Hourly => VelocityControlIntervalType::Hourly,
         Interval::Daily => VelocityControlIntervalType::Daily,

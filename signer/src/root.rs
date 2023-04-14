@@ -1,5 +1,5 @@
 use crate::parser::MsgDriver;
-use crate::policy::make_policy;
+use crate::policy::{make_policy, policy_interval};
 use sphinx_glyph::types;
 use types::Policy;
 
@@ -9,9 +9,11 @@ use lightning_signer::node::NodeServices;
 use lightning_signer::persist::Persist;
 use lightning_signer::policy::simple_validator::SimpleValidatorFactory;
 use lightning_signer::util::clock::StandardClock;
+use lightning_signer::util::velocity::{VelocityControl, VelocityControlSpec};
 use std::sync::Arc;
 use vls_protocol::model::PubKey;
 use vls_protocol::msgs::{self, read_serial_request_header, write_serial_response_header, Message};
+use vls_protocol_signer::approver::{NegativeApprover, VelocityApprover};
 use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
 use vls_protocol_signer::lightning_signer::bitcoin::Network;
@@ -33,13 +35,23 @@ pub fn init(
         validator_factory,
         starting_time_factory: random_time_factory,
         persister,
-        clock,
+        clock: clock.clone(),
     };
-    let handler_builder = RootHandlerBuilder::new(network, 0, services, seed).allowlist(allowlist);
+    let mut handler_builder =
+        RootHandlerBuilder::new(network, 0, services, seed).allowlist(allowlist);
+    let delegate = NegativeApprover();
+    let spec = VelocityControlSpec {
+        limit: po.sat_limit,
+        interval_type: policy_interval(po.interval),
+    };
+    let control = VelocityControl::new(spec);
+    // FIXME load state into VelociyApprover
+    // VelocityControl::load_from_state(spec, state);
+    let approver = VelocityApprover::new(clock.clone(), control, delegate);
+    handler_builder = handler_builder.approver(Arc::new(approver));
 
     log::info!("create root handler now");
     let (root_handler, _muts) = handler_builder.build();
-    // let root_handler = RootHandler::new(network, 0, Some(seed), allowlist, services);
     log::info!("root_handler created");
     Ok(root_handler)
 }
