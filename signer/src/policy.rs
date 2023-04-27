@@ -65,10 +65,10 @@ pub fn set_policy(root_handler: &RootHandler, network: Network, po: Policy) -> a
 
 pub fn make_policy(network: Network, po: &Policy) -> SimplePolicy {
     let mut p = make_simple_policy(network);
-    p.max_htlc_value_sat = po.htlc_limit;
+    p.max_htlc_value_sat = po.htlc_limit_sat;
     p.filter = PolicyFilter::new_permissive();
     let velocity_spec = VelocityControlSpec {
-        limit: po.sat_limit,
+        limit: po.sat_per_interval,
         interval_type: policy_interval(po.interval),
     };
     p.global_velocity_control = velocity_spec;

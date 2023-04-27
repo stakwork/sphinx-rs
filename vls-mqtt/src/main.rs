@@ -9,8 +9,10 @@ use glyph::control::{ControlPersist, Controller};
 use rocket::tokio::sync::{broadcast, mpsc};
 use sphinx_signer::lightning_signer::bitcoin::Network;
 use sphinx_signer::lightning_signer::persist::Persist;
+use sphinx_signer::lightning_signer::wallet::Wallet;
 use sphinx_signer::persist::FsPersister;
 use sphinx_signer::policy::update_controls;
+use sphinx_signer::Handler;
 use sphinx_signer::{self, root, sphinx_glyph as glyph, RootHandler};
 use std::env;
 use std::str::FromStr;
@@ -45,6 +47,8 @@ async fn rocket() -> _ {
     let root_handler =
         root::init(seed32, network, &initial_policy, persister).expect("failed to init signer");
 
+    let root_network = root_handler.node().network();
+    log::info!("root network {:?}", root_network);
     logger::log_errors(error_rx);
 
     let rh = Arc::new(root_handler);

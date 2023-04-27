@@ -37,11 +37,12 @@ pub fn init(
         persister,
         clock: clock.clone(),
     };
+    log::info!("create root handler with network {:?}", network);
     let mut handler_builder =
         RootHandlerBuilder::new(network, 0, services, seed).allowlist(allowlist);
     let delegate = NegativeApprover();
     let spec = VelocityControlSpec {
-        limit: po.sat_limit,
+        limit: po.sat_per_interval,
         interval_type: policy_interval(po.interval),
     };
     let control = VelocityControl::new(spec);
@@ -69,6 +70,8 @@ pub fn handle(root_handler: &RootHandler, bytes: Vec<u8>, do_log: bool) -> anyho
         if ChainHash::using_genesis_block(root_handler.node().network()).as_bytes()
             != &m.chain_params.0
         {
+            log::warn!("chain network {:?}", &m.chain_params.0);
+            log::warn!("root handler network {:?}", root_handler.node().network());
             log::error!("The network setting of CLN and VLS don't match!");
             panic!("The network setting of CLN and VLS don't match!");
         }
