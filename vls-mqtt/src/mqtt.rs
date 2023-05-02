@@ -24,17 +24,24 @@ pub async fn start(
         let token = t.sign_to_base64(&secret)?;
 
         let client_id = format!("sphinx-{}", random_word(8));
-        // let client_id = format!("sphinx-1");
         let broker: String = env::var("BROKER").unwrap_or("localhost:1883".to_string());
-        let broker_: Vec<&str> = broker.split(":").collect();
-        let broker_port = broker_
-            .get(1)
-            .unwrap_or(&"1883")
-            .parse::<u16>()
-            .expect("NaN");
+
+        println!(".......... start eventloop ..........");
         let (client, eventloop) = loop {
-            println!("connect to {}:{}", broker_[0], broker_port);
-            let mut mqttoptions = MqttOptions::new(&client_id, broker_[0], broker_port);
+            let mut mqtturl = format!("{}?client_id={}", broker, client_id);
+            if !(mqtturl.starts_with("mqtt://") || mqtturl.starts_with("mqtts://")) {
+                let scheme = if mqtturl.contains("8883") {
+                    "mqtts"
+                } else {
+                    "mqtt"
+                };
+                mqtturl = format!("{}://{}", scheme, mqtturl);
+            }
+            println!("===> connect to {}", mqtturl);
+
+            let mut mqttoptions = MqttOptions::parse_url(mqtturl).unwrap();
+
+            // let mut mqttoptions = MqttOptions::new(&client_id, broker_[0], broker_port);
             mqttoptions.set_credentials(pubkey.clone(), token.clone());
             mqttoptions.set_keep_alive(Duration::from_secs(5));
             let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
@@ -59,11 +66,20 @@ pub async fn start(
             .await
             .expect("could not mqtt subscribe");
 
-        run_main(root_handler, eventloop, &client, error_tx.clone(), client_id).await;
+        run_main(
+            root_handler,
+            eventloop,
+            &client,
+            error_tx.clone(),
+            client_id,
+        )
+        .await;
     }
 }
 
 use rand::{distributions::Alphanumeric, Rng};
+
+// use crate::mqtt;
 pub fn random_word(n: usize) -> String {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
@@ -92,7 +108,7 @@ async fn run_main(
                                     .publish(return_topic, QoS::AtLeastOnce, false, b)
                                     .await
                                     .expect("could not publish init response")
-                            },
+                            }
                             Err(e) => {
                                 let error_topic = format!("{}/{}", &client_id, topics::ERROR);
                                 // publish errors back to broker AND locally

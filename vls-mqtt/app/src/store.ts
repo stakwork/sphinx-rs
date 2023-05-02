@@ -9,9 +9,10 @@ export const pages: PageItem[] = [
   { label: "Account", page: "account" },
   { label: "Policy", page: "policy" },
   { label: "Allow List", page: "allowlist" },
+  { label: "Force Close", page: "forceclose" },
 ];
 
-export type Page = "account" | "allowlist" | "policy";
+export type Page = "account" | "allowlist" | "policy" | "forceclose";
 
 export const menu = writable<Page>("account");
 

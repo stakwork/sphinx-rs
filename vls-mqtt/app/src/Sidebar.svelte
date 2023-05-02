@@ -4,6 +4,7 @@
   import VirtualColumnKey from "carbon-icons-svelte/lib/VirtualColumnKey.svelte";
   import Policy from "carbon-icons-svelte/lib/Policy.svelte";
   import ListChecked from "carbon-icons-svelte/lib/ListChecked.svelte";
+  import Exit from "carbon-icons-svelte/lib/Exit.svelte";
 
   function navigate(page: string) {
     menu.set(page as Page);
@@ -12,6 +13,7 @@
     account: VirtualColumnKey,
     policy: Policy,
     allowlist: ListChecked,
+    forceclose: Exit,
   };
 </script>
 
