@@ -64,7 +64,17 @@ pub async fn start(
         client
             .subscribe(vls_topic, QoS::AtMostOnce)
             .await
-            .expect("could not mqtt subscribe");
+            .expect("could not subscribe VLS");
+        let ctrl_topic = format!("{}/{}", client_id, topics::CONTROL);
+        client
+            .subscribe(ctrl_topic, QoS::AtMostOnce)
+            .await
+            .expect("could not subscribe CTRL");
+        let lss_res_topic = format!("{}/{}", client_id, topics::LSS_RES);
+        client
+            .subscribe(lss_res_topic, QoS::AtMostOnce)
+            .await
+            .expect("could not subscribe LSS");
 
         run_main(
             root_handler,
@@ -124,6 +134,9 @@ async fn run_main(
                                 let _ = error_tx.send(e.to_string().as_bytes().to_vec());
                             }
                         };
+                    } else if topic.ends_with(topics::LSS_RES) {
+                        // check hmac
+                        // update local state
                     } else if topic.ends_with(topics::CONTROL) {
                         //
                     } else {

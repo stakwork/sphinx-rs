@@ -1,4 +1,5 @@
 mod logger;
+mod lss;
 mod mqtt;
 mod persist;
 mod routes;
