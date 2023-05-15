@@ -14,9 +14,9 @@ fspersist = ["fsdb", "vls-persist"]
 [dependencies]
 sphinx-glyph = { path = '../glyph' }
 # sphinx-glyph = "0.1.2"
-vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "dcd8628893b5504b3ac2d3eb8cc5ed36f36d7625", default-features = false, features = ["std", "secp-lowmemory"] }
-vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "dcd8628893b5504b3ac2d3eb8cc5ed36f36d7625", features = ["std"] }
-vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "dcd8628893b5504b3ac2d3eb8cc5ed36f36d7625", optional = true }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "e13c8cd994b310f598c0b2902741d89ad5472382", default-features = false, features = ["std", "secp-lowmemory"] }
+vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "e13c8cd994b310f598c0b2902741d89ad5472382", features = ["std"] }
+vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "e13c8cd994b310f598c0b2902741d89ad5472382", optional = true }
 log = "0.4"
 rand = "0.8"
 serde = "1.0.1"

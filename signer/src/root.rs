@@ -42,7 +42,7 @@ pub fn init(
         RootHandlerBuilder::new(network, 0, services, seed).allowlist(allowlist);
     let delegate = NegativeApprover();
     let spec = VelocityControlSpec {
-        limit: po.sat_per_interval,
+        limit_msat: po.sat_per_interval,
         interval_type: policy_interval(po.interval),
     };
     let control = VelocityControl::new(spec);

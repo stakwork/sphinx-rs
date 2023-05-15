@@ -68,7 +68,7 @@ pub fn make_policy(network: Network, po: &Policy) -> SimplePolicy {
     p.max_htlc_value_sat = po.htlc_limit_sat;
     p.filter = PolicyFilter::new_permissive();
     let velocity_spec = VelocityControlSpec {
-        limit: po.sat_per_interval,
+        limit_msat: po.sat_per_interval,
         interval_type: policy_interval(po.interval),
     };
     p.global_velocity_control = velocity_spec;
