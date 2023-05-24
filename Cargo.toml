@@ -6,6 +6,7 @@ members = [
     "signer",
     "sphinx-frost",
     "vls-mqtt",
+    "lss-connector"
 ]
 
 exclude = [

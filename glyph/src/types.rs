@@ -39,17 +39,17 @@ pub struct Config {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Policy {
-    pub sat_per_interval: u64,
+    pub msat_per_interval: u64,
     pub interval: Interval,
-    pub htlc_limit_sat: u64,
+    pub htlc_limit_msat: u64,
 }
 
 impl Default for Policy {
     fn default() -> Self {
         Self {
-            sat_per_interval: 1_000_000,
+            msat_per_interval: 21_000_000_000,
             interval: Interval::Daily,
-            htlc_limit_sat: 1_000_000,
+            htlc_limit_msat: 1_000_000_000,
         }
     }
 }
