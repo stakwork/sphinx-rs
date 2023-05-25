@@ -19,12 +19,12 @@ use vls_protocol_signer::lightning_signer;
 use vls_protocol_signer::lightning_signer::bitcoin::Network;
 use vls_protocol_signer::lightning_signer::wallet::Wallet;
 
-pub fn init(
+pub fn builder(
     seed: [u8; 32],
     network: Network,
     po: &Policy,
     persister: Arc<dyn Persist>,
-) -> anyhow::Result<RootHandler> {
+) -> anyhow::Result<RootHandlerBuilder> {
     // FIXME initial allowlist?
     let allowlist = vec![];
     let policy = make_policy(network, po);
@@ -51,10 +51,7 @@ pub fn init(
     let approver = VelocityApprover::new(clock.clone(), control, delegate);
     handler_builder = handler_builder.approver(Arc::new(approver));
 
-    log::info!("create root handler now");
-    let (root_handler, _muts) = handler_builder.build();
-    log::info!("root_handler created");
-    Ok(root_handler)
+    Ok(handler_builder)
 }
 
 pub fn handle(root_handler: &RootHandler, bytes: Vec<u8>, do_log: bool) -> anyhow::Result<Vec<u8>> {

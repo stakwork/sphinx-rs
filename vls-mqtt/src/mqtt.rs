@@ -1,19 +1,20 @@
+use crate::ChanMsg;
 use sphinx_auther::secp256k1::{PublicKey, SecretKey};
 use sphinx_auther::token::Token;
 use sphinx_signer::sphinx_glyph::{sphinx_auther, topics};
 
-use rocket::tokio::sync::broadcast;
+use rocket::tokio::sync::{broadcast, mpsc};
 use rumqttc::{self, AsyncClient, Event, EventLoop, MqttOptions, Packet, QoS};
-use sphinx_signer::{self, root, RootHandler};
 use std::env;
 use std::error::Error;
 use std::time::Duration;
 
 pub async fn start(
-    root_handler: &RootHandler,
+    vls_tx: mpsc::Sender<ChanMsg>,
     pubkey: &PublicKey,
     secret: &SecretKey,
     error_tx: broadcast::Sender<Vec<u8>>,
+    lss_tx: mpsc::Sender<ChanMsg>,
 ) -> Result<(), Box<dyn Error>> {
     // alternate between "reconnection" and "handler"
     loop {
@@ -70,40 +71,31 @@ pub async fn start(
             .subscribe(ctrl_topic, QoS::AtMostOnce)
             .await
             .expect("could not subscribe CTRL");
-        let lss_res_topic = format!("{}/{}", client_id, topics::LSS_RES);
+        let lss_topic = format!("{}/{}", client_id, topics::LSS_MSG);
         client
-            .subscribe(lss_res_topic, QoS::AtMostOnce)
+            .subscribe(lss_topic, QoS::AtMostOnce)
             .await
             .expect("could not subscribe LSS");
 
-        run_main(
-            root_handler,
+        main_listener(
+            vls_tx.clone(),
             eventloop,
             &client,
             error_tx.clone(),
             client_id,
+            lss_tx.clone(),
         )
         .await;
     }
 }
 
-use rand::{distributions::Alphanumeric, Rng};
-
-// use crate::mqtt;
-pub fn random_word(n: usize) -> String {
-    rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(n)
-        .map(char::from)
-        .collect()
-}
-
-async fn run_main(
-    root_handler: &RootHandler,
+async fn main_listener(
+    vls_tx: mpsc::Sender<ChanMsg>,
     mut eventloop: EventLoop,
     client: &AsyncClient,
     error_tx: broadcast::Sender<Vec<u8>>,
     client_id: String,
+    lss_tx: mpsc::Sender<ChanMsg>,
 ) {
     loop {
         match eventloop.poll().await {
@@ -111,7 +103,9 @@ async fn run_main(
                 if let Some((topic, msg_bytes)) = incoming_bytes(event) {
                     if topic.ends_with(topics::VLS) {
                         // println!("Got VLS message of length: {}", msg_bytes.len());
-                        match root::handle(root_handler, msg_bytes, true) {
+                        let (vls_msg, reply_rx) = ChanMsg::new(msg_bytes);
+                        let _ = vls_tx.send(vls_msg).await;
+                        match reply_rx.await.unwrap() {
                             Ok(b) => {
                                 let return_topic = format!("{}/{}", &client_id, topics::VLS_RETURN);
                                 client
@@ -133,10 +127,20 @@ async fn run_main(
                                     .expect("could not publish error response");
                                 let _ = error_tx.send(e.to_string().as_bytes().to_vec());
                             }
-                        };
-                    } else if topic.ends_with(topics::LSS_RES) {
+                        }
+                    } else if topic.ends_with(topics::LSS_MSG) {
                         // check hmac
                         // update local state
+                        let (lss_msg, reply_rx) = ChanMsg::new(msg_bytes);
+                        let _ = lss_tx.send(lss_msg).await;
+                        match reply_rx.await.unwrap() {
+                            Ok(b) => {
+                                log::info!("LSS reply! ok");
+                            }
+                            Err(e) => {
+                                log::error!("LSS reply tx fail {:?}", e);
+                            }
+                        };
                     } else if topic.ends_with(topics::CONTROL) {
                         //
                     } else {
@@ -169,4 +173,15 @@ fn incoming_conn_ack(event: Event) -> Option<()> {
         }
     }
     None
+}
+
+use rand::{distributions::Alphanumeric, Rng};
+
+// use crate::mqtt;
+pub fn random_word(n: usize) -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(n)
+        .map(char::from)
+        .collect()
 }

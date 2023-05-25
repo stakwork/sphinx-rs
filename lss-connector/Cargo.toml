@@ -7,10 +7,14 @@ description = "LSS connector utils"
 repository = "https://github.com/stakwork/sphinx-rs"
 license = "MIT"
 
+[features]
+default = ["broker"]
+broker = ["lightning-storage-server", "vls-frontend"]
+
 [dependencies]
-lightning-storage-server = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "e13c8cd994b310f598c0b2902741d89ad5472382" }
 vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "e13c8cd994b310f598c0b2902741d89ad5472382", default-features = false, features = ["std", "secp-lowmemory"] }
-vls-frontend = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "e13c8cd994b310f598c0b2902741d89ad5472382" }
+lightning-storage-server = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "e13c8cd994b310f598c0b2902741d89ad5472382", optional = true }
+vls-frontend = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "e13c8cd994b310f598c0b2902741d89ad5472382", optional = true }
 log = "0.4"
 serde = "1.0.1"
 anyhow = "1"

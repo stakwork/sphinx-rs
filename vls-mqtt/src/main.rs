@@ -7,7 +7,8 @@ mod routes;
 use crate::routes::{ChannelReply, ChannelRequest};
 use dotenv::dotenv;
 use glyph::control::{ControlPersist, Controller};
-use rocket::tokio::sync::{broadcast, mpsc};
+use lss_connector::{msgs as lss_msgs, secp256k1::PublicKey, LssSigner};
+use rocket::tokio::sync::{broadcast, mpsc, oneshot};
 use sphinx_signer::lightning_signer::bitcoin::Network;
 use sphinx_signer::lightning_signer::persist::Persist;
 use sphinx_signer::lightning_signer::wallet::Wallet;
@@ -20,6 +21,18 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 pub const ROOT_STORE: &str = "teststore";
+
+#[derive(Debug)]
+pub struct ChanMsg {
+    pub message: Vec<u8>,
+    pub reply_tx: oneshot::Sender<anyhow::Result<Vec<u8>>>,
+}
+impl ChanMsg {
+    pub fn new(message: Vec<u8>) -> (Self, oneshot::Receiver<anyhow::Result<Vec<u8>>>) {
+        let (reply_tx, reply_rx) = oneshot::channel();
+        (Self { message, reply_tx }, reply_rx)
+    }
+}
 
 #[rocket::launch]
 async fn rocket() -> _ {
@@ -45,20 +58,58 @@ async fn rocket() -> _ {
     let seed32: [u8; 32] = seed.try_into().expect("invalid seed");
     let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
     let persister: Arc<dyn Persist> = Arc::new(FsPersister::new(&store_path, None));
-    let root_handler =
-        root::init(seed32, network, &initial_policy, persister).expect("failed to init signer");
+    let handler_builder =
+        root::builder(seed32, network, &initial_policy, persister).expect("failed to init signer");
+
+    // let lss_signer = LssSigner::new(&handler_builder);
+    // let root_handler = lss_signer.build_with_lss(handler_builder);
+
+    let (vls_tx, mut vls_rx) = mpsc::channel::<ChanMsg>(1000);
+    let vls_tx_ = vls_tx.clone();
+
+    let (lss_tx, mut lss_rx) = mpsc::channel::<ChanMsg>(1000);
+    let (lss_response_tx, lss_response_rx) = std::sync::mpsc::channel::<Vec<u8>>();
+
+    let lss_tx_ = lss_tx.clone();
+    let error_tx_ = error_tx.clone();
+    rocket::tokio::spawn(async move {
+        mqtt::start(vls_tx_, &pk, &sk, error_tx_, lss_tx_)
+            .await
+            .expect("mqtt crash");
+    });
+
+    // LSS initialization
+    let first_lss_msg = lss_rx.recv().await.unwrap();
+    let msg = lss_msgs::Msg::from_slice(&first_lss_msg.message).unwrap();
+    let init = match msg {
+        lss_msgs::Msg::Init(init) => init,
+        _ => panic!("bad first LSS broker msg"),
+    };
+    let server_pubkey_bytes = hex::decode(init.server_pubkey).unwrap();
+    let server_pubkey = PublicKey::from_slice(&server_pubkey_bytes).unwrap();
+    let lss_signer = LssSigner::new(&handler_builder, &server_pubkey, lss_response_tx);
+
+    let second_lss_msg = lss_rx.recv().await.unwrap();
+    let msg = lss_msgs::Msg::from_slice(&second_lss_msg.message).unwrap();
+    let created = match msg {
+        lss_msgs::Msg::Created(c) => c,
+        _ => panic!("bad second LSS broker msg"),
+    };
+
+    // build the root handler
+    let root_handler = lss_signer.build_with_lss(created, handler_builder).unwrap();
 
     let root_network = root_handler.node().network();
     log::info!("root network {:?}", root_network);
     logger::log_errors(error_rx);
 
     let rh = Arc::new(root_handler);
-    let error_tx_ = error_tx.clone();
     let rh_ = rh.clone();
     rocket::tokio::spawn(async move {
-        mqtt::start(&rh_, &pk, &sk, error_tx_)
-            .await
-            .expect("mqtt crash");
+        while let Some(msg) = vls_rx.recv().await {
+            let res_res = root::handle(&rh_, msg.message, true);
+            let _ = msg.reply_tx.send(res_res);
+        }
     });
 
     rocket::tokio::spawn(
