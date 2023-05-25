@@ -2,6 +2,7 @@ use crate::msgs::*;
 
 use anyhow::Result;
 use lightning_storage_server::client::Auth;
+use secp256k1::PublicKey;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use vls_frontend::external_persist::lss::Client as LssClient;
@@ -18,21 +19,26 @@ impl LssBroker {
     pub async fn get_server_pubkey_and_emit_init(
         uri: &str,
         emitter: mpsc::Sender<Vec<u8>>,
-    ) -> Result<()> {
+    ) -> Result<PublicKey> {
         let spk = LssClient::get_server_pubkey(uri).await?;
         let server_pubkey = hex::encode(spk.serialize());
         let msg = Msg::Init(Init { server_pubkey }).to_vec()?;
         emitter.send(msg)?;
-        Ok(())
+        Ok(spk)
     }
-    pub async fn new(uri: &str, ir: InitResponse, emitter: mpsc::Sender<Vec<u8>>) -> Result<Self> {
+    pub async fn new(
+        uri: &str,
+        ir: InitResponse,
+        emitter: mpsc::Sender<Vec<u8>>,
+        spk: PublicKey,
+    ) -> Result<Self> {
         let pk_slice = hex::decode(ir.client_id)?;
         let client_id = secp256k1::PublicKey::from_slice(&pk_slice)?;
         let auth = Auth {
             client_id: client_id,
             token: ir.auth_token,
         };
-        let client = LssClient::new(uri, &client_id, auth).await?;
+        let client = LssClient::new(uri, &spk, auth).await?;
         let (muts, server_hmac) = client.get("".to_string(), &ir.nonce).await.unwrap();
         log::info!("connected to LSS provider {}", uri);
 

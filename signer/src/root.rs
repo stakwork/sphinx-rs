@@ -37,7 +37,7 @@ pub fn builder(
         persister,
         clock: clock.clone(),
     };
-    log::info!("create root handler with network {:?}", network);
+    log::info!("create root handler builder with network {:?}", network);
     let mut handler_builder =
         RootHandlerBuilder::new(network, 0, services, seed).allowlist(allowlist);
     let delegate = NegativeApprover();

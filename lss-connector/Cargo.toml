@@ -19,6 +19,5 @@ log = "0.4"
 serde = "1.0.1"
 anyhow = "1"
 secp256k1 = { version = "0.24.0", features = ["rand-std", "bitcoin_hashes"] }
-tokio = "1"
 rmp-serde = "1.1.0"
 hex = "0.4.3"

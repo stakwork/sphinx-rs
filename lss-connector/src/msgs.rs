@@ -1,13 +1,13 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Msg {
     Init(Init),
     Created(BrokerMutations),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Response {
     Init(InitResponse),
     Created(SignerMutations),
@@ -15,24 +15,24 @@ pub enum Response {
 
 pub type Muts = Vec<(String, (u64, Vec<u8>))>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Init {
     pub server_pubkey: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BrokerMutations {
     pub muts: Muts,
     pub server_hmac: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SignerMutations {
     pub muts: Muts,
     pub client_hmac: [u8; 32],
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct InitResponse {
     pub client_id: String,
     pub auth_token: Vec<u8>,
