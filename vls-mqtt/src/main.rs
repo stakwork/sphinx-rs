@@ -61,76 +61,19 @@ async fn rocket() -> _ {
     let handler_builder =
         root::builder(seed32, network, &initial_policy, persister).expect("failed to init signer");
 
-    // let lss_signer = LssSigner::new(&handler_builder);
-    // let root_handler = lss_signer.build_with_lss(handler_builder);
-
     let (vls_tx, mut vls_rx) = mpsc::channel::<ChanMsg>(1000);
     let vls_tx_ = vls_tx.clone();
-
     let (lss_tx, mut lss_rx) = mpsc::channel::<ChanMsg>(1000);
-    let (lss_response_tx, lss_response_rx) = std::sync::mpsc::channel::<Vec<u8>>();
-    let (lss_response_broadcast_tx, mut lss_response_broadcast_rx) =
-        broadcast::channel::<Vec<u8>>(1000);
-
-    // test
-    // let lss_response_broadcast_tx_ = lss_response_broadcast_tx.clone();
-    // FIXME <- it doesnt work without this useless loop???????????
-    rocket::tokio::spawn(async move {
-        // let mut hi = lss_response_broadcast_tx_.subscribe();
-        println!("waiting to receive...");
-        let m = lss_response_broadcast_rx.recv().await;
-        println!("!!!!!!!!!!!!!! hi {:?}", m);
-    });
-
     let lss_tx_ = lss_tx.clone();
     let error_tx_ = error_tx.clone();
-    let lss_response_broadcast_tx_ = lss_response_broadcast_tx.clone();
     rocket::tokio::spawn(async move {
-        mqtt::start(
-            vls_tx_,
-            &pk,
-            &sk,
-            error_tx_,
-            lss_tx_,
-            lss_response_broadcast_tx_,
-        )
-        .await
-        .expect("mqtt crash");
-    });
-
-    // let lss_response_broadcast_tx_ = lss_response_broadcast_tx.clone();
-    rocket::tokio::spawn(async move {
-        while let Ok(lss_res) = lss_response_rx.recv() {
-            let _ = lss_response_broadcast_tx.send(lss_res).unwrap();
-        }
+        mqtt::start(vls_tx_, &pk, &sk, error_tx_, lss_tx_)
+            .await
+            .expect("mqtt crash");
     });
 
     // LSS initialization
-    let first_lss_msg = lss_rx.recv().await.unwrap();
-    let msg = lss_msgs::Msg::from_slice(&first_lss_msg.message).unwrap();
-    let init = match msg {
-        lss_msgs::Msg::Init(init) => init,
-        _ => panic!("bad first LSS broker msg"),
-    };
-    println!("first lss msg! {:?}", init);
-    let server_pubkey_bytes = hex::decode(init.server_pubkey).unwrap();
-    let server_pubkey = PublicKey::from_slice(&server_pubkey_bytes).unwrap();
-
-    println!("lss_signer new:::");
-    let lss_signer = LssSigner::new(&handler_builder, &server_pubkey, lss_response_tx);
-    println!("lss_signer created!!!!!!:::");
-
-    let second_lss_msg = lss_rx.recv().await.unwrap();
-    let msg = lss_msgs::Msg::from_slice(&second_lss_msg.message).unwrap();
-    let created = match msg {
-        lss_msgs::Msg::Created(c) => c,
-        _ => panic!("bad second LSS broker msg"),
-    };
-    println!("second lss msg! {:?}", created);
-
-    // build the root handler
-    let root_handler = lss_signer.build_with_lss(created, handler_builder).unwrap();
-    println!("root handler build!!!!!");
+    let root_handler = init_lss(lss_rx).await.unwrap();
 
     let root_network = root_handler.node().network();
     log::info!("root network {:?}", root_network);
@@ -150,6 +93,29 @@ async fn rocket() -> _ {
     );
 
     routes::launch_rocket(ctrl_tx, error_tx)
+}
+
+async fn init_lss(lss_rx: mpsc::Receiver<ChanMsg>) -> Result<RootHandler> {
+    let first_lss_msg = lss_rx.recv().await?;
+    let init = lss_msgs::Msg::from_slice(&first_lss_msg.message)?.as_init()?;
+    let server_pubkey_bytes = hex::decode(init.server_pubkey)?;
+    let server_pubkey = PublicKey::from_slice(&server_pubkey_bytes)?;
+
+    let (lss_signer, res1) = LssSigner::new(&handler_builder, &server_pubkey);
+    if let Err(e) = first_lss_msg.reply_tx.send(Ok(res1)) {
+        log::warn!("could not send on first_lss_msg.reply_tx, {:?}", e);
+    }
+
+    let second_lss_msg = lss_rx.recv().await?;
+    let created = lss_msgs::Msg::from_slice(&second_lss_msg.message)?.as_created()?;
+
+    // build the root handler
+    let (root_handler, res2) = lss_signer.build_with_lss(created, handler_builder).unwrap();
+    println!("root handler built!!!!!");
+    if let Err(e) = second_lss_msg.reply_tx.send(Ok(res2)) {
+        log::warn!("could not send on second_lss_msg.reply_tx, {:?}", e);
+    }
+    Ok(root_handler)
 }
 
 async fn listen_for_commands(

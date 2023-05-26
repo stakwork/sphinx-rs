@@ -15,7 +15,6 @@ pub async fn start(
     secret: &SecretKey,
     error_tx: broadcast::Sender<Vec<u8>>,
     lss_tx: mpsc::Sender<ChanMsg>,
-    lss_response_tx: broadcast::Sender<Vec<u8>>,
 ) -> Result<(), Box<dyn Error>> {
     // alternate between "reconnection" and "handler"
     loop {
@@ -85,7 +84,6 @@ pub async fn start(
             error_tx.clone(),
             client_id,
             lss_tx.clone(),
-            lss_response_tx.subscribe(),
         )
         .await;
     }
@@ -98,81 +96,66 @@ async fn main_listener(
     error_tx: broadcast::Sender<Vec<u8>>,
     client_id: String,
     lss_tx: mpsc::Sender<ChanMsg>,
-    mut lss_response_rx: broadcast::Receiver<Vec<u8>>,
 ) {
     loop {
-        let lss_fut = lss_response_rx.recv();
-        rocket::tokio::select! {
-            incoming_lss = lss_fut => {
-                println!("something... not sure..........................");
-                if let Ok(bytes) = incoming_lss {
-                    let lss_res_topic = format!("{}/{}", &client_id, topics::LSS_RES);
-                    println!("publish LSS_RES back to broker! {}", &lss_res_topic);
-                    client.publish(lss_res_topic, QoS::AtLeastOnce, false, bytes)
-                        .await
-                        .expect("could not publish lss response");
-                }
-            }
-            incoming_mqtt = eventloop.poll() => {
-                match incoming_mqtt {
-                    Ok(event) => {
-                        if let Some((topic, msg_bytes)) = incoming_bytes(event) {
-                            if topic.ends_with(topics::VLS) {
-                                // println!("Got VLS message of length: {}", msg_bytes.len());
-                                let (vls_msg, reply_rx) = ChanMsg::new(msg_bytes);
-                                let _ = vls_tx.send(vls_msg).await;
-                                match reply_rx.await.unwrap() {
-                                    Ok(b) => {
-                                        let return_topic = format!("{}/{}", &client_id, topics::VLS_RETURN);
-                                        client
-                                            .publish(return_topic, QoS::AtLeastOnce, false, b)
-                                            .await
-                                            .expect("could not publish init response")
-                                    }
-                                    Err(e) => {
-                                        let error_topic = format!("{}/{}", &client_id, topics::ERROR);
-                                        // publish errors back to broker AND locally
-                                        client
-                                            .publish(
-                                                error_topic,
-                                                QoS::AtLeastOnce,
-                                                false,
-                                                e.to_string().as_bytes(),
-                                            )
-                                            .await
-                                            .expect("could not publish error response");
-                                        let _ = error_tx.send(e.to_string().as_bytes().to_vec());
-                                    }
-                                }
-                            } else if topic.ends_with(topics::LSS_MSG) {
-                                // check hmac
-                                // update local state
-                                println!("===> GOT A LSS MSG!!!!!!!!!");
-                                let (lss_msg, reply_rx) = ChanMsg::new(msg_bytes);
-                                let txres = lss_tx.send(lss_msg).await;
-                                println!("ASDFASDF lsstxres: {:?}", txres);
-                                // TODO???
-                                // match reply_rx.await.unwrap() {
-                                //     Ok(b) => {
-                                //         log::info!("LSS reply! ok");
-                                //     }
-                                //     Err(e) => {
-                                //         log::error!("LSS reply tx fail {:?}", e);
-                                //     }
-                                // };
-                            } else if topic.ends_with(topics::CONTROL) {
-                                //
-                            } else {
-                                log::info!("invalid topic");
+        match eventloop.poll().await {
+            Ok(event) => {
+                if let Some((topic, msg_bytes)) = incoming_bytes(event) {
+                    if topic.ends_with(topics::VLS) {
+                        // println!("Got VLS message of length: {}", msg_bytes.len());
+                        let (vls_msg, reply_rx) = ChanMsg::new(msg_bytes);
+                        let _ = vls_tx.send(vls_msg).await;
+                        match reply_rx.await.unwrap() {
+                            Ok(b) => {
+                                let return_topic = format!("{}/{}", &client_id, topics::VLS_RETURN);
+                                client
+                                    .publish(return_topic, QoS::AtLeastOnce, false, b)
+                                    .await
+                                    .expect("could not publish init response")
+                            }
+                            Err(e) => {
+                                let error_topic = format!("{}/{}", &client_id, topics::ERROR);
+                                // publish errors back to broker AND locally
+                                client
+                                    .publish(
+                                        error_topic,
+                                        QoS::AtLeastOnce,
+                                        false,
+                                        e.to_string().as_bytes(),
+                                    )
+                                    .await
+                                    .expect("could not publish error response");
+                                let _ = error_tx.send(e.to_string().as_bytes().to_vec());
                             }
                         }
-                    }
-                    Err(e) => {
-                        log::warn!("diconnected {:?}", e);
-                        rocket::tokio::time::sleep(Duration::from_secs(1)).await;
-                        break; // break out of this loop to reconnect
+                    } else if topic.ends_with(topics::LSS_MSG) {
+                        // check hmac
+                        // update local state
+                        let (lss_msg, reply_rx) = ChanMsg::new(msg_bytes);
+                        let txres = lss_tx.send(lss_msg).await;
+                        match reply_rx.await.unwrap() {
+                            Ok(b) => {
+                                let lss_res_topic = format!("{}/{}", &client_id, topics::LSS_RES);
+                                client
+                                    .publish(lss_res_topic, QoS::AtLeastOnce, false, b)
+                                    .await
+                                    .expect("could not publish lss response");
+                            }
+                            Err(e) => {
+                                log::error!("LSS reply tx fail {:?}", e);
+                            }
+                        };
+                    } else if topic.ends_with(topics::CONTROL) {
+                        //
+                    } else {
+                        log::info!("invalid topic");
                     }
                 }
+            }
+            Err(e) => {
+                log::warn!("diconnected {:?}", e);
+                rocket::tokio::time::sleep(Duration::from_secs(1)).await;
+                break; // break out of this loop to reconnect
             }
         }
     }
