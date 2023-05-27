@@ -1,10 +1,10 @@
 mod logger;
-mod lss;
 mod mqtt;
 mod persist;
 mod routes;
 
 use crate::routes::{ChannelReply, ChannelRequest};
+use anyhow::{anyhow, Result};
 use dotenv::dotenv;
 use glyph::control::{ControlPersist, Controller};
 use lss_connector::{msgs as lss_msgs, secp256k1::PublicKey, LssSigner};
@@ -15,7 +15,7 @@ use sphinx_signer::lightning_signer::wallet::Wallet;
 use sphinx_signer::persist::FsPersister;
 use sphinx_signer::policy::update_controls;
 use sphinx_signer::Handler;
-use sphinx_signer::{self, root, sphinx_glyph as glyph, RootHandler};
+use sphinx_signer::{self, root, sphinx_glyph as glyph, RootHandler, RootHandlerBuilder};
 use std::env;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
@@ -25,10 +25,10 @@ pub const ROOT_STORE: &str = "teststore";
 #[derive(Debug)]
 pub struct ChanMsg {
     pub message: Vec<u8>,
-    pub reply_tx: oneshot::Sender<anyhow::Result<Vec<u8>>>,
+    pub reply_tx: oneshot::Sender<Result<Vec<u8>>>,
 }
 impl ChanMsg {
-    pub fn new(message: Vec<u8>) -> (Self, oneshot::Receiver<anyhow::Result<Vec<u8>>>) {
+    pub fn new(message: Vec<u8>) -> (Self, oneshot::Receiver<Result<Vec<u8>>>) {
         let (reply_tx, reply_rx) = oneshot::channel();
         (Self { message, reply_tx }, reply_rx)
     }
@@ -63,7 +63,7 @@ async fn rocket() -> _ {
 
     let (vls_tx, mut vls_rx) = mpsc::channel::<ChanMsg>(1000);
     let vls_tx_ = vls_tx.clone();
-    let (lss_tx, mut lss_rx) = mpsc::channel::<ChanMsg>(1000);
+    let (lss_tx, lss_rx) = mpsc::channel::<ChanMsg>(1000);
     let lss_tx_ = lss_tx.clone();
     let error_tx_ = error_tx.clone();
     rocket::tokio::spawn(async move {
@@ -73,7 +73,7 @@ async fn rocket() -> _ {
     });
 
     // LSS initialization
-    let root_handler = init_lss(lss_rx).await.unwrap();
+    let (root_handler, _lss_signer) = init_lss(handler_builder, lss_rx).await.unwrap();
 
     let root_network = root_handler.node().network();
     log::info!("root network {:?}", root_network);
@@ -84,7 +84,11 @@ async fn rocket() -> _ {
     rocket::tokio::spawn(async move {
         while let Some(msg) = vls_rx.recv().await {
             let res_res = root::handle(&rh_, msg.message, true);
-            let _ = msg.reply_tx.send(res_res);
+            let to_send = match res_res {
+                Ok((bytes, muts)) => Ok(bytes),
+                Err(e) => Err(e),
+            };
+            let _ = msg.reply_tx.send(to_send);
         }
     });
 
@@ -95,8 +99,11 @@ async fn rocket() -> _ {
     routes::launch_rocket(ctrl_tx, error_tx)
 }
 
-async fn init_lss(lss_rx: mpsc::Receiver<ChanMsg>) -> Result<RootHandler> {
-    let first_lss_msg = lss_rx.recv().await?;
+async fn init_lss(
+    handler_builder: RootHandlerBuilder,
+    mut lss_rx: mpsc::Receiver<ChanMsg>,
+) -> Result<(RootHandler, LssSigner)> {
+    let first_lss_msg = lss_rx.recv().await.ok_or(anyhow!("couldnt receive"))?;
     let init = lss_msgs::Msg::from_slice(&first_lss_msg.message)?.as_init()?;
     let server_pubkey_bytes = hex::decode(init.server_pubkey)?;
     let server_pubkey = PublicKey::from_slice(&server_pubkey_bytes)?;
@@ -106,7 +113,7 @@ async fn init_lss(lss_rx: mpsc::Receiver<ChanMsg>) -> Result<RootHandler> {
         log::warn!("could not send on first_lss_msg.reply_tx, {:?}", e);
     }
 
-    let second_lss_msg = lss_rx.recv().await?;
+    let second_lss_msg = lss_rx.recv().await.ok_or(anyhow!("couldnt receive"))?;
     let created = lss_msgs::Msg::from_slice(&second_lss_msg.message)?.as_created()?;
 
     // build the root handler
@@ -115,7 +122,7 @@ async fn init_lss(lss_rx: mpsc::Receiver<ChanMsg>) -> Result<RootHandler> {
     if let Err(e) = second_lss_msg.reply_tx.send(Ok(res2)) {
         log::warn!("could not send on second_lss_msg.reply_tx, {:?}", e);
     }
-    Ok(root_handler)
+    Ok((root_handler, lss_signer))
 }
 
 async fn listen_for_commands(

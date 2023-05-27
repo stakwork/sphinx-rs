@@ -1,4 +1,4 @@
-use crate::{lss, ChanMsg};
+use crate::ChanMsg;
 use sphinx_auther::secp256k1::{PublicKey, SecretKey};
 use sphinx_auther::token::Token;
 use sphinx_signer::sphinx_glyph::{sphinx_auther, topics};
@@ -132,7 +132,7 @@ async fn main_listener(
                         // check hmac
                         // update local state
                         let (lss_msg, reply_rx) = ChanMsg::new(msg_bytes);
-                        let txres = lss_tx.send(lss_msg).await;
+                        let _ = lss_tx.send(lss_msg).await;
                         match reply_rx.await.unwrap() {
                             Ok(b) => {
                                 let lss_res_topic = format!("{}/{}", &client_id, topics::LSS_RES);

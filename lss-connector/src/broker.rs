@@ -47,6 +47,10 @@ impl LssBroker {
                 let client = self.lss_client.lock().await;
                 client.put(cm.muts, &cm.client_hmac).await?;
             }
+            Response::VlsMuts(vlsm) => {
+                let client = self.lss_client.lock().await;
+                client.put(vlsm.muts, &vlsm.client_hmac).await?;
+            }
         };
         Ok(())
     }

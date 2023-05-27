@@ -54,7 +54,13 @@ pub fn builder(
     Ok(handler_builder)
 }
 
-pub fn handle(root_handler: &RootHandler, bytes: Vec<u8>, do_log: bool) -> anyhow::Result<Vec<u8>> {
+pub type Muts = Vec<(String, (u64, Vec<u8>))>;
+
+pub fn handle(
+    root_handler: &RootHandler,
+    bytes: Vec<u8>,
+    do_log: bool,
+) -> anyhow::Result<(Vec<u8>, Muts)> {
     let mut md = MsgDriver::new(bytes);
     let msgs::SerialRequestHeader {
         sequence,
@@ -82,7 +88,9 @@ pub fn handle(root_handler: &RootHandler, bytes: Vec<u8>, do_log: bool) -> anyho
         let handler = root_handler.for_new_client(dbid, PubKey(peer_id), dbid);
         match handler.handle(message) {
             Ok(r) => r,
-            Err(e) => return Err(anyhow!("client {} handler error: {:?}", dbid, e)),
+            Err(e) => {
+                return Err(anyhow!("client {} handler error: {:?}", dbid, e));
+            }
         }
     } else {
         match root_handler.handle(message) {
@@ -93,7 +101,7 @@ pub fn handle(root_handler: &RootHandler, bytes: Vec<u8>, do_log: bool) -> anyho
     let mut out_md = MsgDriver::new_empty();
     write_serial_response_header(&mut out_md, sequence).expect("write reply header");
     msgs::write_vec(&mut out_md, reply.0.as_vec()).expect("write reply");
-    Ok(out_md.bytes())
+    Ok((out_md.bytes(), reply.1))
 }
 
 pub fn parse_ping_and_form_response(msg_bytes: Vec<u8>) -> Vec<u8> {

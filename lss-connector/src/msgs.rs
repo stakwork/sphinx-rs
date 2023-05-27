@@ -5,12 +5,14 @@ use serde::{Deserialize, Serialize};
 pub enum Msg {
     Init(Init),
     Created(BrokerMutations),
+    Stored(BrokerMutations),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Response {
     Init(InitResponse),
     Created(SignerMutations),
+    VlsMuts(SignerMutations),
 }
 
 pub type Muts = Vec<(String, (u64, Vec<u8>))>;

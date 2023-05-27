@@ -57,11 +57,10 @@ impl LssSigner {
 
         Ok((handler, res_bytes))
     }
-    pub fn handle(&self, msg: Msg) -> Result<()> {
-        match msg {
-            Msg::Init(_) => (),
-            Msg::Created(_) => (),
-        }
-        Ok(())
+    pub fn client_hmac(&self, muts: Muts) -> [u8; 32] {
+        self.helper.client_hmac(&muts)
+    }
+    pub fn check_hmac(&self, bm: &BrokerMutations) -> bool {
+        self.helper.check_hmac(&bm.muts, bm.server_hmac.clone())
     }
 }
