@@ -10,6 +10,10 @@ use lightning_signer::persist::Persist;
 use lightning_signer::policy::simple_validator::SimpleValidatorFactory;
 use lightning_signer::util::clock::StandardClock;
 use lightning_signer::util::velocity::{VelocityControl, VelocityControlSpec};
+use lss_connector::{
+    msgs::{Response as LssResponse, SignerMutations},
+    LssSigner,
+};
 use std::sync::Arc;
 use vls_protocol::model::PubKey;
 use vls_protocol::msgs::{self, read_serial_request_header, write_serial_response_header, Message};
@@ -54,13 +58,12 @@ pub fn builder(
     Ok(handler_builder)
 }
 
-pub type Muts = Vec<(String, (u64, Vec<u8>))>;
-
 pub fn handle(
     root_handler: &RootHandler,
+    lss_signer: &LssSigner,
     bytes: Vec<u8>,
     do_log: bool,
-) -> anyhow::Result<(Vec<u8>, Muts)> {
+) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
     let mut md = MsgDriver::new(bytes);
     let msgs::SerialRequestHeader {
         sequence,
@@ -98,10 +101,14 @@ pub fn handle(
             Err(e) => return Err(anyhow!("root handler error: {:?}", e)),
         }
     };
+    let (vls_msg, muts) = reply;
     let mut out_md = MsgDriver::new_empty();
     write_serial_response_header(&mut out_md, sequence).expect("write reply header");
-    msgs::write_vec(&mut out_md, reply.0.as_vec()).expect("write reply");
-    Ok((out_md.bytes(), reply.1))
+    msgs::write_vec(&mut out_md, vls_msg.as_vec()).expect("write reply");
+    let client_hmac = lss_signer.client_hmac(&muts);
+    let lss_msg = LssResponse::VlsMuts(SignerMutations { client_hmac, muts });
+    let lss_msg_bytes = lss_msg.to_vec().expect("failed to lssmsg to vec");
+    Ok((out_md.bytes(), lss_msg_bytes))
 }
 
 pub fn parse_ping_and_form_response(msg_bytes: Vec<u8>) -> Vec<u8> {

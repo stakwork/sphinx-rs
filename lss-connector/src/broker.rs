@@ -16,16 +16,15 @@ pub struct LssBroker {
 // and receives Response
 impl LssBroker {
     // returns server pubkey and msg to send to signer
-    pub async fn get_server_pubkey_and_emit_init(uri: &str) -> Result<(PublicKey, Vec<u8>)> {
+    pub async fn get_server_pubkey(uri: &str) -> Result<(PublicKey, Vec<u8>)> {
         let spk = LssClient::get_server_pubkey(uri).await?;
-        let server_pubkey = hex::encode(spk.serialize());
+        let server_pubkey = spk.serialize();
         let msg = Msg::Init(Init { server_pubkey }).to_vec()?;
         Ok((spk, msg))
     }
     // returns Self and the msg to send to signer
     pub async fn new(uri: &str, ir: InitResponse, spk: PublicKey) -> Result<(Self, Vec<u8>)> {
-        let pk_slice = hex::decode(ir.client_id)?;
-        let client_id = secp256k1::PublicKey::from_slice(&pk_slice)?;
+        let client_id = secp256k1::PublicKey::from_slice(&ir.client_id)?;
         let auth = Auth {
             client_id: client_id,
             token: ir.auth_token,
@@ -40,18 +39,19 @@ impl LssBroker {
 
         Ok((Self { lss_client }, msg))
     }
-    pub async fn handle(&self, res: Response) -> Result<()> {
+    pub async fn put_muts(&self, cm: SignerMutations) -> Result<Vec<u8>> {
+        Ok(if !cm.muts.is_empty() {
+            let client = self.lss_client.lock().await;
+            client.put(cm.muts, &cm.client_hmac).await?
+        } else {
+            vec![]
+        })
+    }
+    pub async fn handle(&self, res: Response) -> Result<Vec<u8>> {
         match res {
-            Response::Init(_) => (),
-            Response::Created(cm) => {
-                let client = self.lss_client.lock().await;
-                client.put(cm.muts, &cm.client_hmac).await?;
-            }
-            Response::VlsMuts(vlsm) => {
-                let client = self.lss_client.lock().await;
-                client.put(vlsm.muts, &vlsm.client_hmac).await?;
-            }
-        };
-        Ok(())
+            Response::Init(_) => Ok(vec![]),
+            Response::Created(cm) => self.put_muts(cm).await,
+            Response::VlsMuts(vlsm) => self.put_muts(vlsm).await,
+        }
     }
 }

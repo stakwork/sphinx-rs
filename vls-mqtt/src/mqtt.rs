@@ -1,4 +1,5 @@
 use crate::ChanMsg;
+use anyhow::Result;
 use sphinx_auther::secp256k1::{PublicKey, SecretKey};
 use sphinx_auther::token::Token;
 use sphinx_signer::sphinx_glyph::{sphinx_auther, topics};
@@ -106,26 +107,16 @@ async fn main_listener(
                         let (vls_msg, reply_rx) = ChanMsg::new(msg_bytes);
                         let _ = vls_tx.send(vls_msg).await;
                         match reply_rx.await.unwrap() {
-                            Ok(b) => {
-                                let return_topic = format!("{}/{}", &client_id, topics::VLS_RETURN);
-                                client
-                                    .publish(return_topic, QoS::AtLeastOnce, false, b)
-                                    .await
-                                    .expect("could not publish init response")
+                            // TODO
+                            // here, send the lss_bytes first, then VLS
+                            Ok((vls_bytes, _)) => {
+                                publish(client, &client_id, topics::VLS_RETURN, &vls_bytes).await;
                             }
                             Err(e) => {
-                                let error_topic = format!("{}/{}", &client_id, topics::ERROR);
                                 // publish errors back to broker AND locally
-                                client
-                                    .publish(
-                                        error_topic,
-                                        QoS::AtLeastOnce,
-                                        false,
-                                        e.to_string().as_bytes(),
-                                    )
-                                    .await
-                                    .expect("could not publish error response");
-                                let _ = error_tx.send(e.to_string().as_bytes().to_vec());
+                                let b = e.to_string();
+                                publish(client, &client_id, topics::ERROR, &b.as_bytes()).await;
+                                let _ = error_tx.send(b.as_bytes().to_vec());
                             }
                         }
                     } else if topic.ends_with(topics::LSS_MSG) {
@@ -134,12 +125,8 @@ async fn main_listener(
                         let (lss_msg, reply_rx) = ChanMsg::new(msg_bytes);
                         let _ = lss_tx.send(lss_msg).await;
                         match reply_rx.await.unwrap() {
-                            Ok(b) => {
-                                let lss_res_topic = format!("{}/{}", &client_id, topics::LSS_RES);
-                                client
-                                    .publish(lss_res_topic, QoS::AtLeastOnce, false, b)
-                                    .await
-                                    .expect("could not publish lss response");
+                            Ok((_, lss_bytes)) => {
+                                publish(client, &client_id, topics::LSS_RES, &lss_bytes).await;
                             }
                             Err(e) => {
                                 log::error!("LSS reply tx fail {:?}", e);
@@ -159,6 +146,14 @@ async fn main_listener(
             }
         }
     }
+}
+
+async fn publish(client: &AsyncClient, client_id: &str, topic: &str, bytes: &[u8]) {
+    let res_topic = format!("{}/{}", &client_id, topic);
+    client
+        .publish(res_topic, QoS::AtLeastOnce, false, bytes)
+        .await
+        .expect(&format!("could not publish to {}", topic));
 }
 
 fn incoming_bytes(event: Event) -> Option<(String, Vec<u8>)> {

@@ -25,10 +25,10 @@ pub const ROOT_STORE: &str = "teststore";
 #[derive(Debug)]
 pub struct ChanMsg {
     pub message: Vec<u8>,
-    pub reply_tx: oneshot::Sender<Result<Vec<u8>>>,
+    pub reply_tx: oneshot::Sender<Result<(Vec<u8>, Vec<u8>)>>,
 }
 impl ChanMsg {
-    pub fn new(message: Vec<u8>) -> (Self, oneshot::Receiver<Result<Vec<u8>>>) {
+    pub fn new(message: Vec<u8>) -> (Self, oneshot::Receiver<Result<(Vec<u8>, Vec<u8>)>>) {
         let (reply_tx, reply_rx) = oneshot::channel();
         (Self { message, reply_tx }, reply_rx)
     }
@@ -73,7 +73,7 @@ async fn rocket() -> _ {
     });
 
     // LSS initialization
-    let (root_handler, _lss_signer) = init_lss(handler_builder, lss_rx).await.unwrap();
+    let (root_handler, lss_signer) = init_lss(handler_builder, lss_rx).await.unwrap();
 
     let root_network = root_handler.node().network();
     log::info!("root network {:?}", root_network);
@@ -83,12 +83,8 @@ async fn rocket() -> _ {
     let rh_ = rh.clone();
     rocket::tokio::spawn(async move {
         while let Some(msg) = vls_rx.recv().await {
-            let res_res = root::handle(&rh_, msg.message, true);
-            let to_send = match res_res {
-                Ok((bytes, muts)) => Ok(bytes),
-                Err(e) => Err(e),
-            };
-            let _ = msg.reply_tx.send(to_send);
+            let res_res = root::handle(&rh_, &lss_signer, msg.message, true);
+            let _ = msg.reply_tx.send(res_res);
         }
     });
 
@@ -105,11 +101,10 @@ async fn init_lss(
 ) -> Result<(RootHandler, LssSigner)> {
     let first_lss_msg = lss_rx.recv().await.ok_or(anyhow!("couldnt receive"))?;
     let init = lss_msgs::Msg::from_slice(&first_lss_msg.message)?.as_init()?;
-    let server_pubkey_bytes = hex::decode(init.server_pubkey)?;
-    let server_pubkey = PublicKey::from_slice(&server_pubkey_bytes)?;
+    let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
 
     let (lss_signer, res1) = LssSigner::new(&handler_builder, &server_pubkey);
-    if let Err(e) = first_lss_msg.reply_tx.send(Ok(res1)) {
+    if let Err(e) = first_lss_msg.reply_tx.send(Ok((vec![], res1))) {
         log::warn!("could not send on first_lss_msg.reply_tx, {:?}", e);
     }
 
@@ -119,7 +114,7 @@ async fn init_lss(
     // build the root handler
     let (root_handler, res2) = lss_signer.build_with_lss(created, handler_builder).unwrap();
     println!("root handler built!!!!!");
-    if let Err(e) = second_lss_msg.reply_tx.send(Ok(res2)) {
+    if let Err(e) = second_lss_msg.reply_tx.send(Ok((vec![], res2))) {
         log::warn!("could not send on second_lss_msg.reply_tx, {:?}", e);
     }
     Ok((root_handler, lss_signer))

@@ -25,7 +25,7 @@ impl LssSigner {
         let entropy = SimpleEntropy::new();
         // send client_id and auth_token back to broker
         let msg = Response::Init(InitResponse {
-            client_id: hex::encode(client_id.serialize()),
+            client_id: client_id.serialize(),
             auth_token: auth_token.to_vec(),
             nonce: helper.new_nonce(&entropy),
         });
@@ -57,8 +57,8 @@ impl LssSigner {
 
         Ok((handler, res_bytes))
     }
-    pub fn client_hmac(&self, muts: Muts) -> [u8; 32] {
-        self.helper.client_hmac(&muts)
+    pub fn client_hmac(&self, muts: &Muts) -> [u8; 32] {
+        self.helper.client_hmac(muts)
     }
     pub fn check_hmac(&self, bm: &BrokerMutations) -> bool {
         self.helper.check_hmac(&bm.muts, bm.server_hmac.clone())

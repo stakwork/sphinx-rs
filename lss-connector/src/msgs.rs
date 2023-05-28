@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Msg {
@@ -19,7 +20,8 @@ pub type Muts = Vec<(String, (u64, Vec<u8>))>;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Init {
-    pub server_pubkey: String,
+    #[serde(with = "BigArray")]
+    pub server_pubkey: [u8; 33],
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -36,7 +38,8 @@ pub struct SignerMutations {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct InitResponse {
-    pub client_id: String,
+    #[serde(with = "BigArray")]
+    pub client_id: [u8; 33],
     pub auth_token: Vec<u8>,
     pub nonce: [u8; 32],
 }

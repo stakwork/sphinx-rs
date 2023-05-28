@@ -18,7 +18,7 @@ serde = "1.0.1"
 anyhow = "1"
 secp256k1 = { version = "0.24.0", features = ["rand-std", "bitcoin_hashes"] }
 rmp-serde = "1.1.0"
-hex = "0.4.3"
+serde-big-array = "0.5.1"
 # broker libs
 lightning-storage-server = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "e13c8cd994b310f598c0b2902741d89ad5472382", optional = true }
 vls-frontend = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "e13c8cd994b310f598c0b2902741d89ad5472382", optional = true }
