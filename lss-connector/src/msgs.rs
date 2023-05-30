@@ -83,4 +83,10 @@ impl Response {
             _ => Err(anyhow!("not a created msg")),
         }
     }
+    pub fn as_vls_muts(&self) -> Result<SignerMutations> {
+        match self {
+            Response::VlsMuts(m) => Ok(m.clone()),
+            _ => Err(anyhow!("not a VlsMuts msg")),
+        }
+    }
 }

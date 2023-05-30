@@ -8,13 +8,18 @@ use tokio::sync::Mutex as AsyncMutex;
 use vls_frontend::external_persist::lss::Client as LssClient;
 use vls_frontend::external_persist::ExternalPersist;
 
+pub type LssPersister = Arc<AsyncMutex<Box<dyn ExternalPersist>>>;
+
 pub struct LssBroker {
-    lss_client: Arc<AsyncMutex<Box<dyn ExternalPersist>>>,
+    lss_client: LssPersister,
 }
 
 // broker emits Msg
 // and receives Response
 impl LssBroker {
+    pub fn persister(&self) -> LssPersister {
+        self.lss_client.clone()
+    }
     // returns server pubkey and msg to send to signer
     pub async fn get_server_pubkey(uri: &str) -> Result<(PublicKey, Vec<u8>)> {
         let spk = LssClient::get_server_pubkey(uri).await?;
