@@ -10,6 +10,7 @@ use vls_frontend::external_persist::ExternalPersist;
 
 pub type LssPersister = Arc<AsyncMutex<Box<dyn ExternalPersist>>>;
 
+#[derive(Clone)]
 pub struct LssBroker {
     lss_client: LssPersister,
 }
@@ -52,11 +53,30 @@ impl LssBroker {
             vec![]
         })
     }
-    pub async fn handle(&self, res: Response) -> Result<Vec<u8>> {
+    pub async fn handle_bytes(&self, resb: &[u8]) -> Result<Vec<u8>> {
+        let res = Response::from_slice(resb)?;
+        let msg = self.handle(res).await?;
+        Ok(msg.to_vec()?)
+    }
+    pub async fn handle(&self, res: Response) -> Result<Msg> {
         match res {
-            Response::Init(_) => Ok(vec![]),
-            Response::Created(cm) => self.put_muts(cm).await,
-            Response::VlsMuts(vlsm) => self.put_muts(vlsm).await,
+            Response::Init(_) => Ok(Msg::Init(Init {
+                server_pubkey: [0; 33], // dummy
+            })),
+            Response::Created(cm) => {
+                let server_hmac = self.put_muts(cm).await?;
+                Ok(Msg::Created(BrokerMutations {
+                    muts: Vec::new(),
+                    server_hmac,
+                }))
+            }
+            Response::VlsMuts(vlsm) => {
+                let server_hmac = self.put_muts(vlsm).await?;
+                Ok(Msg::Stored(BrokerMutations {
+                    muts: Vec::new(),
+                    server_hmac,
+                }))
+            }
         }
     }
 }
