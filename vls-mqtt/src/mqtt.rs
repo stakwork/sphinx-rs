@@ -1,4 +1,4 @@
-use crate::ChanMsg;
+use crate::{LssChanMsg, VlsChanMsg};
 use anyhow::Result;
 use sphinx_auther::secp256k1::{PublicKey, SecretKey};
 use sphinx_auther::token::Token;
@@ -11,11 +11,11 @@ use std::error::Error;
 use std::time::Duration;
 
 pub async fn start(
-    vls_tx: mpsc::Sender<ChanMsg>,
+    vls_tx: mpsc::Sender<VlsChanMsg>,
     pubkey: &PublicKey,
     secret: &SecretKey,
     error_tx: broadcast::Sender<Vec<u8>>,
-    lss_tx: mpsc::Sender<ChanMsg>,
+    lss_tx: mpsc::Sender<LssChanMsg>,
 ) -> Result<(), Box<dyn Error>> {
     // alternate between "reconnection" and "handler"
     loop {
@@ -91,52 +91,24 @@ pub async fn start(
 }
 
 async fn main_listener(
-    vls_tx: mpsc::Sender<ChanMsg>,
+    vls_tx: mpsc::Sender<VlsChanMsg>,
     mut eventloop: EventLoop,
     client: &AsyncClient,
     error_tx: broadcast::Sender<Vec<u8>>,
     client_id: String,
-    lss_tx: mpsc::Sender<ChanMsg>,
+    lss_tx: mpsc::Sender<LssChanMsg>,
 ) {
+    let mut msgs: Option<(Vec<u8>, Vec<u8>)> = None;
     loop {
         match eventloop.poll().await {
             Ok(event) => {
                 if let Some((topic, msg_bytes)) = incoming_bytes(event) {
-                    if topic.ends_with(topics::VLS) {
-                        // println!("Got VLS message of length: {}", msg_bytes.len());
-                        let (vls_msg, reply_rx) = ChanMsg::new(msg_bytes);
-                        let _ = vls_tx.send(vls_msg).await;
-                        match reply_rx.await.unwrap() {
-                            // TODO
-                            // here, send the lss_bytes first, then VLS
-                            Ok((vls_bytes, _)) => {
-                                publish(client, &client_id, topics::VLS_RETURN, &vls_bytes).await;
-                            }
-                            Err(e) => {
-                                // publish errors back to broker AND locally
-                                let b = e.to_string();
-                                publish(client, &client_id, topics::ERROR, &b.as_bytes()).await;
-                                let _ = error_tx.send(b.as_bytes().to_vec());
-                            }
-                        }
-                    } else if topic.ends_with(topics::LSS_MSG) {
-                        // check hmac
-                        // update local state
-                        let (lss_msg, reply_rx) = ChanMsg::new(msg_bytes);
-                        let _ = lss_tx.send(lss_msg).await;
-                        match reply_rx.await.unwrap() {
-                            Ok((_, lss_bytes)) => {
-                                publish(client, &client_id, topics::LSS_RES, &lss_bytes).await;
-                            }
-                            Err(e) => {
-                                log::error!("LSS reply tx fail {:?}", e);
-                            }
-                        };
-                    } else if topic.ends_with(topics::CONTROL) {
-                        //
-                    } else {
-                        log::info!("invalid topic");
+                    let (return_topic, bytes) =
+                        got_msg(&topic, &msg_bytes, &vls_tx, &lss_tx, &mut msgs).await;
+                    if return_topic == topics::ERROR {
+                        let _ = error_tx.send(bytes.clone());
                     }
+                    publish(client, &client_id, &return_topic, &bytes).await;
                 }
             }
             Err(e) => {
@@ -145,6 +117,43 @@ async fn main_listener(
                 break; // break out of this loop to reconnect
             }
         }
+    }
+}
+
+// VLS->(vls handle)->LSS_RES (lss_bytes)
+// LSS_MSG->(lss check hmac)->VLS_RETURN (vls_bytes)
+
+async fn got_msg(
+    topic: &str,
+    msg_bytes: &[u8],
+    vls_tx: &mpsc::Sender<VlsChanMsg>,
+    lss_tx: &mpsc::Sender<LssChanMsg>,
+    msgs: &mut Option<(Vec<u8>, Vec<u8>)>,
+) -> (String, Vec<u8>) {
+    if topic.ends_with(topics::VLS) {
+        let (vls_msg, reply_rx) = VlsChanMsg::new(msg_bytes.to_vec());
+        let _ = vls_tx.send(vls_msg).await;
+        match reply_rx.await.unwrap() {
+            Ok((vls_bytes, lss_bytes)) => {
+                *msgs = Some((vls_bytes, lss_bytes.clone()));
+                (topics::LSS_RES.to_string(), lss_bytes)
+            }
+            Err(e) => (topics::ERROR.to_string(), e.to_string().as_bytes().to_vec()),
+        }
+    } else if topic.ends_with(topics::LSS_MSG) {
+        let (lss_msg, reply_rx) = LssChanMsg::new(msg_bytes.to_vec(), msgs.clone());
+        let _ = lss_tx.send(lss_msg).await;
+        match reply_rx.await.unwrap() {
+            // these are the vls bytes from before
+            Ok((topic, payload)) => {
+                *msgs = None;
+                (topic, payload.to_vec())
+            }
+            Err(e) => (topics::ERROR.to_string(), e.to_string().as_bytes().to_vec()),
+        }
+    } else {
+        let err = format!("=> bad topic {}", topic);
+        (topics::ERROR.to_string(), err.as_bytes().to_vec())
     }
 }
 

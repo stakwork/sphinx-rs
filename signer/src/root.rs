@@ -69,8 +69,8 @@ pub fn handle(
         sequence,
         peer_id,
         dbid,
-    } = read_serial_request_header(&mut md).expect("read request header");
-    let message = msgs::read(&mut md).expect("message read failed");
+    } = read_serial_request_header(&mut md)?;
+    let message = msgs::read(&mut md)?;
 
     if let Message::HsmdInit(ref m) = message {
         if ChainHash::using_genesis_block(root_handler.node().network()).as_bytes()
@@ -102,12 +102,13 @@ pub fn handle(
         }
     };
     let (vls_msg, muts) = reply;
+    // make the VLS message bytes
     let mut out_md = MsgDriver::new_empty();
-    write_serial_response_header(&mut out_md, sequence).expect("write reply header");
-    msgs::write_vec(&mut out_md, vls_msg.as_vec()).expect("write reply");
+    write_serial_response_header(&mut out_md, sequence)?;
+    msgs::write_vec(&mut out_md, vls_msg.as_vec())?;
     let client_hmac = lss_signer.client_hmac(&muts);
     let lss_msg = LssResponse::VlsMuts(SignerMutations { client_hmac, muts });
-    let lss_msg_bytes = lss_msg.to_vec().expect("failed to lssmsg to vec");
+    let lss_msg_bytes = lss_msg.to_vec()?;
     Ok((out_md.bytes(), lss_msg_bytes))
 }
 

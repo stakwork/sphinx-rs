@@ -63,6 +63,12 @@ impl Msg {
             _ => Err(anyhow!("not a created msg")),
         }
     }
+    pub fn as_stored(&self) -> Result<BrokerMutations> {
+        match self {
+            Msg::Stored(m) => Ok(m.clone()),
+            _ => Err(anyhow!("not a created msg")),
+        }
+    }
 }
 impl Response {
     pub fn to_vec(&self) -> Result<Vec<u8>> {

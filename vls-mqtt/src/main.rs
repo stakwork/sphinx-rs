@@ -7,7 +7,9 @@ use crate::routes::{ChannelReply, ChannelRequest};
 use anyhow::{anyhow, Result};
 use dotenv::dotenv;
 use glyph::control::{ControlPersist, Controller};
-use lss_connector::{msgs as lss_msgs, secp256k1::PublicKey, LssSigner};
+use lss_connector::{
+    msgs as lss_msgs, secp256k1::PublicKey, LssSigner, Msg as LssMsg, Response as LssRes,
+};
 use rocket::tokio::sync::{broadcast, mpsc, oneshot};
 use sphinx_signer::lightning_signer::bitcoin::Network;
 use sphinx_signer::lightning_signer::persist::Persist;
@@ -22,15 +24,43 @@ use std::sync::{Arc, Mutex};
 
 pub const ROOT_STORE: &str = "teststore";
 
+// requests from incoming VLS messages
 #[derive(Debug)]
-pub struct ChanMsg {
+pub struct VlsChanMsg {
     pub message: Vec<u8>,
     pub reply_tx: oneshot::Sender<Result<(Vec<u8>, Vec<u8>)>>,
 }
-impl ChanMsg {
+impl VlsChanMsg {
     pub fn new(message: Vec<u8>) -> (Self, oneshot::Receiver<Result<(Vec<u8>, Vec<u8>)>>) {
         let (reply_tx, reply_rx) = oneshot::channel();
         (Self { message, reply_tx }, reply_rx)
+    }
+}
+
+// requests from incoming LSS messages
+// they include the "previous" VLS and LSS bytes
+#[derive(Debug)]
+pub struct LssChanMsg {
+    pub message: Vec<u8>,
+    // the previous VLS msgs
+    pub previous: Option<(Vec<u8>, Vec<u8>)>,
+    // topic, payload
+    pub reply_tx: oneshot::Sender<Result<(String, Vec<u8>)>>,
+}
+impl LssChanMsg {
+    pub fn new(
+        message: Vec<u8>,
+        previous: Option<(Vec<u8>, Vec<u8>)>,
+    ) -> (Self, oneshot::Receiver<Result<(String, Vec<u8>)>>) {
+        let (reply_tx, reply_rx) = oneshot::channel();
+        (
+            Self {
+                message,
+                previous,
+                reply_tx,
+            },
+            reply_rx,
+        )
     }
 }
 
@@ -66,9 +96,9 @@ async fn rocket() -> _ {
     let handler_builder =
         root::builder(seed32, network, &initial_policy, persister).expect("failed to init signer");
 
-    let (vls_tx, mut vls_rx) = mpsc::channel::<ChanMsg>(1000);
+    let (vls_tx, mut vls_rx) = mpsc::channel::<VlsChanMsg>(1000);
     let vls_tx_ = vls_tx.clone();
-    let (lss_tx, lss_rx) = mpsc::channel::<ChanMsg>(1000);
+    let (lss_tx, lss_rx) = mpsc::channel::<LssChanMsg>(1000);
     let lss_tx_ = lss_tx.clone();
     let error_tx_ = error_tx.clone();
     rocket::tokio::spawn(async move {
@@ -102,14 +132,17 @@ async fn rocket() -> _ {
 
 async fn init_lss(
     handler_builder: RootHandlerBuilder,
-    mut lss_rx: mpsc::Receiver<ChanMsg>,
+    mut lss_rx: mpsc::Receiver<LssChanMsg>,
 ) -> Result<(RootHandler, LssSigner)> {
+    use sphinx_signer::sphinx_glyph::topics;
+    let res_topic = topics::LSS_RES.to_string();
+
     let first_lss_msg = lss_rx.recv().await.ok_or(anyhow!("couldnt receive"))?;
     let init = lss_msgs::Msg::from_slice(&first_lss_msg.message)?.as_init()?;
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
 
     let (lss_signer, res1) = LssSigner::new(&handler_builder, &server_pubkey);
-    if let Err(e) = first_lss_msg.reply_tx.send(Ok((vec![], res1))) {
+    if let Err(e) = first_lss_msg.reply_tx.send(Ok((res_topic.clone(), res1))) {
         log::warn!("could not send on first_lss_msg.reply_tx, {:?}", e);
     }
 
@@ -119,10 +152,42 @@ async fn init_lss(
     // build the root handler
     let (root_handler, res2) = lss_signer.build_with_lss(created, handler_builder).unwrap();
     println!("root handler built!!!!!");
-    if let Err(e) = second_lss_msg.reply_tx.send(Ok((vec![], res2))) {
+    if let Err(e) = second_lss_msg.reply_tx.send(Ok((res_topic, res2))) {
         log::warn!("could not send on second_lss_msg.reply_tx, {:?}", e);
     }
+
+    let lss_signer_ = lss_signer.clone();
+    rocket::tokio::spawn(async move {
+        while let Some(msg) = lss_rx.recv().await {
+            let ret = match handle_lss_confirmation(&msg, &lss_signer_).await {
+                Ok(vls_bytes) => Ok((topics::VLS_RETURN.to_string(), vls_bytes)),
+                Err(e) => Err(e),
+            };
+            let _ = msg.reply_tx.send(ret);
+        }
+    });
+
     Ok((root_handler, lss_signer))
+}
+
+// return the original VLS bytes
+async fn handle_lss_confirmation(msg: &LssChanMsg, lss_signer: &LssSigner) -> Result<Vec<u8>> {
+    let lssmsg = LssMsg::from_slice(&msg.message)?;
+    let mut bm = lssmsg.as_stored()?;
+    if let None = msg.previous {
+        return Err(anyhow!("should be previous msg bytes"));
+    }
+    let previous = msg.previous.clone().unwrap();
+    // get the previous vls msg (where i sent signer muts)
+    let prev_lssmsg = LssRes::from_slice(&previous.1)?;
+    let sm = prev_lssmsg.as_vls_muts()?;
+    bm.muts = sm.muts;
+    // send back the original VLS response finally
+    if lss_signer.check_hmac(&bm) {
+        Ok(previous.0)
+    } else {
+        Err(anyhow!("Invalid server hmac"))
+    }
 }
 
 async fn listen_for_commands(
