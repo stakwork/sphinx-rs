@@ -172,6 +172,7 @@ async fn init_lss(
 
 // return the original VLS bytes
 async fn handle_lss_confirmation(msg: &LssChanMsg, lss_signer: &LssSigner) -> Result<Vec<u8>> {
+    println!("LssMsg::from_slice {:?}", &msg.message);
     let lssmsg = LssMsg::from_slice(&msg.message)?;
     let mut bm = lssmsg.as_stored()?;
     if let None = msg.previous {
@@ -179,14 +180,21 @@ async fn handle_lss_confirmation(msg: &LssChanMsg, lss_signer: &LssSigner) -> Re
     }
     let previous = msg.previous.clone().unwrap();
     // get the previous vls msg (where i sent signer muts)
+    println!("LssRes::from_slice {:?}", &previous.1);
     let prev_lssmsg = LssRes::from_slice(&previous.1)?;
+    println!("hm ok");
     let sm = prev_lssmsg.as_vls_muts()?;
-    bm.muts = sm.muts;
-    // send back the original VLS response finally
-    if lss_signer.check_hmac(&bm) {
+    if sm.muts.is_empty() {
+        // empty muts? dont need to check server hmac
         Ok(previous.0)
     } else {
-        Err(anyhow!("Invalid server hmac"))
+        bm.muts = sm.muts;
+        // send back the original VLS response finally
+        if lss_signer.check_hmac(&bm) {
+            Ok(previous.0)
+        } else {
+            Err(anyhow!("Invalid server hmac"))
+        }
     }
 }
 
@@ -200,11 +208,8 @@ async fn listen_for_commands(
         match ctrlr.handle(&msg.message) {
             Ok((cmsg, cres)) => {
                 let res2 = update_controls(rh, network, cmsg, cres);
-                let reply =
-                    rmp_serde::to_vec_named(&res2).expect("could not build control response");
-                msg.reply_tx
-                    .send(ChannelReply { reply })
-                    .expect("couldnt send ctrl reply");
+                let reply = rmp_serde::to_vec_named(&res2).unwrap();
+                let _ = msg.reply_tx.send(ChannelReply { reply });
             }
             Err(e) => log::warn!("error parsing ctrl msg {:?}", e),
         };

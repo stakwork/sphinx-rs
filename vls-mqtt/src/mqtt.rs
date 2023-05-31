@@ -130,7 +130,7 @@ async fn got_msg(
     lss_tx: &mpsc::Sender<LssChanMsg>,
     msgs: &mut Option<(Vec<u8>, Vec<u8>)>,
 ) -> (String, Vec<u8>) {
-    println!("GOT MSG on {}", topic);
+    println!("GOT MSG on {} {:?}", topic, msg_bytes);
     if topic.ends_with(topics::VLS) {
         let (vls_msg, reply_rx) = VlsChanMsg::new(msg_bytes.to_vec());
         let _ = vls_tx.send(vls_msg).await;
@@ -147,10 +147,14 @@ async fn got_msg(
         match reply_rx.await.unwrap() {
             // these are the vls bytes from before
             Ok((topic, payload)) => {
+                println!("got something back to send on {}", &topic);
                 *msgs = None;
                 (topic, payload.to_vec())
             }
-            Err(e) => (topics::ERROR.to_string(), e.to_string().as_bytes().to_vec()),
+            Err(e) => {
+                println!("LSS ERROR {:?}", e);
+                (topics::ERROR.to_string(), e.to_string().as_bytes().to_vec())
+            }
         }
     } else {
         let err = format!("=> bad topic {}", topic);
