@@ -66,17 +66,14 @@ pub async fn lss_handle(lss: &LssPersister, msg: &[u8]) -> Result<Vec<u8>> {
     let res = Response::from_slice(msg)?.as_vls_muts()?;
     log::info!("res {:?}", res);
     let client = lss.lock().await;
-    Ok(if !res.muts.is_empty() {
+    let bm: BrokerMutations = if !res.muts.is_empty() {
         let server_hmac = client.put(res.muts, &res.client_hmac).await?;
-        log::info!("bad hmac");
-        let bm = BrokerMutations {
+        BrokerMutations {
             muts: Default::default(),
             server_hmac,
-        };
-        let msg = Msg::Stored(bm).to_vec()?;
-        log::info!("bad stored");
-        msg
+        }
     } else {
-        Vec::new()
-    })
+        Default::default()
+    };
+    Ok(Msg::Stored(bm).to_vec()?)
 }

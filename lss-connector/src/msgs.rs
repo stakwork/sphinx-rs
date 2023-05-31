@@ -24,7 +24,7 @@ pub struct Init {
     pub server_pubkey: [u8; 33],
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct BrokerMutations {
     pub muts: Muts,
     pub server_hmac: Vec<u8>,

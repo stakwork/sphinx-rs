@@ -130,6 +130,7 @@ async fn got_msg(
     lss_tx: &mpsc::Sender<LssChanMsg>,
     msgs: &mut Option<(Vec<u8>, Vec<u8>)>,
 ) -> (String, Vec<u8>) {
+    println!("GOT MSG on {}", topic);
     if topic.ends_with(topics::VLS) {
         let (vls_msg, reply_rx) = VlsChanMsg::new(msg_bytes.to_vec());
         let _ = vls_tx.send(vls_msg).await;
