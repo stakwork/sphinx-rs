@@ -159,7 +159,7 @@ async fn init_lss(
     let lss_signer_ = lss_signer.clone();
     rocket::tokio::spawn(async move {
         while let Some(msg) = lss_rx.recv().await {
-            let ret = handle_lss_confirmation(&msg, &lss_signer_).await;
+            let ret = handle_lss_msg(&msg, &lss_signer_).await;
             let _ = msg.reply_tx.send(ret);
         }
     });
@@ -170,20 +170,16 @@ async fn init_lss(
 // return the original VLS bytes
 // FIXME handle reconnects from broker restarting (init, created msgs)
 // return the return_topic and bytes
-async fn handle_lss_confirmation(
-    msg: &LssChanMsg,
-    lss_signer: &LssSigner,
-) -> Result<(String, Vec<u8>)> {
+async fn handle_lss_msg(msg: &LssChanMsg, lss_signer: &LssSigner) -> Result<(String, Vec<u8>)> {
     use sphinx_signer::sphinx_glyph::topics;
 
-    println!("LssMsg::from_slice {:?}", &msg.message);
+    // println!("LssMsg::from_slice {:?}", &msg.message);
     let lssmsg = LssMsg::from_slice(&msg.message)?;
+    println!("incoming ?LSS msg {:?}", lssmsg);
     match lssmsg {
-        LssMsg::Init(i) => {
-            // FIXME
-            // let bs = lss_signer.reconnect_init_response();
-            // Ok((topics::LSS_RES.to_string(), bs))
-            Ok((topics::LSS_RES.to_string(), Vec::new()))
+        LssMsg::Init(_) => {
+            let bs = lss_signer.reconnect_init_response();
+            Ok((topics::LSS_RES.to_string(), bs))
         }
         LssMsg::Created(bm) => {
             if lss_signer.check_hmac(&bm) {
@@ -199,9 +195,9 @@ async fn handle_lss_confirmation(
             }
             let previous = msg.previous.clone().unwrap();
             // get the previous vls msg (where i sent signer muts)
-            println!("LssRes::from_slice {:?}", &previous.1);
+            // println!("LssRes::from_slice {:?}", &previous.1);
             let prev_lssmsg = LssRes::from_slice(&previous.1)?;
-            println!("hm ok");
+            println!("previous lss res: {:?}", prev_lssmsg);
             let sm = prev_lssmsg.as_vls_muts()?;
             if sm.muts.is_empty() {
                 // empty muts? dont need to check server hmac
