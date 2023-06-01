@@ -12,6 +12,7 @@ pub type LssPersister = Arc<AsyncMutex<Box<dyn ExternalPersist>>>;
 
 #[derive(Clone)]
 pub struct LssBroker {
+    uri: String,
     lss_client: LssPersister,
 }
 
@@ -21,6 +22,7 @@ impl LssBroker {
     pub fn persister(&self) -> LssPersister {
         self.lss_client.clone()
     }
+
     // returns server pubkey and msg to send to signer
     pub async fn get_server_pubkey(uri: &str) -> Result<(PublicKey, Vec<u8>)> {
         let spk = LssClient::get_server_pubkey(uri).await?;
@@ -42,8 +44,26 @@ impl LssBroker {
         let msg = Msg::Created(BrokerMutations { muts, server_hmac }).to_vec()?;
 
         let lss_client = Arc::new(AsyncMutex::new(Box::new(client) as Box<dyn ExternalPersist>));
-
-        Ok((Self { lss_client }, msg))
+        Ok((
+            Self {
+                lss_client,
+                uri: uri.to_string(),
+            },
+            msg,
+        ))
+    }
+    // on reconnection
+    pub async fn make_init_msg(&self) -> Result<Vec<u8>> {
+        let spk = LssClient::get_server_pubkey(&self.uri).await?;
+        let server_pubkey = spk.serialize();
+        Ok(Msg::Init(Init { server_pubkey }).to_vec()?)
+    }
+    // on reconenction
+    pub async fn get_initial_state_msg(&self, resbytes: &[u8]) -> Result<Vec<u8>> {
+        let ir = Response::from_slice(resbytes)?.as_init()?;
+        let client = self.lss_client.lock().await;
+        let (muts, server_hmac) = client.get("".to_string(), &ir.nonce).await.unwrap();
+        Ok(Msg::Created(BrokerMutations { muts, server_hmac }).to_vec()?)
     }
     pub async fn put_muts(&self, cm: SignerMutations) -> Result<Vec<u8>> {
         Ok(if !cm.muts.is_empty() {
