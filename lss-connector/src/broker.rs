@@ -75,6 +75,7 @@ impl LssBroker {
     }
     pub async fn handle_bytes(&self, resb: &[u8]) -> Result<Vec<u8>> {
         let res = Response::from_slice(resb)?;
+        log::info!("HANDLE LSS {:?}", res);
         let msg = self.handle(res).await?;
         Ok(msg.to_vec()?)
     }
