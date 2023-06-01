@@ -82,7 +82,7 @@ impl LssBroker {
 }
 
 pub async fn lss_handle(lss: &LssPersister, msg: &[u8]) -> Result<Vec<u8>> {
-    println!("MSG {:?}", msg);
+    log::info!("MSG {:?}", msg);
     let res = Response::from_slice(msg)?.as_vls_muts()?;
     log::info!("res::: {:?}", res);
     let client = lss.lock().await;
@@ -91,7 +91,7 @@ pub async fn lss_handle(lss: &LssPersister, msg: &[u8]) -> Result<Vec<u8>> {
     } else {
         let server_hmac = client.put(res.muts, &res.client_hmac).await?;
         BrokerMutations {
-            muts: Default::default(),
+            muts: Vec::new(),
             server_hmac,
         }
     };
