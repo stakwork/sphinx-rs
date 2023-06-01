@@ -66,7 +66,7 @@ impl Msg {
     pub fn as_stored(&self) -> Result<BrokerMutations> {
         match self {
             Msg::Stored(m) => Ok(m.clone()),
-            _ => Err(anyhow!("not a created msg")),
+            _ => Err(anyhow!("not a stored msg")),
         }
     }
 }

@@ -34,6 +34,25 @@ impl LssSigner {
         let state = Arc::new(Mutex::new(Default::default()));
         (Self { state, helper }, msg_bytes)
     }
+    // on reconnection
+    // only the "nonce" is needed
+    pub fn reconnect_init_response(&mut self) -> Vec<u8> {
+        let entropy = SimpleEntropy::new();
+        let msg = Response::Init(InitResponse {
+            client_id: [0; 33],
+            auth_token: Default::default(),
+            nonce: self.helper.new_nonce(&entropy),
+        });
+        msg.to_vec().unwrap()
+    }
+    // on reconnection, empty muts and no hmac
+    pub fn empty_created(&self) -> Vec<u8> {
+        let res = Response::Created(SignerMutations {
+            muts: Vec::new(),
+            client_hmac: [0; 32],
+        });
+        res.to_vec().unwrap()
+    }
     pub fn build_with_lss(
         &self,
         c: BrokerMutations,

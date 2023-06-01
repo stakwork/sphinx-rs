@@ -150,7 +150,7 @@ async fn init_lss(
     let created = lss_msgs::Msg::from_slice(&second_lss_msg.message)?.as_created()?;
 
     // build the root handler
-    let (root_handler, res2) = lss_signer.build_with_lss(created, handler_builder).unwrap();
+    let (root_handler, res2) = lss_signer.build_with_lss(created, handler_builder)?;
     println!("root handler built!!!!!");
     if let Err(e) = second_lss_msg.reply_tx.send(Ok((res_topic, res2))) {
         log::warn!("could not send on second_lss_msg.reply_tx, {:?}", e);
@@ -159,10 +159,7 @@ async fn init_lss(
     let lss_signer_ = lss_signer.clone();
     rocket::tokio::spawn(async move {
         while let Some(msg) = lss_rx.recv().await {
-            let ret = match handle_lss_confirmation(&msg, &lss_signer_).await {
-                Ok(vls_bytes) => Ok((topics::VLS_RETURN.to_string(), vls_bytes)),
-                Err(e) => Err(e),
-            };
+            let ret = handle_lss_confirmation(&msg, &lss_signer_).await;
             let _ = msg.reply_tx.send(ret);
         }
     });
@@ -171,29 +168,54 @@ async fn init_lss(
 }
 
 // return the original VLS bytes
-async fn handle_lss_confirmation(msg: &LssChanMsg, lss_signer: &LssSigner) -> Result<Vec<u8>> {
+// FIXME handle reconnects from broker restarting (init, created msgs)
+// return the return_topic and bytes
+async fn handle_lss_confirmation(
+    msg: &LssChanMsg,
+    lss_signer: &LssSigner,
+) -> Result<(String, Vec<u8>)> {
+    use sphinx_signer::sphinx_glyph::topics;
+
     println!("LssMsg::from_slice {:?}", &msg.message);
     let lssmsg = LssMsg::from_slice(&msg.message)?;
-    let mut bm = lssmsg.as_stored()?;
-    if let None = msg.previous {
-        return Err(anyhow!("should be previous msg bytes"));
-    }
-    let previous = msg.previous.clone().unwrap();
-    // get the previous vls msg (where i sent signer muts)
-    println!("LssRes::from_slice {:?}", &previous.1);
-    let prev_lssmsg = LssRes::from_slice(&previous.1)?;
-    println!("hm ok");
-    let sm = prev_lssmsg.as_vls_muts()?;
-    if sm.muts.is_empty() {
-        // empty muts? dont need to check server hmac
-        Ok(previous.0)
-    } else {
-        bm.muts = sm.muts;
-        // send back the original VLS response finally
-        if lss_signer.check_hmac(&bm) {
-            Ok(previous.0)
-        } else {
-            Err(anyhow!("Invalid server hmac"))
+    match lssmsg {
+        LssMsg::Init(i) => {
+            // FIXME
+            // let bs = lss_signer.reconnect_init_response();
+            // Ok((topics::LSS_RES.to_string(), bs))
+            Ok((topics::LSS_RES.to_string(), Vec::new()))
+        }
+        LssMsg::Created(bm) => {
+            if lss_signer.check_hmac(&bm) {
+                let bs = lss_signer.empty_created();
+                Ok((topics::LSS_RES.to_string(), bs))
+            } else {
+                Err(anyhow!("Invalid server hmac"))
+            }
+        }
+        LssMsg::Stored(mut bm) => {
+            if let None = msg.previous {
+                return Err(anyhow!("should be previous msg bytes"));
+            }
+            let previous = msg.previous.clone().unwrap();
+            // get the previous vls msg (where i sent signer muts)
+            println!("LssRes::from_slice {:?}", &previous.1);
+            let prev_lssmsg = LssRes::from_slice(&previous.1)?;
+            println!("hm ok");
+            let sm = prev_lssmsg.as_vls_muts()?;
+            if sm.muts.is_empty() {
+                // empty muts? dont need to check server hmac
+                Ok((topics::VLS_RETURN.to_string(), previous.0))
+            } else {
+                // check the original muts
+                bm.muts = sm.muts;
+                // send back the original VLS response finally
+                if lss_signer.check_hmac(&bm) {
+                    Ok((topics::VLS_RETURN.to_string(), previous.0))
+                } else {
+                    Err(anyhow!("Invalid server hmac"))
+                }
+            }
         }
     }
 }
