@@ -68,7 +68,7 @@ pub async fn handle_lss_msg(msg: &LssChanMsg, lss_signer: &LssSigner) -> Result<
             let bs = lss_signer.empty_created();
             Ok((topics::LSS_RES.to_string(), bs))
         }
-        LssMsg::Stored(mut bm) => {
+        LssMsg::Stored(bm) => {
             if let None = msg.previous {
                 return Err(anyhow!("should be previous msg bytes"));
             }
@@ -77,23 +77,23 @@ pub async fn handle_lss_msg(msg: &LssChanMsg, lss_signer: &LssSigner) -> Result<
             let prev_lssmsg = LssRes::from_slice(&previous.1)?;
             // println!("previous lss res: {:?}", prev_lssmsg);
             let sm = prev_lssmsg.as_vls_muts()?;
-            Ok((topics::VLS_RETURN.to_string(), previous.0))
-            // if sm.muts.is_empty() {
-            //     // empty muts? dont need to check server hmac
-            //     Ok((topics::VLS_RETURN.to_string(), previous.0))
-            // } else  {
-            //     // check the original muts
-            //     bm.muts = sm.muts;
-            //     let server_hmac = lss_signer.server_hmac(&bm.muts);
-            //     println!("GENERATED SERVER HMAC {:?}", server_hmac);
-            //     println!("MUTS TO CHECK {:?}", &bm);
-            //     // send back the original VLS response finally
-            //     if lss_signer.check_hmac(&bm) {
-            //         Ok((topics::VLS_RETURN.to_string(), previous.0))
-            //     } else {
-            //         Err(anyhow!("Invalid server hmac"))
-            //     }
-            // }
+            if sm.muts.is_empty() {
+                // empty muts? dont need to check server hmac
+                Ok((topics::VLS_RETURN.to_string(), previous.0))
+            } else {
+                let shmac: [u8; 32] = bm
+                    .server_hmac
+                    .try_into()
+                    .map_err(|_| anyhow!("Invalid server hmac (not 32 bytes)"))?;
+                // check the original muts
+                let server_hmac = lss_signer.server_hmac(&sm.muts);
+                // send back the original VLS response finally
+                if server_hmac == shmac {
+                    Ok((topics::VLS_RETURN.to_string(), previous.0))
+                } else {
+                    Err(anyhow!("Invalid server hmac"))
+                }
+            }
         }
     }
 }
