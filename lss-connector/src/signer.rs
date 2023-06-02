@@ -52,6 +52,7 @@ impl LssSigner {
             auth_token: self.auth_token.to_vec(),
             nonce: None,
         });
+        println!("===> reconnect_init_response {:?}", msg);
         msg.to_vec().unwrap()
     }
     // on reconnection, empty muts and no hmac

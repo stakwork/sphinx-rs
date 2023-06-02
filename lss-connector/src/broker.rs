@@ -83,6 +83,7 @@ impl LssBroker {
         let res = Response::from_slice(resb)?;
         log::info!("HANDLE LSS {:?}", res);
         let msg = self.handle(res).await?;
+        log::info!("MSG TO SIGNER: {:?}", msg);
         Ok(msg.to_vec()?)
     }
     pub async fn handle(&self, res: Response) -> Result<Msg> {

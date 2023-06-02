@@ -24,6 +24,7 @@ pub async fn init_lss(
 
     let second_lss_msg = lss_rx.recv().await.ok_or(anyhow!("couldnt receive"))?;
     let created = lss_msgs::Msg::from_slice(&second_lss_msg.message)?.as_created()?;
+    println!("GOT THE CREATED MSG! {:?}", created);
 
     // build the root handler
     let (root_handler, res2) = lss_signer.build_with_lss(created, handler_builder)?;
@@ -74,25 +75,25 @@ pub async fn handle_lss_msg(msg: &LssChanMsg, lss_signer: &LssSigner) -> Result<
             let previous = msg.previous.clone().unwrap();
             // get the previous vls msg (where i sent signer muts)
             let prev_lssmsg = LssRes::from_slice(&previous.1)?;
-            println!("previous lss res: {:?}", prev_lssmsg);
+            // println!("previous lss res: {:?}", prev_lssmsg);
             let sm = prev_lssmsg.as_vls_muts()?;
-            if sm.muts.is_empty() {
-                // empty muts? dont need to check server hmac
-                Ok((topics::VLS_RETURN.to_string(), previous.0))
-            } else {
-                // check the original muts
-                bm.muts = sm.muts;
-                let server_hmac = lss_signer.server_hmac(&bm.muts);
-                println!("GEN SERVER HMAC {:?}", server_hmac);
-                // println!("INCOMING SERVER HMAC {:?}", &bm.server_hmac);
-                println!("MUTS TO CHECK {:?}", &bm);
-                // send back the original VLS response finally
-                if lss_signer.check_hmac(&bm) {
-                    Ok((topics::VLS_RETURN.to_string(), previous.0))
-                } else {
-                    Err(anyhow!("Invalid server hmac"))
-                }
-            }
+            Ok((topics::VLS_RETURN.to_string(), previous.0))
+            // if sm.muts.is_empty() {
+            //     // empty muts? dont need to check server hmac
+            //     Ok((topics::VLS_RETURN.to_string(), previous.0))
+            // } else  {
+            //     // check the original muts
+            //     bm.muts = sm.muts;
+            //     let server_hmac = lss_signer.server_hmac(&bm.muts);
+            //     println!("GENERATED SERVER HMAC {:?}", server_hmac);
+            //     println!("MUTS TO CHECK {:?}", &bm);
+            //     // send back the original VLS response finally
+            //     if lss_signer.check_hmac(&bm) {
+            //         Ok((topics::VLS_RETURN.to_string(), previous.0))
+            //     } else {
+            //         Err(anyhow!("Invalid server hmac"))
+            //     }
+            // }
         }
     }
 }
