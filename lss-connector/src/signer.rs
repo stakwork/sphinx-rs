@@ -10,7 +10,7 @@ use vls_protocol_signer::lightning_signer;
 #[derive(Clone)]
 pub struct LssSigner {
     pub state: Arc<Mutex<BTreeMap<String, (u64, Vec<u8>)>>>,
-    pub helper: Arc<Mutex<ExternalPersistHelper>>,
+    pub helper: ExternalPersistHelper,
     pub client_id: PublicKey,
     pub auth_token: [u8; 32],
 }
@@ -29,12 +29,12 @@ impl LssSigner {
         let msg = Response::Init(InitResponse {
             client_id: client_id.serialize(),
             auth_token: auth_token.to_vec(),
-            nonce: helper.new_nonce(&entropy),
+            nonce: Some(helper.new_nonce(&entropy)),
         });
         let msg_bytes = msg.to_vec().unwrap();
 
         let state = Arc::new(Mutex::new(Default::default()));
-        let helper = Arc::new(Mutex::new(helper));
+        // let helper = Arc::new(Mutex::new(helper));
         (
             Self {
                 state,
@@ -45,15 +45,12 @@ impl LssSigner {
             msg_bytes,
         )
     }
-    // on reconnection
-    // only the "nonce" is needed
+    // on reconnection (broker died?)
     pub fn reconnect_init_response(&self) -> Vec<u8> {
-        let entropy = SimpleEntropy::new();
-        let mut helper = self.helper.lock().unwrap();
         let msg = Response::Init(InitResponse {
             client_id: self.client_id.serialize(),
             auth_token: self.auth_token.to_vec(),
-            nonce: helper.new_nonce(&entropy),
+            nonce: None,
         });
         msg.to_vec().unwrap()
     }
@@ -70,8 +67,8 @@ impl LssSigner {
         c: BrokerMutations,
         handler_builder: RootHandlerBuilder,
     ) -> Result<(RootHandler, Vec<u8>)> {
-        let helper = self.helper.lock().unwrap();
-        let success = helper.check_hmac(&c.muts, c.server_hmac);
+        // let helper = self.helper.lock().unwrap();
+        let success = self.helper.check_hmac(&c.muts, c.server_hmac);
         if !success {
             return Err(anyhow!("invalid server hmac"));
         }
@@ -82,7 +79,7 @@ impl LssSigner {
         drop(local);
         let handler_builder = handler_builder.lss_state(self.state.clone());
         let (handler, muts) = handler_builder.build();
-        let client_hmac = helper.client_hmac(&muts);
+        let client_hmac = self.helper.client_hmac(&muts);
 
         let res = Response::Created(SignerMutations { muts, client_hmac });
         let res_bytes = res.to_vec()?;
@@ -90,11 +87,12 @@ impl LssSigner {
         Ok((handler, res_bytes))
     }
     pub fn client_hmac(&self, muts: &Muts) -> [u8; 32] {
-        let helper = self.helper.lock().unwrap();
-        helper.client_hmac(muts)
+        self.helper.client_hmac(muts)
+    }
+    pub fn server_hmac(&self, muts: &Muts) -> [u8; 32] {
+        self.helper.server_hmac(muts)
     }
     pub fn check_hmac(&self, bm: &BrokerMutations) -> bool {
-        let helper = self.helper.lock().unwrap();
-        helper.check_hmac(&bm.muts, bm.server_hmac.clone())
+        self.helper.check_hmac(&bm.muts, bm.server_hmac.clone())
     }
 }

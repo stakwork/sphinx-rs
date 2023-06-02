@@ -41,7 +41,7 @@ pub struct InitResponse {
     #[serde(with = "BigArray")]
     pub client_id: [u8; 33],
     pub auth_token: Vec<u8>,
-    pub nonce: [u8; 32],
+    pub nonce: Option<[u8; 32]>,
 }
 
 impl Msg {

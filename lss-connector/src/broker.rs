@@ -31,26 +31,23 @@ impl LssBroker {
         Ok((spk, msg))
     }
     // returns Self and the msg to send to signer
-    pub async fn new(uri: &str, ir: InitResponse, spk: PublicKey) -> Result<(Self, Vec<u8>)> {
+    pub async fn new(uri: &str, ir: InitResponse, spk: PublicKey) -> Result<Self> {
         let client_id = secp256k1::PublicKey::from_slice(&ir.client_id)?;
         let auth = Auth {
             client_id: client_id,
             token: ir.auth_token,
         };
         let client = LssClient::new(uri, &spk, auth).await?;
-        let (muts, server_hmac) = client.get("".to_string(), &ir.nonce).await.unwrap();
         log::info!("connected to LSS provider {}", uri);
 
-        let msg = Msg::Created(BrokerMutations { muts, server_hmac }).to_vec()?;
+        // let (muts, server_hmac) = client.get("".to_string(), &ir.nonce).await.unwrap();
+        // let msg = Msg::Created(BrokerMutations { muts, server_hmac }).to_vec()?;
 
         let lss_client = Arc::new(AsyncMutex::new(Box::new(client) as Box<dyn ExternalPersist>));
-        Ok((
-            Self {
-                lss_client,
-                uri: uri.to_string(),
-            },
-            msg,
-        ))
+        Ok(Self {
+            lss_client,
+            uri: uri.to_string(),
+        })
     }
     // on reconnection
     pub async fn make_init_msg(&self) -> Result<Vec<u8>> {
@@ -58,19 +55,28 @@ impl LssBroker {
         let server_pubkey = spk.serialize();
         Ok(Msg::Init(Init { server_pubkey }).to_vec()?)
     }
-    // on reconenction
-    pub async fn get_initial_state_msg(&self, resbytes: &[u8]) -> Result<Vec<u8>> {
-        let ir = Response::from_slice(resbytes)?.as_init()?;
+    // on reconnection
+    // if no nonce was sent the the signer does not need state update
+    pub async fn get_created_state_msg(&self, ir: &InitResponse) -> Result<Vec<u8>> {
+        let bm: BrokerMutations = if let Some(nonce) = ir.nonce {
+            self.get_created_state_from_nonce(&nonce).await?
+        } else {
+            // send empty if not needed
+            Default::default()
+        };
+        Ok(Msg::Created(bm).to_vec()?)
+    }
+    pub async fn get_created_state_from_nonce(&self, nonce: &[u8]) -> Result<BrokerMutations> {
         let client = self.lss_client.lock().await;
-        let (muts, server_hmac) = client.get("".to_string(), &ir.nonce).await.unwrap();
-        Ok(Msg::Created(BrokerMutations { muts, server_hmac }).to_vec()?)
+        let (muts, server_hmac) = client.get("".to_string(), nonce).await?;
+        Ok(BrokerMutations { muts, server_hmac })
     }
     pub async fn put_muts(&self, cm: SignerMutations) -> Result<Vec<u8>> {
-        Ok(if !cm.muts.is_empty() {
+        Ok(if cm.muts.is_empty() {
+            Vec::new()
+        } else {
             let client = self.lss_client.lock().await;
             client.put(cm.muts, &cm.client_hmac).await?
-        } else {
-            vec![]
         })
     }
     pub async fn handle_bytes(&self, resb: &[u8]) -> Result<Vec<u8>> {
@@ -81,8 +87,9 @@ impl LssBroker {
     }
     pub async fn handle(&self, res: Response) -> Result<Msg> {
         match res {
-            Response::Init(_) => Ok(Msg::Init(Init {
-                server_pubkey: [0; 33], // dummy
+            Response::Init(_) => Ok(Msg::Created(BrokerMutations {
+                muts: Vec::new(),        // empty
+                server_hmac: Vec::new(), // empty
             })),
             Response::Created(cm) => {
                 let server_hmac = self.put_muts(cm).await?;
