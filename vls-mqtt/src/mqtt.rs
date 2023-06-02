@@ -138,7 +138,7 @@ async fn got_msg(
             Ok((vls_bytes, lss_bytes)) => {
                 if lss_bytes.len() == 0 {
                     // no muts, respond directly back!
-                    (topics::VLS_RETURN.to_string(), lss_bytes)
+                    (topics::VLS_RETURN.to_string(), vls_bytes)
                 } else {
                     // muts! do LSS first!
                     *msgs = Some((vls_bytes, lss_bytes.clone()));

@@ -117,7 +117,7 @@ async fn rocket() -> _ {
     let rh_ = rh.clone();
     rocket::tokio::spawn(async move {
         while let Some(msg) = vls_rx.recv().await {
-            let res_res = root::handle(&rh_, &lss_signer, msg.message, true);
+            let res_res = root::handle_with_lss(&rh_, &lss_signer, msg.message, true);
             let _ = msg.reply_tx.send(res_res);
         }
     });
