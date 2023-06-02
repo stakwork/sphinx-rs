@@ -58,12 +58,12 @@ pub fn builder(
     Ok(handler_builder)
 }
 
-pub fn handle(
+// returns the VLS return msg and the muts
+fn handle_inner(
     root_handler: &RootHandler,
-    lss_signer: &LssSigner,
     bytes: Vec<u8>,
     do_log: bool,
-) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
+) -> anyhow::Result<(Vec<u8>, Vec<(String, (u64, Vec<u8>))>)> {
     let mut md = MsgDriver::new(bytes);
     let msgs::SerialRequestHeader {
         sequence,
@@ -106,6 +106,21 @@ pub fn handle(
     let mut out_md = MsgDriver::new_empty();
     write_serial_response_header(&mut out_md, sequence)?;
     msgs::write_vec(&mut out_md, vls_msg.as_vec())?;
+    Ok((out_md.bytes(), muts))
+}
+
+pub fn handle(root_handler: &RootHandler, bytes: Vec<u8>, do_log: bool) -> anyhow::Result<Vec<u8>> {
+    let (out_bytes, _muts) = handle_inner(root_handler, bytes, do_log)?;
+    Ok(out_bytes)
+}
+
+pub fn handle_with_lss(
+    root_handler: &RootHandler,
+    lss_signer: &LssSigner,
+    bytes: Vec<u8>,
+    do_log: bool,
+) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
+    let (out_bytes, muts) = handle_inner(root_handler, bytes, do_log)?;
     let lss_bytes = if muts.is_empty() {
         Vec::new()
     } else {
@@ -113,7 +128,7 @@ pub fn handle(
         let lss_msg = LssResponse::VlsMuts(SignerMutations { client_hmac, muts });
         lss_msg.to_vec()?
     };
-    Ok((out_md.bytes(), lss_bytes))
+    Ok((out_bytes, lss_bytes))
 }
 
 pub fn parse_ping_and_form_response(msg_bytes: Vec<u8>) -> Vec<u8> {
