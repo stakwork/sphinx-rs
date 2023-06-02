@@ -106,10 +106,14 @@ pub fn handle(
     let mut out_md = MsgDriver::new_empty();
     write_serial_response_header(&mut out_md, sequence)?;
     msgs::write_vec(&mut out_md, vls_msg.as_vec())?;
-    let client_hmac = lss_signer.client_hmac(&muts);
-    let lss_msg = LssResponse::VlsMuts(SignerMutations { client_hmac, muts });
-    let lss_msg_bytes = lss_msg.to_vec()?;
-    Ok((out_md.bytes(), lss_msg_bytes))
+    let lss_bytes = if muts.is_empty() {
+        Vec::new()
+    } else {
+        let client_hmac = lss_signer.client_hmac(&muts);
+        let lss_msg = LssResponse::VlsMuts(SignerMutations { client_hmac, muts });
+        lss_msg.to_vec()?
+    };
+    Ok((out_md.bytes(), lss_bytes))
 }
 
 pub fn parse_ping_and_form_response(msg_bytes: Vec<u8>) -> Vec<u8> {

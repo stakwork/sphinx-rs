@@ -136,8 +136,14 @@ async fn got_msg(
         let _ = vls_tx.send(vls_msg).await;
         match reply_rx.await.unwrap() {
             Ok((vls_bytes, lss_bytes)) => {
-                *msgs = Some((vls_bytes, lss_bytes.clone()));
-                (topics::LSS_RES.to_string(), lss_bytes)
+                if lss_bytes.len() == 0 {
+                    // no muts, respond directly back!
+                    (topics::VLS_RETURN.to_string(), lss_bytes)
+                } else {
+                    // muts! do LSS first!
+                    *msgs = Some((vls_bytes, lss_bytes.clone()));
+                    (topics::LSS_RES.to_string(), lss_bytes)
+                }
             }
             Err(e) => (topics::ERROR.to_string(), e.to_string().as_bytes().to_vec()),
         }
