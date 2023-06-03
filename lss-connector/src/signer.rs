@@ -97,3 +97,62 @@ impl LssSigner {
         self.helper.check_hmac(&bm.muts, bm.server_hmac.clone())
     }
 }
+
+// return the original VLS bytes
+// handles reconnects from broker restarting (init, created msgs)
+// return the return_topic and bytes
+pub async fn handle_lss_msg(
+    msg: &[u8],
+    previous: &Option<(Vec<u8>, Vec<u8>)>,
+    lss_signer: &LssSigner,
+) -> Result<(String, Vec<u8>)> {
+    use sphinx_glyph::topics;
+    use std::convert::TryInto;
+
+    // println!("LssMsg::from_slice {:?}", &msg.message);
+    let lssmsg = Msg::from_slice(&msg)?;
+    println!("incoming LSS msg {:?}", lssmsg);
+    match lssmsg {
+        Msg::Init(_) => {
+            let bs = lss_signer.reconnect_init_response();
+            Ok((topics::LSS_RES.to_string(), bs))
+        }
+        Msg::Created(bm) => {
+            // dont need to check muts if theyre empty
+            if !bm.muts.is_empty() {
+                if !lss_signer.check_hmac(&bm) {
+                    return Err(anyhow!("Invalid server hmac"));
+                }
+            }
+            let bs = lss_signer.empty_created();
+            Ok((topics::LSS_RES.to_string(), bs))
+        }
+        Msg::Stored(bm) => {
+            if let None = previous {
+                return Err(anyhow!("should be previous msg bytes"));
+            }
+            let previous = previous.clone().unwrap();
+            // get the previous lss msg (where i sent signer muts)
+            let prev_lssmsg = Response::from_slice(&previous.1)?;
+            // println!("previous lss res: {:?}", prev_lssmsg);
+            let sm = prev_lssmsg.as_vls_muts()?;
+            if sm.muts.is_empty() {
+                // empty muts? dont need to check server hmac
+                Ok((topics::VLS_RETURN.to_string(), previous.0))
+            } else {
+                let shmac: [u8; 32] = bm
+                    .server_hmac
+                    .try_into()
+                    .map_err(|_| anyhow!("Invalid server hmac (not 32 bytes)"))?;
+                // check the original muts
+                let server_hmac = lss_signer.server_hmac(&sm.muts);
+                // send back the original VLS response finally
+                if server_hmac == shmac {
+                    Ok((topics::VLS_RETURN.to_string(), previous.0))
+                } else {
+                    Err(anyhow!("Invalid server hmac"))
+                }
+            }
+        }
+    }
+}

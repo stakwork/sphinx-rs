@@ -4,7 +4,7 @@ mod signer;
 pub use msgs::*;
 pub use secp256k1;
 
-pub use signer::LssSigner;
+pub use signer::{handle_lss_msg, LssSigner};
 
 #[cfg(feature = "broker")]
 mod broker;
