@@ -1,8 +1,6 @@
 use crate::LssChanMsg;
 use anyhow::{anyhow, Result};
-use lss_connector::{
-    msgs as lss_msgs, secp256k1::PublicKey, LssSigner, Msg as LssMsg, Response as LssRes,
-};
+use lss_connector::{secp256k1::PublicKey, LssSigner, Msg as LssMsg, Response as LssRes};
 use rocket::tokio::sync::mpsc;
 use sphinx_signer::{self, RootHandler, RootHandlerBuilder};
 
@@ -14,7 +12,7 @@ pub async fn init_lss(
     let res_topic = topics::LSS_RES.to_string();
 
     let first_lss_msg = lss_rx.recv().await.ok_or(anyhow!("couldnt receive"))?;
-    let init = lss_msgs::Msg::from_slice(&first_lss_msg.message)?.as_init()?;
+    let init = LssMsg::from_slice(&first_lss_msg.message)?.as_init()?;
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
 
     let (lss_signer, res1) = LssSigner::new(&handler_builder, &server_pubkey);
@@ -23,7 +21,7 @@ pub async fn init_lss(
     }
 
     let second_lss_msg = lss_rx.recv().await.ok_or(anyhow!("couldnt receive"))?;
-    let created = lss_msgs::Msg::from_slice(&second_lss_msg.message)?.as_created()?;
+    let created = LssMsg::from_slice(&second_lss_msg.message)?.as_created()?;
     println!("GOT THE CREATED MSG! {:?}", created);
 
     // build the root handler
