@@ -101,7 +101,7 @@ impl LssSigner {
 // return the original VLS bytes
 // handles reconnects from broker restarting (init, created msgs)
 // return the return_topic and bytes
-pub async fn handle_lss_msg(
+pub fn handle_lss_msg(
     msg: &[u8],
     previous: &Option<(Vec<u8>, Vec<u8>)>,
     lss_signer: &LssSigner,
