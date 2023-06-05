@@ -79,7 +79,7 @@ impl LssSigner {
         }
         drop(local);
         let handler_builder = handler_builder.lss_state(self.state.clone());
-        let (handler, muts) = handler_builder.build();
+        let (handler, muts) = handler_builder.build().expect("handler build");
         let client_hmac = self.helper.client_hmac(&muts);
 
         let res = Response::Created(SignerMutations { muts, client_hmac });

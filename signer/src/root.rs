@@ -44,17 +44,19 @@ pub fn builder(
     log::info!("create root handler builder with network {:?}", network);
     let mut handler_builder =
         RootHandlerBuilder::new(network, 0, services, seed).allowlist(allowlist);
+    // FIXME set up a manual approver (ui_approver)
     let delegate = NegativeApprover();
     let spec = VelocityControlSpec {
         limit_msat: po.msat_per_interval,
         interval_type: policy_interval(po.interval),
     };
     let control = VelocityControl::new(spec);
-    // FIXME load state into VelociyApprover
+    // FIXME load state into VelocityApprover
     // VelocityControl::load_from_state(spec, state);
     let approver = VelocityApprover::new(clock.clone(), control, delegate);
+    // FIXME need to be able to update approvder velocity control on the fly
     handler_builder = handler_builder.approver(Arc::new(approver));
-
+    // FIXME no "make_policy".. no global velocity control
     Ok(handler_builder)
 }
 

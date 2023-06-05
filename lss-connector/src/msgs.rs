@@ -96,3 +96,22 @@ impl Response {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lss_msg() -> anyhow::Result<()> {
+        let m1 = Msg::Created(BrokerMutations {
+            muts: Vec::new(),
+            server_hmac: Vec::new(),
+        });
+        println!("M1 {:?}", m1.to_vec()?);
+        // let s = vec![];
+        // println!("LEN {:?}", s.len());
+        // let m = Msg::from_slice(&s)?;
+        // println!("M {:?}", m);
+        Ok(())
+    }
+}
