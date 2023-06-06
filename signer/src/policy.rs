@@ -4,7 +4,7 @@ use sphinx_glyph::types::{Interval, Policy};
 use lightning_signer::policy::simple_validator::{
     make_simple_policy, SimplePolicy, SimpleValidatorFactory,
 };
-use lightning_signer::util::velocity::{VelocityControlIntervalType, VelocityControlSpec};
+use lightning_signer::util::velocity::VelocityControlIntervalType;
 use sphinx_glyph::control::{ControlMessage, ControlResponse};
 use std::sync::Arc;
 use vls_protocol_signer::handler::{Handler, RootHandler};
