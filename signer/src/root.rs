@@ -31,9 +31,13 @@ pub fn builder(
     persister: Arc<dyn Persist>,
     node_id: &PublicKey,
 ) -> anyhow::Result<RootHandlerBuilder> {
-    let allowlist = persister
-        .get_node_allowlist(node_id)
-        .map_err(|_| anyhow!("failed to get_node_allowlist"))?;
+    let allowlist = match persister.get_node_allowlist(node_id) {
+        Ok(al) => al,
+        Err(_) => {
+            log::warn!("no allowlist found in persister!");
+            Vec::new()
+        }
+    };
 
     let policy = make_policy(network, po);
     let validator_factory = Arc::new(SimpleValidatorFactory::new_with_policy(policy));
