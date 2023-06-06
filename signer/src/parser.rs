@@ -3,6 +3,7 @@ use std::cmp::min;
 use std::io;
 use vls_protocol::msgs::{self, DeBolt, Message};
 use vls_protocol::serde_bolt::{Error, Read, Result, Write};
+use crate::vls_protocol;
 
 pub struct MsgDriver(Vec<u8>);
 
