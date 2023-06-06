@@ -11,9 +11,9 @@ use glyph::control::{ControlPersist, Controller};
 use lss::init_lss;
 use rocket::tokio::sync::{broadcast, mpsc, oneshot};
 use sphinx_signer::lightning_signer::bitcoin::Network;
-use sphinx_signer::lightning_signer::persist::Persist;
+// use sphinx_signer::lightning_signer::persist::Persist;
 use sphinx_signer::lightning_signer::wallet::Wallet;
-use sphinx_signer::persist::{FsPersister, ThreadMemoPersister};
+use sphinx_signer::persist::{BackupPersister, FsPersister, ThreadMemoPersister};
 use sphinx_signer::policy::update_controls;
 use sphinx_signer::Handler;
 use sphinx_signer::{self, root, sphinx_glyph as glyph, RootHandler};
@@ -85,15 +85,15 @@ async fn rocket() -> _ {
     let mut ctrlr = Controller::new_with_persister(sk, pk, pers_arc);
 
     let seed32: [u8; 32] = seed.try_into().expect("invalid seed");
-    let persister: Arc<dyn Persist> = if env::var("USE_FS_PERSISTER").is_ok() {
-        let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
-        Arc::new(FsPersister::new(&store_path, None))
-    } else {
-        // used by LSS to catch muts
-        Arc::new(ThreadMemoPersister {})
-    };
-    let handler_builder =
-        root::builder(seed32, network, &initial_policy, persister).expect("failed to init signer");
+    let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
+
+    let fs_persister = FsPersister::new(&store_path, None);
+    let lss_persister = ThreadMemoPersister {};
+    let persister = Arc::new(BackupPersister::new(fs_persister, lss_persister));
+
+    let node_id = ctrlr.pubkey();
+    let handler_builder = root::builder(seed32, network, &initial_policy, persister, &node_id)
+        .expect("failed to init signer");
 
     let (vls_tx, mut vls_rx) = mpsc::channel::<VlsChanMsg>(1000);
     let vls_tx_ = vls_tx.clone();

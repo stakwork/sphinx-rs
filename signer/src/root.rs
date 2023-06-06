@@ -1,5 +1,6 @@
 use crate::parser::MsgDriver;
 use crate::policy::{make_policy, policy_interval};
+use lss_connector::secp256k1::PublicKey;
 use sphinx_glyph::types;
 use types::Policy;
 
@@ -28,9 +29,16 @@ pub fn builder(
     network: Network,
     po: &Policy,
     persister: Arc<dyn Persist>,
+    node_id: &PublicKey,
 ) -> anyhow::Result<RootHandlerBuilder> {
-    // FIXME initial allowlist?
-    let allowlist = vec![];
+    let allowlist = match persister.get_node_allowlist(node_id) {
+        Ok(al) => al,
+        Err(_) => {
+            log::warn!("no allowlist found in persister!");
+            Vec::new()
+        }
+    };
+
     let policy = make_policy(network, po);
     let validator_factory = Arc::new(SimpleValidatorFactory::new_with_policy(policy));
     let random_time_factory = crate::rst::RandomStartingTimeFactory::new();
@@ -41,20 +49,23 @@ pub fn builder(
         persister,
         clock: clock.clone(),
     };
+
     log::info!("create root handler builder with network {:?}", network);
     let mut handler_builder =
         RootHandlerBuilder::new(network, 0, services, seed).allowlist(allowlist);
+    // FIXME set up a manual approver (ui_approver)
     let delegate = NegativeApprover();
     let spec = VelocityControlSpec {
         limit_msat: po.msat_per_interval,
         interval_type: policy_interval(po.interval),
     };
     let control = VelocityControl::new(spec);
-    // FIXME load state into VelociyApprover
+    // FIXME hydrate state into VelocityApprover
     // VelocityControl::load_from_state(spec, state);
     let approver = VelocityApprover::new(clock.clone(), control, delegate);
+    // FIXME need to be able to update approvder velocity control on the fly
     handler_builder = handler_builder.approver(Arc::new(approver));
-
+    // FIXME need to update stored buckets every time?
     Ok(handler_builder)
 }
 

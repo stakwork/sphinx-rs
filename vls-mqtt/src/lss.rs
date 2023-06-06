@@ -11,6 +11,8 @@ pub async fn init_lss(
     use sphinx_signer::sphinx_glyph::topics;
     let res_topic = topics::LSS_RES.to_string();
 
+    println!("INIT LSS!");
+
     let first_lss_msg = lss_rx.recv().await.ok_or(anyhow!("couldnt receive"))?;
     let init = Msg::from_slice(&first_lss_msg.message)?.as_init()?;
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
@@ -34,7 +36,7 @@ pub async fn init_lss(
     let lss_signer_ = lss_signer.clone();
     rocket::tokio::spawn(async move {
         while let Some(msg) = lss_rx.recv().await {
-            let ret = handle_lss_msg(&msg.message, &msg.previous, &lss_signer_).await;
+            let ret = handle_lss_msg(&msg.message, &msg.previous, &lss_signer_);
             let _ = msg.reply_tx.send(ret);
         }
     });
