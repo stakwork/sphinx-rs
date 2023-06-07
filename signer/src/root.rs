@@ -30,7 +30,7 @@ pub fn builder(
     po: &Policy,
     persister: Arc<dyn Persist>,
     node_id: &PublicKey,
-) -> anyhow::Result<RootHandlerBuilder> {
+) -> anyhow::Result<(RootHandlerBuilder, Arc<VelocityApprover<NegativeApprover>>)> {
     let allowlist = match persister.get_node_allowlist(node_id) {
         Ok(al) => al,
         Err(_) => {
@@ -62,12 +62,12 @@ pub fn builder(
     let control = VelocityControl::new(spec);
     // FIXME hydrate state into VelocityApprover
     // VelocityControl::load_from_state(spec, state);
-    let approver = VelocityApprover::new(clock.clone(), control, delegate);
+    let approver = Arc::new(VelocityApprover::new(clock.clone(), control, delegate));
     // FIXME need to be able to update approvder velocity control on the fly
-    handler_builder = handler_builder.approver(Arc::new(approver));
+    handler_builder = handler_builder.approver(approver.clone());
     // FIXME need to update stored buckets every time?
     // approver.control().get_state()
-    Ok(handler_builder)
+    Ok((handler_builder, approver))
 }
 
 // returns the VLS return msg and the muts

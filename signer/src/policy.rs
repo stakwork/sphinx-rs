@@ -1,6 +1,6 @@
 use sphinx_glyph::types::{Interval, Policy};
 
-// use lightning_signer::policy::filter::PolicyFilter;
+use lightning_signer::policy::filter::PolicyFilter;
 use lightning_signer::policy::simple_validator::{
     make_simple_policy, SimplePolicy, SimpleValidatorFactory,
 };

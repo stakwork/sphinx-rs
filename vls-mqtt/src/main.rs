@@ -92,8 +92,9 @@ async fn rocket() -> _ {
     let persister = Arc::new(BackupPersister::new(fs_persister, lss_persister));
 
     let node_id = ctrlr.pubkey();
-    let handler_builder = root::builder(seed32, network, &initial_policy, persister, &node_id)
-        .expect("failed to init signer");
+    let (handler_builder, approver) =
+        root::builder(seed32, network, &initial_policy, persister, &node_id)
+            .expect("failed to init signer");
 
     let (vls_tx, mut vls_rx) = mpsc::channel::<VlsChanMsg>(1000);
     let vls_tx_ = vls_tx.clone();
@@ -117,7 +118,13 @@ async fn rocket() -> _ {
     let rh_ = rh.clone();
     rocket::tokio::spawn(async move {
         while let Some(msg) = vls_rx.recv().await {
+            let s1 = approver.control().get_state();
             let res_res = root::handle_with_lss(&rh_, &lss_signer, msg.message, true);
+            let s2 = approver.control().get_state();
+            if s1 != s2 {
+                log::info!("===> VelocityApprover state updated");
+                // FIXME store the "buckets" in persistence
+            }
             let _ = msg.reply_tx.send(res_res);
         }
     });
