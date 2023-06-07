@@ -64,16 +64,12 @@ pub fn set_policy(root_handler: &RootHandler, network: Network, po: Policy) -> a
 }
 
 pub fn make_policy(network: Network, _po: &Policy) -> SimplePolicy {
-    make_simple_policy(network)
+    let mut p = make_simple_policy(network);
     // let mut p = make_simple_policy(network);
     // p.max_htlc_value_sat = po.htlc_limit_msat;
-    // p.filter = PolicyFilter::new_permissive();
-    // let velocity_spec = VelocityControlSpec {
-    //     limit_msat: po.msat_per_interval,
-    //     interval_type: policy_interval(po.interval),
-    // };
-    // p.global_velocity_control = velocity_spec;
-    // p
+    p.filter = PolicyFilter::new_permissive();
+    // FIXME for prod use a nempty filter
+    p
 }
 
 pub fn policy_interval(int: Interval) -> VelocityControlIntervalType {
