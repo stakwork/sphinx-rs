@@ -79,10 +79,11 @@ async fn rocket() -> _ {
     let (pk, sk) = sphinx_signer::derive_node_keys(&network, &seed);
     println!("PUBKEY {}", hex::encode(pk.serialize()));
 
-    let pers = persist::ControlPersister::new("vls_mqtt_data");
-    let initial_policy = pers.read_policy().unwrap_or_default();
-    let pers_arc = Arc::new(Mutex::new(pers));
-    let mut ctrlr = Controller::new_with_persister(sk, pk, pers_arc);
+    let ctrlr_db = persist::ControlPersister::new("vls_mqtt_data");
+    let initial_policy = ctrlr_db.read_policy().unwrap_or_default();
+    let initial_velocity = ctrlr_db.read_velocity().unwrap_or_default();
+    let ctrlr_db_mutex = Arc::new(Mutex::new(ctrlr_db));
+    let mut ctrlr = Controller::new_with_persister(sk, pk, ctrlr_db_mutex.clone());
 
     let seed32: [u8; 32] = seed.try_into().expect("invalid seed");
     let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
@@ -92,9 +93,15 @@ async fn rocket() -> _ {
     let persister = Arc::new(BackupPersister::new(fs_persister, lss_persister));
 
     let node_id = ctrlr.pubkey();
-    let (handler_builder, approver) =
-        root::builder(seed32, network, &initial_policy, persister, &node_id)
-            .expect("failed to init signer");
+    let (handler_builder, approver) = root::builder(
+        seed32,
+        network,
+        &initial_policy,
+        &initial_velocity,
+        persister,
+        &node_id,
+    )
+    .expect("failed to init signer");
 
     let (vls_tx, mut vls_rx) = mpsc::channel::<VlsChanMsg>(1000);
     let vls_tx_ = vls_tx.clone();
@@ -116,6 +123,7 @@ async fn rocket() -> _ {
 
     let rh = Arc::new(root_handler);
     let rh_ = rh.clone();
+    let ctrldb_ = ctrlr.persister();
     rocket::tokio::spawn(async move {
         while let Some(msg) = vls_rx.recv().await {
             let s1 = approver.control().get_state();
@@ -123,7 +131,11 @@ async fn rocket() -> _ {
             let s2 = approver.control().get_state();
             if s1 != s2 {
                 log::info!("===> VelocityApprover state updated");
-                // FIXME store the "buckets" in persistence
+                let mut ctrldb_ = ctrldb_.lock().unwrap();
+                if let Err(e) = ctrldb_.write_velocity(s2) {
+                    log::error!("failed to set velocity state {:?}", e);
+                }
+                drop(ctrldb_);
             }
             let _ = msg.reply_tx.send(res_res);
         }

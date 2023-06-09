@@ -12,6 +12,7 @@ pub enum ControlMessage {
     UpdatePolicy(Policy),
     QueryAllowlist,
     UpdateAllowlist(Vec<String>),
+    QueryVelocity,
     Ota(OtaParams),
 }
 
@@ -25,6 +26,7 @@ pub enum ControlResponse {
     PolicyUpdated(Policy),
     AllowlistCurrent(Vec<String>),
     AllowlistUpdated(Vec<String>),
+    VelocityCurrent(Velocity),
     OtaConfirm(OtaParams),
     Error(String),
 }
@@ -36,6 +38,8 @@ pub struct Config {
     pub pass: String,
     pub network: String,
 }
+
+pub type Velocity = (u64, Vec<u64>);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Policy {

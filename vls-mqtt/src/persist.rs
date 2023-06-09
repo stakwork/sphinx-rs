@@ -1,22 +1,24 @@
 use anyhow::Result;
 use fsdb::{Bucket, Fsdb};
-use sphinx_signer::sphinx_glyph::control::{Config, ControlPersist, Policy};
+use sphinx_signer::sphinx_glyph::control::{Config, ControlPersist, Policy, Velocity};
 
 pub struct ControlPersister {
     nonce: Bucket<[u8; 8]>,
     config: Bucket<Config>,
     seed: Bucket<[u8; 32]>,
     policy: Bucket<Policy>,
+    velocity: Bucket<Velocity>,
 }
 
 impl ControlPersister {
     pub fn new(dir: &str) -> Self {
         let db = Fsdb::new(dir).expect("could not create db");
         Self {
-            nonce: db.bucket("nonce", None).expect("fail nonce"),
-            config: db.bucket("config", None).expect("fail config"),
-            seed: db.bucket("seed", None).expect("fail seed"),
-            policy: db.bucket("policy", None).expect("fail policy"),
+            nonce: db.bucket("nonce", None).expect("fail nonce db"),
+            config: db.bucket("config", None).expect("fail config db"),
+            seed: db.bucket("seed", None).expect("fail seed db"),
+            policy: db.bucket("policy", None).expect("fail policy db"),
+            velocity: db.bucket("velocity", None).expect("fail velocity db"),
         }
     }
 }
@@ -55,5 +57,11 @@ impl ControlPersist for ControlPersister {
     }
     fn remove_policy(&mut self) -> Result<()> {
         Ok(self.policy.remove("policy")?)
+    }
+    fn read_velocity(&self) -> Result<Velocity> {
+        Ok(self.velocity.get("velocity")?)
+    }
+    fn write_velocity(&mut self, v: Velocity) -> Result<()> {
+        Ok(self.velocity.put("velocity", v)?)
     }
 }
