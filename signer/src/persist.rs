@@ -246,4 +246,7 @@ impl Persist for FsPersister {
         let _ = self.pubkeys.clear();
         Ok(())
     }
+    fn recovery_required(&self) -> bool {
+        self.nodes.list().unwrap_or(Vec::new()).len() == 0
+    }
 }
