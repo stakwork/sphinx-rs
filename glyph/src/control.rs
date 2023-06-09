@@ -1,4 +1,6 @@
-pub use crate::types::{Config, ControlMessage, ControlResponse, Interval, OtaParams, Policy};
+pub use crate::types::{
+    Config, ControlMessage, ControlResponse, Interval, OtaParams, Policy, Velocity,
+};
 use anyhow::Result;
 use sphinx_auther::nonce;
 use sphinx_auther::secp256k1::{PublicKey, SecretKey};
@@ -31,6 +33,9 @@ impl Controller {
     }
     pub fn nonce(&self) -> u64 {
         self.2
+    }
+    pub fn persister(&self) -> Arc<Mutex<dyn ControlPersist>> {
+        self.3.clone()
     }
     pub fn build_msg(&mut self, msg: ControlMessage) -> anyhow::Result<Vec<u8>> {
         let data = rmp_serde::to_vec_named(&msg)?;
@@ -97,6 +102,10 @@ impl Controller {
                 store.write_policy(np.clone())?;
                 ControlResponse::PolicyUpdated(np)
             }
+            ControlMessage::QueryVelocity => {
+                let v = store.read_velocity().unwrap_or_default();
+                ControlResponse::VelocityCurrent(v)
+            }
             ControlMessage::QueryAllowlist => ControlResponse::AllowlistCurrent(vec![]),
             ControlMessage::UpdateAllowlist(na) => ControlResponse::AllowlistUpdated(na),
             ControlMessage::Ota(params) => ControlResponse::OtaConfirm(params),
@@ -135,6 +144,7 @@ pub enum FlashKey {
     Seed,
     Nonce,
     Policy,
+    Velocity,
 }
 impl FlashKey {
     pub fn as_str(&self) -> &'static str {
@@ -143,6 +153,7 @@ impl FlashKey {
             FlashKey::Seed => "seed",
             FlashKey::Nonce => "nonce",
             FlashKey::Policy => "policy",
+            FlashKey::Velocity => "velocity",
         }
     }
 }
@@ -159,6 +170,8 @@ pub trait ControlPersist: Sync + Send {
     fn read_policy(&self) -> Result<Policy>;
     fn write_policy(&mut self, s: Policy) -> Result<()>;
     fn remove_policy(&mut self) -> Result<()>;
+    fn read_velocity(&self) -> Result<Velocity>;
+    fn write_velocity(&mut self, v: Velocity) -> Result<()>;
 }
 
 pub struct DummyPersister;
@@ -195,6 +208,12 @@ impl ControlPersist for DummyPersister {
         Ok(())
     }
     fn remove_policy(&mut self) -> Result<()> {
+        Ok(())
+    }
+    fn read_velocity(&self) -> Result<Velocity> {
+        Ok(Default::default())
+    }
+    fn write_velocity(&mut self, _s: Velocity) -> Result<()> {
         Ok(())
     }
 }

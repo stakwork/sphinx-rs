@@ -28,6 +28,7 @@ pub fn builder(
     seed: [u8; 32],
     network: Network,
     po: &Policy,
+    vel: &types::Velocity,
     persister: Arc<dyn Persist>,
     node_id: &PublicKey,
 ) -> anyhow::Result<(RootHandlerBuilder, Arc<VelocityApprover<NegativeApprover>>)> {
@@ -59,14 +60,10 @@ pub fn builder(
         limit_msat: po.msat_per_interval,
         interval_type: policy_interval(po.interval),
     };
-    let control = VelocityControl::new(spec);
-    // FIXME hydrate state into VelocityApprover
-    // VelocityControl::load_from_state(spec, state);
+    let control = VelocityControl::load_from_state(spec, vel.clone());
     let approver = Arc::new(VelocityApprover::new(clock.clone(), control, delegate));
     // FIXME need to be able to update approvder velocity control on the fly
     handler_builder = handler_builder.approver(approver.clone());
-    // FIXME need to update stored buckets every time?
-    // approver.control().get_state()
     Ok((handler_builder, approver))
 }
 
