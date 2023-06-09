@@ -31,14 +31,16 @@ pub fn builder(
     vel: &types::Velocity,
     persister: Arc<dyn Persist>,
     node_id: &PublicKey,
+    initial_allowlist: Vec<String>,
 ) -> anyhow::Result<(RootHandlerBuilder, Arc<VelocityApprover<NegativeApprover>>)> {
-    let allowlist = match persister.get_node_allowlist(node_id) {
-        Ok(al) => al,
-        Err(_) => {
-            log::warn!("no allowlist found in persister!");
-            Vec::new()
-        }
-    };
+    // let allowlist = match persister.get_node_allowlist(node_id) {
+    //     Ok(al) => al,
+    //     Err(_) => {
+    //         log::warn!("no allowlist found in persister!");
+    //         Vec::new()
+    //     }
+    // };
+    // let allowlist = vec![];
 
     let policy = make_policy(network, po);
     let validator_factory = Arc::new(SimpleValidatorFactory::new_with_policy(policy));
@@ -53,7 +55,7 @@ pub fn builder(
 
     log::info!("create root handler builder with network {:?}", network);
     let mut handler_builder =
-        RootHandlerBuilder::new(network, 0, services, seed).allowlist(allowlist);
+        RootHandlerBuilder::new(network, 0, services, seed).allowlist(initial_allowlist);
     // FIXME set up a manual approver (ui_approver)
     let delegate = NegativeApprover();
     let spec = VelocityControlSpec {
