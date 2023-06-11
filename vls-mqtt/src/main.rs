@@ -82,7 +82,7 @@ async fn rocket() -> _ {
 
     let ctrlr_db = persist::ControlPersister::new("vls_mqtt_data");
     let initial_policy = ctrlr_db.read_policy().unwrap_or_default();
-    let initial_velocity = ctrlr_db.read_velocity().unwrap_or_default();
+    let initial_velocity = ctrlr_db.read_velocity().ok();
     let ctrlr_db_mutex = Arc::new(Mutex::new(ctrlr_db));
     let mut ctrlr = Controller::new_with_persister(sk, pk, ctrlr_db_mutex.clone());
     let node_id = ctrlr.pubkey();
@@ -105,11 +105,10 @@ async fn rocket() -> _ {
     let (handler_builder, approver) = root::builder(
         seed32,
         network,
-        &initial_policy,
-        &initial_velocity,
-        persister,
-        &node_id,
+        initial_policy,
+        initial_velocity,
         initial_allowlist,
+        persister,
     )
     .expect("failed to init signer");
 

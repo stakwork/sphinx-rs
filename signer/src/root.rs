@@ -1,8 +1,7 @@
 use crate::parser::MsgDriver;
 use crate::policy::{make_policy, policy_interval};
-use lss_connector::secp256k1::PublicKey;
 use sphinx_glyph::types;
-use types::Policy;
+use types::{Policy, Velocity};
 
 use anyhow::anyhow;
 use lightning_signer::bitcoin::blockdata::constants::ChainHash;
@@ -27,22 +26,13 @@ use vls_protocol_signer::lightning_signer::wallet::Wallet;
 pub fn builder(
     seed: [u8; 32],
     network: Network,
-    po: &Policy,
-    vel: &types::Velocity,
-    persister: Arc<dyn Persist>,
-    node_id: &PublicKey,
+    initial_policy: Policy,
+    initial_velocity: Option<Velocity>,
     initial_allowlist: Vec<String>,
+    persister: Arc<dyn Persist>,
 ) -> anyhow::Result<(RootHandlerBuilder, Arc<VelocityApprover<NegativeApprover>>)> {
-    // let allowlist = match persister.get_node_allowlist(node_id) {
-    //     Ok(al) => al,
-    //     Err(_) => {
-    //         log::warn!("no allowlist found in persister!");
-    //         Vec::new()
-    //     }
-    // };
-    // let allowlist = vec![];
-
-    let policy = make_policy(network, po);
+    //
+    let policy = make_policy(network, &initial_policy);
     let validator_factory = Arc::new(SimpleValidatorFactory::new_with_policy(policy));
     let random_time_factory = crate::rst::RandomStartingTimeFactory::new();
     let clock = Arc::new(StandardClock());
@@ -59,10 +49,13 @@ pub fn builder(
     // FIXME set up a manual approver (ui_approver)
     let delegate = NegativeApprover();
     let spec = VelocityControlSpec {
-        limit_msat: po.msat_per_interval,
-        interval_type: policy_interval(po.interval),
+        limit_msat: initial_policy.msat_per_interval,
+        interval_type: policy_interval(initial_policy.interval),
     };
-    let control = VelocityControl::load_from_state(spec, vel.clone());
+    let control = match initial_velocity {
+        Some(v) => VelocityControl::load_from_state(spec, v),
+        None => VelocityControl::new(spec),
+    };
     let approver = Arc::new(VelocityApprover::new(clock.clone(), control, delegate));
     // FIXME need to be able to update approvder velocity control on the fly
     handler_builder = handler_builder.approver(approver.clone());
