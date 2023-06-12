@@ -46,7 +46,7 @@
   <Form on:submit={submit}
     ><FormGroup>
       <NumberInput
-        label="Satoshi Limit Per Interval"
+        label="MilliSatoshi Limit Per Interval"
         bind:value={msat_per_interval}
       />
       <br />
@@ -60,7 +60,10 @@
       />
     </FormGroup>
     <br />
-    <NumberInput label="HTLC Limit" bind:value={htlc_limit_msat} />
+    <NumberInput
+      label="HTLC Limit (MilliSatoshis)"
+      bind:value={htlc_limit_msat}
+    />
     <br /><br /><br />
     <Button type="submit" icon={Save} disabled={!dirty}>Save</Button>
   </Form>

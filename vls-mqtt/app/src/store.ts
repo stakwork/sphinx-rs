@@ -25,20 +25,14 @@ export interface Policy {
 }
 
 export const defaultPolicy: Policy = {
-  msat_per_interval: 1100000,
+  msat_per_interval: 21000000000,
   interval: "daily",
-  htlc_limit_msat: 1000000,
+  htlc_limit_msat: 1000000000,
 };
 
 export const policy = writable<Policy>(defaultPolicy);
 
-const devAllowlist = [
-  "lbtc134234gh234gh2g34hg2h3g4h2g34",
-  "lbtc134234gh234gh2g34hg2h3g4h2g34",
-  "lbtc134234gh234gh2g34hg2h3g4h2g34",
-];
-
-export const allowlist = writable<string[]>(devAllowlist);
+export const allowlist = writable<string[]>([]);
 
 export const genKey = (): string => {
   return Array.from(

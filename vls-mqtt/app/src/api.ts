@@ -1,14 +1,16 @@
 import { sphinx } from "./wasm";
 import { localStorageStore } from "./storage";
-import { seed, policy, Policy } from "./store";
+import { seed, policy, allowlist, Policy } from "./store";
 import { derived, get } from "svelte/store";
 
 const nonce = localStorageStore("nonce", 0);
 
-function newNonce(): bigint {
+function newNonce(update: boolean): bigint {
   let n = get(nonce);
-  // nonce.update((n) => n + 1);
-  log("newNonce", n);
+  if (update) {
+    nonce.update((n) => n + 1);
+  }
+  log("newNonce", n + 1);
   return BigInt(n + 1);
 }
 
@@ -57,12 +59,16 @@ export function root() {
 }
 
 async function sendCmd(type: Cmd, content?: any) {
-  log("sendCmd", type, content);
+  log("=> sendCmd", type, content);
   const j = JSON.stringify({ type, ...(content && { content }) });
   const ks: sphinx.Keys = get(keys);
   let msg;
   try {
-    msg = sphinx.build_control_request(j, ks.secret, newNonce());
+    msg = sphinx.build_control_request(
+      j,
+      ks.secret,
+      newNonce(type !== "Nonce")
+    );
   } catch (e) {
     console.error(e);
     return null;
@@ -71,11 +77,12 @@ async function sendCmd(type: Cmd, content?: any) {
     method: "POST",
   });
   const res = await r.text();
+  // update the nonce for next time
   return res;
 }
 
 export async function getNonce() {
-  log("getNonce");
+  log("=> getNonce");
   try {
     const res = await sendCmd("Nonce");
     const msg = sphinx.parse_control_response(res);
@@ -83,6 +90,7 @@ export async function getNonce() {
     const j = JSON.parse(msg);
     if (j.Nonce) {
       nonce.set(j.Nonce);
+      return j.Nonce;
     }
     return msg;
   } catch (e) {
@@ -92,13 +100,12 @@ export async function getNonce() {
 }
 
 export async function getPolicy(): Promise<Policy> {
-  log("getPolicy");
+  log("=> getPolicy");
   try {
     const res = await sendCmd("QueryPolicy");
     const msg = sphinx.parse_control_response(res);
     const j = JSON.parse(msg);
     if (j.PolicyCurrent) {
-      console.log(j.PolicyCurrent);
       policy.set(j.PolicyCurrent);
       return j.PolicyCurrent;
     }
@@ -108,6 +115,7 @@ export async function getPolicy(): Promise<Policy> {
 }
 
 export async function setPolicy(p: Policy): Promise<Policy> {
+  log("=> setPolicy");
   try {
     const res = await sendCmd("UpdatePolicy", p);
     const msg = sphinx.parse_control_response(res);
@@ -117,6 +125,36 @@ export async function setPolicy(p: Policy): Promise<Policy> {
       policy.set(j.PolicyUpdated);
       return j.PolicyUpdated;
     }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+export async function getAllowlist(): Promise<string[]> {
+  log("=> getAllowlist");
+  try {
+    const res = await sendCmd("QueryAllowlist");
+    const msg = sphinx.parse_control_response(res);
+    const j = JSON.parse(msg);
+    console.log(j);
+    if (j.AllowlistCurrent) {
+      allowlist.set(j.AllowlistCurrent);
+      return j.AllowlistCurrent;
+    }
+    return [];
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+export async function setAllowlist(al: string[]): Promise<string[]> {
+  log("=> setAllowlist");
+  try {
+    const res = await sendCmd("UpdateAllowlist", al);
+    const msg = sphinx.parse_control_response(res);
+    const j = JSON.parse(msg);
+    console.log(j);
+    return [];
   } catch (e) {
     console.error(e);
   }

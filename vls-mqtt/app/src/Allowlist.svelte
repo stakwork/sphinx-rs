@@ -8,8 +8,19 @@
   import Add from "carbon-icons-svelte/lib/Add.svelte";
   import Save from "carbon-icons-svelte/lib/Save.svelte";
   import { allowlist } from "./store";
+  import { onMount } from "svelte";
+  import * as api from "./api";
 
   let list = $allowlist.slice();
+
+  async function initPolicy() {
+    const p = await api.getAllowlist();
+    console.log(p);
+    list = p;
+  }
+  onMount(() => {
+    initPolicy();
+  });
 
   let adding;
   let newAddress = "";
@@ -32,10 +43,13 @@
     adding = false;
     newAddress = "";
   }
-  function save() {
-    allowlist.set(list);
+  async function save() {
+    // allowlist.set(list);
     loading = true;
-    setTimeout(() => (loading = false), 1000);
+    // setTimeout(() => (loading = false), 1000);
+    const p = await api.setAllowlist(list);
+    loading = false;
+    console.log(p);
   }
 
   function equals(a, b) {

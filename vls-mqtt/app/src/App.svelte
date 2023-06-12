@@ -6,6 +6,7 @@
   import Account from "./Account.svelte";
   import Allowlist from "./Allowlist.svelte";
   import Policy from "./Policy.svelte";
+  import ForceClose from "./ForceClose.svelte";
 
   let loaded = false;
 
@@ -25,6 +26,7 @@
     account: Account,
     policy: Policy,
     allowlist: Allowlist,
+    forceclose: ForceClose,
   };
   $: component = components[page.page];
 </script>
