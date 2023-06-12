@@ -19,15 +19,15 @@ export const menu = writable<Page>("account");
 export type Interval = "hourly" | "daily";
 
 export interface Policy {
-  sat_limit: number;
+  msat_per_interval: number;
   interval: Interval;
-  htlc_limit: number;
+  htlc_limit_msat: number;
 }
 
 export const defaultPolicy: Policy = {
-  sat_limit: 1100000,
+  msat_per_interval: 1100000,
   interval: "daily",
-  htlc_limit: 1000000,
+  htlc_limit_msat: 1000000,
 };
 
 export const policy = writable<Policy>(defaultPolicy);

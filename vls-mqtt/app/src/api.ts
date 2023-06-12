@@ -79,9 +79,14 @@ export async function getNonce() {
   try {
     const res = await sendCmd("Nonce");
     const msg = sphinx.parse_control_response(res);
-    console.log("nonce response:", msg);
+    console.log("nonce response:", msg, typeof msg);
+    const j = JSON.parse(msg);
+    if (j.Nonce) {
+      nonce.set(j.Nonce);
+    }
     return msg;
   } catch (e) {
+    console.log("FAILED getNonce()");
     return null;
   }
 }
@@ -117,4 +122,4 @@ export async function setPolicy(p: Policy): Promise<Policy> {
   }
 }
 
-const log = false ? console.log : () => {};
+const log = true ? console.log : () => {};

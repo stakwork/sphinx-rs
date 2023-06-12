@@ -64,15 +64,16 @@ impl Controller {
     pub fn handle(&mut self, input: &[u8]) -> anyhow::Result<(ControlMessage, ControlResponse)> {
         let msg_nonce = self.parse_msg_no_nonce(input)?;
         let msg = msg_nonce.0;
-        // nonce must be higher each time
-        if msg_nonce.1 <= self.2 {
-            return Err(anyhow::anyhow!("invalid nonce"));
-        }
-        // increment the nonce EXCEPT for Nonce requests
+        // handle on store
         let mut store = self.3.lock().unwrap();
+        // increment the nonce EXCEPT for Nonce requests
         match msg {
             ControlMessage::Nonce => (),
             _ => {
+                // nonce must be higher each time
+                if msg_nonce.1 <= self.2 {
+                    return Err(anyhow::anyhow!("invalid nonce"));
+                }
                 self.2 = self.2 + 1;
                 store.set_nonce(self.2)?;
             }

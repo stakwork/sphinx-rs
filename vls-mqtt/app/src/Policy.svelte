@@ -11,15 +11,16 @@
   import * as api from "./api";
   import { policy } from "./store";
 
-  let sat_limit = $policy.sat_limit;
+  let msat_per_interval = $policy.msat_per_interval;
   let interval = $policy.interval;
-  let htlc_limit = $policy.htlc_limit;
+  let htlc_limit_msat = $policy.htlc_limit_msat;
 
   async function initPolicy() {
     const p = await api.getPolicy();
-    sat_limit = p.sat_limit;
+    console.log(p);
+    msat_per_interval = p.msat_per_interval;
     interval = p.interval;
-    htlc_limit = p.htlc_limit;
+    htlc_limit_msat = p.htlc_limit_msat;
   }
   onMount(() => {
     initPolicy();
@@ -27,15 +28,15 @@
 
   // dirty = ready to be saved
   $: dirty =
-    htlc_limit !== $policy.htlc_limit ||
+    htlc_limit_msat !== $policy.htlc_limit_msat ||
     interval !== $policy.interval ||
-    sat_limit !== $policy.sat_limit;
+    msat_per_interval !== $policy.msat_per_interval;
 
   async function submit(e) {
     e.preventDefault();
     await api.setPolicy({
-      sat_limit,
-      htlc_limit,
+      msat_per_interval,
+      htlc_limit_msat,
       interval,
     });
   }
@@ -44,7 +45,10 @@
 <main>
   <Form on:submit={submit}
     ><FormGroup>
-      <NumberInput label="Satoshi Limit Per Interval" bind:value={sat_limit} />
+      <NumberInput
+        label="Satoshi Limit Per Interval"
+        bind:value={msat_per_interval}
+      />
       <br />
       <Dropdown
         titleText="Interval"
@@ -56,7 +60,7 @@
       />
     </FormGroup>
     <br />
-    <NumberInput label="HTLC Limit" bind:value={htlc_limit} />
+    <NumberInput label="HTLC Limit" bind:value={htlc_limit_msat} />
     <br /><br /><br />
     <Button type="submit" icon={Save} disabled={!dirty}>Save</Button>
   </Form>
