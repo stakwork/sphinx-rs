@@ -12,6 +12,7 @@ use lss::init_lss;
 use rocket::tokio::sync::{broadcast, mpsc, oneshot};
 use sphinx_signer::lightning_signer::bitcoin::Network;
 // use sphinx_signer::lightning_signer::persist::Persist;
+use sphinx_signer::lightning_signer::persist::Persist;
 use sphinx_signer::lightning_signer::wallet::Wallet;
 use sphinx_signer::persist::{BackupPersister, FsPersister, ThreadMemoPersister};
 use sphinx_signer::policy::update_controls;
@@ -81,25 +82,33 @@ async fn rocket() -> _ {
 
     let ctrlr_db = persist::ControlPersister::new("vls_mqtt_data");
     let initial_policy = ctrlr_db.read_policy().unwrap_or_default();
-    let initial_velocity = ctrlr_db.read_velocity().unwrap_or_default();
+    let initial_velocity = ctrlr_db.read_velocity().ok();
     let ctrlr_db_mutex = Arc::new(Mutex::new(ctrlr_db));
     let mut ctrlr = Controller::new_with_persister(sk, pk, ctrlr_db_mutex.clone());
+    let node_id = ctrlr.pubkey();
 
     let seed32: [u8; 32] = seed.try_into().expect("invalid seed");
     let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
 
     let fs_persister = FsPersister::new(&store_path, None);
+    let initial_allowlist = match fs_persister.get_node_allowlist(&node_id) {
+        Ok(al) => al,
+        Err(_) => {
+            log::warn!("no allowlist found in fs persister!");
+            Vec::new()
+        }
+    };
+
     let lss_persister = ThreadMemoPersister {};
     let persister = Arc::new(BackupPersister::new(fs_persister, lss_persister));
 
-    let node_id = ctrlr.pubkey();
     let (handler_builder, approver) = root::builder(
         seed32,
         network,
-        &initial_policy,
-        &initial_velocity,
+        initial_policy,
+        initial_velocity,
+        initial_allowlist,
         persister,
-        &node_id,
     )
     .expect("failed to init signer");
 
