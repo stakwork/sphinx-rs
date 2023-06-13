@@ -17,7 +17,8 @@
 
   async function initPolicy() {
     const p = await api.getPolicy();
-    console.log(p);
+    console.log("policy:", p);
+    if (!p) return;
     msat_per_interval = p.msat_per_interval;
     interval = p.interval;
     htlc_limit_msat = p.htlc_limit_msat;

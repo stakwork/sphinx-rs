@@ -16,7 +16,7 @@
   async function initPolicy() {
     const p = await api.getAllowlist();
     console.log(p);
-    list = p;
+    if (p) list = p;
   }
   onMount(() => {
     initPolicy();
@@ -53,7 +53,7 @@
   }
 
   function equals(a, b) {
-    return a.length === b.length && a.every((v, i) => v === b[i]);
+    return (a && a.length) === (b && b.length) && a.every((v, i) => v === b[i]);
   }
   $: dirty = !equals(list, $allowlist);
 </script>
