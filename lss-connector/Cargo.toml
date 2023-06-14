@@ -13,7 +13,8 @@ broker = ["lightning-storage-server", "vls-frontend", "tokio"]
 
 [dependencies]
 sphinx-glyph = { path = '../glyph' }
-vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "b355d2235b4ff0a223820e16889ba9cf939c0752", default-features = false, features = ["std", "secp-lowmemory"] }
+# vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "b355d2235b4ff0a223820e16889ba9cf939c0752", default-features = false, features = ["std", "secp-lowmemory"] }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", branch = "2023-06-with-persist", default-features = false, features = ["std", "secp-lowmemory"] }
 log = "0.4"
 serde = "1.0.1"
 anyhow = "1"

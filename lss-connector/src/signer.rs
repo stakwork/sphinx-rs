@@ -1,5 +1,6 @@
 use crate::msgs::*;
 use anyhow::{anyhow, Result};
+use lightning_signer::persist::Mutations;
 use lightning_signer::persist::{ExternalPersistHelper, SimpleEntropy};
 use secp256k1::PublicKey;
 use std::collections::BTreeMap;
@@ -69,7 +70,9 @@ impl LssSigner {
         handler_builder: RootHandlerBuilder,
     ) -> Result<(RootHandler, Vec<u8>)> {
         // let helper = self.helper.lock().unwrap();
-        let success = self.helper.check_hmac(&c.muts, c.server_hmac);
+        let success = self
+            .helper
+            .check_hmac(&Mutations::from_vec(c.muts.clone()), c.server_hmac);
         if !success {
             return Err(anyhow!("invalid server hmac"));
         }
@@ -84,19 +87,23 @@ impl LssSigner {
             .map_err(|_| anyhow!("failed to build"))?;
         let client_hmac = self.helper.client_hmac(&muts);
 
-        let res = Response::Created(SignerMutations { muts, client_hmac });
+        let res = Response::Created(SignerMutations {
+            muts: muts.into_inner(),
+            client_hmac,
+        });
         let res_bytes = res.to_vec()?;
 
         Ok((handler, res_bytes))
     }
-    pub fn client_hmac(&self, muts: &Muts) -> [u8; 32] {
-        self.helper.client_hmac(muts)
+    pub fn client_hmac(&self, muts: Muts) -> [u8; 32] {
+        self.helper.client_hmac(&Mutations::from_vec(muts))
     }
-    pub fn server_hmac(&self, muts: &Muts) -> [u8; 32] {
-        self.helper.server_hmac(muts)
+    pub fn server_hmac(&self, muts: Muts) -> [u8; 32] {
+        self.helper.server_hmac(&Mutations::from_vec(muts))
     }
-    pub fn check_hmac(&self, bm: &BrokerMutations) -> bool {
-        self.helper.check_hmac(&bm.muts, bm.server_hmac.clone())
+    pub fn check_hmac(&self, bm: BrokerMutations) -> bool {
+        self.helper
+            .check_hmac(&Mutations::from_vec(bm.muts), bm.server_hmac)
     }
 }
 
@@ -122,7 +129,7 @@ pub fn handle_lss_msg(
         Msg::Created(bm) => {
             // dont need to check muts if theyre empty
             if !bm.muts.is_empty() {
-                if !lss_signer.check_hmac(&bm) {
+                if !lss_signer.check_hmac(bm) {
                     return Err(anyhow!("Invalid server hmac"));
                 }
             }
@@ -147,7 +154,7 @@ pub fn handle_lss_msg(
                     .try_into()
                     .map_err(|_| anyhow!("Invalid server hmac (not 32 bytes)"))?;
                 // check the original muts
-                let server_hmac = lss_signer.server_hmac(&sm.muts);
+                let server_hmac = lss_signer.server_hmac(sm.muts);
                 // send back the original VLS response finally
                 if server_hmac == shmac {
                     Ok((topics::VLS_RETURN.to_string(), previous.0))

@@ -166,7 +166,7 @@ async fn listen_for_commands(
     while let Some(msg) = ctrl_rx.recv().await {
         match ctrlr.handle(&msg.message) {
             Ok((cmsg, cres)) => {
-                let res2 = update_controls(rh, network, cmsg, cres);
+                let (res2, _muts) = update_controls(rh, network, cmsg, cres);
                 let reply = rmp_serde::to_vec_named(&res2).unwrap();
                 let _ = msg.reply_tx.send(ChannelReply { reply });
             }
