@@ -166,7 +166,10 @@ async fn listen_for_commands(
     while let Some(msg) = ctrl_rx.recv().await {
         match ctrlr.handle(&msg.message) {
             Ok((cmsg, cres)) => {
-                let (res2, _muts) = update_controls(rh, network, cmsg, cres);
+                let (res2, muts) = update_controls(rh, network, cmsg, cres);
+                if let Some(_) = muts {
+                    log::warn!("some mutations that need to be sent to LSS!");
+                }
                 let reply = rmp_serde::to_vec_named(&res2).unwrap();
                 let _ = msg.reply_tx.send(ChannelReply { reply });
             }
