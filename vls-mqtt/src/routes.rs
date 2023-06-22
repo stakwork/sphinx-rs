@@ -72,7 +72,12 @@ pub fn launch_rocket(
     error_tx: broadcast::Sender<Vec<u8>>,
 ) -> Rocket<Build> {
     println!("=> launch_rocket");
+    let config = Config {
+        port: 9000,
+        ..Config::default()
+    };
     rocket::build()
+        .configure(config)
         .mount("/", FileServer::from(relative!("app/public")))
         .mount("/api/", routes![control, errors])
         .attach(CORS)
