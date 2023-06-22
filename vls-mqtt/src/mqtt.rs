@@ -77,6 +77,11 @@ pub async fn start(
             .subscribe(lss_topic, QoS::AtMostOnce)
             .await
             .expect("could not subscribe LSS");
+        let init_topic = format!("{}/{}", client_id, topics::INIT_MSG);
+        client
+            .subscribe(init_topic, QoS::AtMostOnce)
+            .await
+            .expect("could not subscribe LSS");
 
         main_listener(
             vls_tx.clone(),
@@ -108,6 +113,7 @@ async fn main_listener(
                     if return_topic == topics::ERROR {
                         let _ = error_tx.send(bytes.clone());
                     }
+                    // println!("publish back to broker! {}", &return_topic);
                     publish(client, &client_id, &return_topic, &bytes).await;
                 }
             }
@@ -147,7 +153,7 @@ async fn got_msg(
             }
             Err(e) => (topics::ERROR.to_string(), e.to_string().as_bytes().to_vec()),
         }
-    } else if topic.ends_with(topics::LSS_MSG) {
+    } else if topic.ends_with(topics::LSS_MSG) || topic.ends_with(topics::INIT_MSG) {
         let (lss_msg, reply_rx) = LssChanMsg::new(msg_bytes.to_vec(), msgs.clone());
         let _ = lss_tx.send(lss_msg).await;
         match reply_rx.await.unwrap() {
@@ -163,6 +169,7 @@ async fn got_msg(
             }
         }
     } else {
+        log::warn!("unrecognized topic {}", topic);
         let err = format!("=> bad topic {}", topic);
         (topics::ERROR.to_string(), err.as_bytes().to_vec())
     }

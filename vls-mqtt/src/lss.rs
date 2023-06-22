@@ -9,7 +9,7 @@ pub async fn init_lss(
     mut lss_rx: mpsc::Receiver<LssChanMsg>,
 ) -> Result<(RootHandler, LssSigner)> {
     use sphinx_signer::sphinx_glyph::topics;
-    let res_topic = topics::LSS_RES.to_string();
+    let res_topic = topics::INIT_RES.to_string();
 
     println!("INIT LSS!");
 

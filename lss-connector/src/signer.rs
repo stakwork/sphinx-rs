@@ -124,7 +124,7 @@ pub fn handle_lss_msg(
     match lssmsg {
         Msg::Init(_) => {
             let bs = lss_signer.reconnect_init_response();
-            Ok((topics::LSS_RES.to_string(), bs))
+            Ok((topics::INIT_RES.to_string(), bs))
         }
         Msg::Created(bm) => {
             // dont need to check muts if theyre empty
@@ -134,7 +134,7 @@ pub fn handle_lss_msg(
                 }
             }
             let bs = lss_signer.empty_created();
-            Ok((topics::LSS_RES.to_string(), bs))
+            Ok((topics::INIT_RES.to_string(), bs))
         }
         Msg::Stored(bm) => {
             if let None = previous {
