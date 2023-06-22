@@ -12,11 +12,14 @@ use vls_protocol_signer::handler::{Handler, RootHandler};
 use vls_protocol_signer::lightning_signer;
 use vls_protocol_signer::lightning_signer::bitcoin::Network;
 
+use crate::root::SphinxApprover;
+
 pub fn update_controls(
     rh: &RootHandler,
     network: Network,
     msg: ControlMessage,
     mut res: ControlResponse,
+    approver: &SphinxApprover,
 ) -> (ControlResponse, Option<Mutations>) {
     let mut muts = None;
     match msg {

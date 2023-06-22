@@ -120,7 +120,7 @@ pub fn handle_lss_msg(
 
     // println!("LssMsg::from_slice {:?}", &msg.message);
     let lssmsg = Msg::from_slice(&msg)?;
-    println!("incoming LSS msg {:?}", lssmsg);
+    // println!("incoming LSS msg {:?}", lssmsg);
     match lssmsg {
         Msg::Init(_) => {
             let bs = lss_signer.reconnect_init_response();

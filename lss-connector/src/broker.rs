@@ -1,12 +1,14 @@
 use crate::msgs::*;
 
 use anyhow::Result;
+use lightning_signer::persist::Mutations;
 use lightning_storage_server::client::Auth;
 use secp256k1::PublicKey;
 use std::sync::Arc;
 use tokio::sync::Mutex as AsyncMutex;
 use vls_frontend::external_persist::lss::Client as LssClient;
 use vls_frontend::external_persist::ExternalPersist;
+use vls_protocol_signer::lightning_signer;
 
 pub type LssPersister = Arc<AsyncMutex<Box<dyn ExternalPersist>>>;
 
@@ -69,14 +71,19 @@ impl LssBroker {
     pub async fn get_created_state_from_nonce(&self, nonce: &[u8]) -> Result<BrokerMutations> {
         let client = self.lss_client.lock().await;
         let (muts, server_hmac) = client.get("".to_string(), nonce).await?;
-        Ok(BrokerMutations { muts, server_hmac })
+        Ok(BrokerMutations {
+            muts: muts.into_inner(),
+            server_hmac,
+        })
     }
     pub async fn put_muts(&self, cm: SignerMutations) -> Result<Vec<u8>> {
         Ok(if cm.muts.is_empty() {
             Vec::new()
         } else {
             let client = self.lss_client.lock().await;
-            client.put(cm.muts, &cm.client_hmac).await?
+            client
+                .put(Mutations::from_vec(cm.muts), &cm.client_hmac)
+                .await?
         })
     }
     pub async fn handle_bytes(&self, resb: &[u8]) -> Result<Vec<u8>> {
@@ -118,7 +125,9 @@ pub async fn lss_handle(lss: &LssPersister, msg: &[u8]) -> Result<Vec<u8>> {
     let bm: BrokerMutations = if res.muts.is_empty() {
         Default::default()
     } else {
-        let server_hmac = client.put(res.muts, &res.client_hmac).await?;
+        let server_hmac = client
+            .put(Mutations::from_vec(res.muts), &res.client_hmac)
+            .await?;
         BrokerMutations {
             muts: Vec::new(),
             server_hmac,

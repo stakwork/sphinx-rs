@@ -132,6 +132,7 @@ async fn rocket() -> _ {
 
     let rh = Arc::new(root_handler);
     let rh_ = rh.clone();
+    let approver_ = approver.clone();
     let ctrldb_ = ctrlr.persister();
     rocket::tokio::spawn(async move {
         while let Some(msg) = vls_rx.recv().await {
@@ -150,9 +151,9 @@ async fn rocket() -> _ {
         }
     });
 
-    rocket::tokio::spawn(
-        async move { listen_for_commands(&mut ctrlr, ctrl_rx, &rh, network).await },
-    );
+    rocket::tokio::spawn(async move {
+        listen_for_commands(&mut ctrlr, ctrl_rx, &rh, network, &approver_).await
+    });
 
     routes::launch_rocket(ctrl_tx, error_tx)
 }
@@ -162,11 +163,12 @@ async fn listen_for_commands(
     mut ctrl_rx: mpsc::Receiver<ChannelRequest>,
     rh: &RootHandler,
     network: Network,
+    approver: &root::SphinxApprover,
 ) {
     while let Some(msg) = ctrl_rx.recv().await {
         match ctrlr.handle(&msg.message) {
             Ok((cmsg, cres)) => {
-                let (res2, muts) = update_controls(rh, network, cmsg, cres);
+                let (res2, muts) = update_controls(rh, network, cmsg, cres, approver);
                 if let Some(_) = muts {
                     log::warn!("some mutations that need to be sent to LSS!");
                 }

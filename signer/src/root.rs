@@ -8,6 +8,7 @@ use lightning_signer::bitcoin::blockdata::constants::ChainHash;
 use lightning_signer::node::NodeServices;
 use lightning_signer::persist::Persist;
 use lightning_signer::policy::simple_validator::SimpleValidatorFactory;
+use lightning_signer::util::clock::Clock;
 use lightning_signer::util::clock::StandardClock;
 use lightning_signer::util::velocity::{VelocityControl, VelocityControlSpec};
 use lss_connector::{
@@ -23,6 +24,8 @@ use vls_protocol_signer::lightning_signer;
 use vls_protocol_signer::lightning_signer::bitcoin::Network;
 use vls_protocol_signer::lightning_signer::wallet::Wallet;
 
+pub type SphinxApprover = VelocityApprover<NegativeApprover>;
+
 pub fn builder(
     seed: [u8; 32],
     network: Network,
@@ -30,7 +33,7 @@ pub fn builder(
     initial_velocity: Option<Velocity>,
     initial_allowlist: Vec<String>,
     persister: Arc<dyn Persist>,
-) -> anyhow::Result<(RootHandlerBuilder, Arc<VelocityApprover<NegativeApprover>>)> {
+) -> anyhow::Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
     //
     let policy = make_policy(network, &initial_policy);
     let validator_factory = Arc::new(SimpleValidatorFactory::new_with_policy(policy));
@@ -47,6 +50,18 @@ pub fn builder(
     let mut handler_builder =
         RootHandlerBuilder::new(network, 0, services, seed).allowlist(initial_allowlist);
     // FIXME set up a manual approver (ui_approver)
+    let approv = create_approver(clock.clone(), initial_policy, initial_velocity);
+    let approver = Arc::new(approv);
+    // FIXME need to be able to update approvder velocity control on the fly
+    handler_builder = handler_builder.approver(approver.clone());
+    Ok((handler_builder, approver))
+}
+
+pub fn create_approver(
+    clock: Arc<dyn Clock>,
+    initial_policy: Policy,
+    initial_velocity: Option<Velocity>,
+) -> SphinxApprover {
     let delegate = NegativeApprover();
     let spec = VelocityControlSpec {
         limit_msat: initial_policy.msat_per_interval,
@@ -56,10 +71,7 @@ pub fn builder(
         Some(v) => VelocityControl::load_from_state(spec, v),
         None => VelocityControl::new(spec),
     };
-    let approver = Arc::new(VelocityApprover::new(clock.clone(), control, delegate));
-    // FIXME need to be able to update approvder velocity control on the fly
-    handler_builder = handler_builder.approver(approver.clone());
-    Ok((handler_builder, approver))
+    VelocityApprover::new(clock.clone(), control, delegate)
 }
 
 // returns the VLS return msg and the muts
@@ -88,7 +100,8 @@ fn handle_inner(
     }
 
     if do_log {
-        log::info!("VLS msg: {:?}", message);
+        vls_log(&message);
+        // log::info!("VLS: {:?}", message);
         // println!("VLS msg: {:?}", message);
     }
     let reply = if dbid > 0 {
@@ -152,4 +165,98 @@ pub fn parse_ping_and_form_response(msg_bytes: Vec<u8>) -> Vec<u8> {
     };
     msgs::write(&mut md, pong).expect("failed to serial write");
     md.bytes()
+}
+
+fn vls_log(msg: &Message) {
+    let m = match msg {
+        Message::Ping(_) => "Ping",
+        Message::Pong(_) => "Pong",
+        Message::HsmdInit(_) => "HsmdInit",
+        // HsmdInitReplyV1(HsmdInitReplyV1),
+        #[allow(deprecated)]
+        Message::HsmdInitReplyV2(_) => "HsmdInitReplyV2",
+        Message::HsmdInitReplyV4(_) => "HsmdInitReplyV4",
+        Message::HsmdInit2(_) => "HsmdInit2",
+        Message::HsmdInit2Reply(_) => "HsmdInit2Reply",
+        Message::ClientHsmFd(_) => "ClientHsmFd",
+        Message::ClientHsmFdReply(_) => "ClientHsmFdReply",
+        Message::SignInvoice(_) => "SignInvoice",
+        Message::SignInvoiceReply(_) => "SignInvoiceReply",
+        Message::SignWithdrawal(_) => "SignWithdrawal",
+        Message::SignWithdrawalReply(_) => "SignWithdrawalReply",
+        Message::Ecdh(_) => "Ecdh",
+        Message::EcdhReply(_) => "EcdhReply",
+        Message::Memleak(_) => "Memleak",
+        Message::MemleakReply(_) => "MemleakReply",
+        Message::CheckFutureSecret(_) => "CheckFutureSecret",
+        Message::CheckFutureSecretReply(_) => "CheckFutureSecretReply",
+        Message::SignBolt12(_) => "SignBolt12",
+        Message::SignBolt12Reply(_) => "SignBolt12Reply",
+        Message::PreapproveInvoice(_) => "PreapproveInvoice",
+        Message::PreapproveInvoiceReply(_) => "PreapproveInvoiceReply",
+        Message::PreapproveKeysend(_) => "PreapproveKeysend",
+        Message::PreapproveKeysendReply(_) => "PreapproveKeysendReply",
+        Message::DeriveSecret(_) => "DeriveSecret",
+        Message::DeriveSecretReply(_) => "DeriveSecretReply",
+        Message::CheckPubKey(_) => "CheckPubKey",
+        Message::CheckPubKeyReply(_) => "CheckPubKeyReply",
+        Message::SignMessage(_) => "SignMessage",
+        Message::SignMessageReply(_) => "SignMessageReply",
+        Message::SignChannelUpdate(_) => "SignChannelUpdate",
+        Message::SignChannelUpdateReply(_) => "SignChannelUpdateReply",
+        Message::SignChannelAnnouncement(_) => "SignChannelAnnouncement",
+        Message::SignChannelAnnouncementReply(_) => "SignChannelAnnouncementReply",
+        Message::SignNodeAnnouncement(_) => "SignNodeAnnouncement",
+        Message::SignNodeAnnouncementReply(_) => "SignNodeAnnouncementReply",
+        Message::GetPerCommitmentPoint(_) => "GetPerCommitmentPoint",
+        Message::GetPerCommitmentPointReply(_) => "GetPerCommitmentPointReply",
+        Message::GetPerCommitmentPoint2(_) => "GetPerCommitmentPoint2",
+        Message::GetPerCommitmentPoint2Reply(_) => "GetPerCommitmentPoint2Reply",
+        Message::ReadyChannel(_) => "ReadyChannel",
+        Message::ReadyChannelReply(_) => "ReadyChannelReply",
+        Message::ValidateCommitmentTx(_) => "ValidateCommitmentTx",
+        Message::ValidateCommitmentTx2(_) => "ValidateCommitmentTx2",
+        Message::ValidateCommitmentTxReply(_) => "ValidateCommitmentTxReply",
+        Message::ValidateRevocation(_) => "ValidateRevocation",
+        Message::ValidateRevocationReply(_) => "ValidateRevocationReply",
+        Message::SignRemoteCommitmentTx(_) => "SignRemoteCommitmentTx",
+        Message::SignRemoteCommitmentTx2(_) => "SignRemoteCommitmentTx2",
+        Message::SignCommitmentTxWithHtlcsReply(_) => "SignCommitmentTxWithHtlcsReply",
+        Message::SignDelayedPaymentToUs(_) => "SignDelayedPaymentToUs",
+        Message::SignAnyDelayedPaymentToUs(_) => "SignAnyDelayedPaymentToUs",
+        Message::SignRemoteHtlcToUs(_) => "SignRemoteHtlcToUs",
+        Message::SignAnyRemoteHtlcToUs(_) => "SignAnyRemoteHtlcToUs",
+        Message::SignLocalHtlcTx(_) => "SignLocalHtlcTx",
+        Message::SignAnyLocalHtlcTx(_) => "SignAnyLocalHtlcTx",
+        Message::SignCommitmentTx(_) => "SignCommitmentTx",
+        Message::SignLocalCommitmentTx2(_) => "SignLocalCommitmentTx2",
+        Message::SignGossipMessage(_) => "SignGossipMessage",
+        Message::SignMutualCloseTx(_) => "SignMutualCloseTx",
+        Message::SignMutualCloseTx2(_) => "SignMutualCloseTx2",
+        Message::SignTxReply(_) => "SignTxReply",
+        Message::SignCommitmentTxReply(_) => "SignCommitmentTxReply",
+        Message::GetChannelBasepoints(_) => "GetChannelBasepoints",
+        Message::GetChannelBasepointsReply(_) => "GetChannelBasepointsReply",
+        Message::NewChannel(_) => "NewChannel",
+        Message::NewChannelReply(_) => "NewChannelReply",
+        Message::SignRemoteHtlcTx(_) => "SignRemoteHtlcTx",
+        Message::SignPenaltyToUs(_) => "SignPenaltyToUs",
+        Message::SignAnyPenaltyToUs(_) => "SignAnyPenaltyToUs",
+        Message::TipInfo(_) => "TipInfo",
+        Message::TipInfoReply(_) => "TipInfoReply",
+        Message::ForwardWatches(_) => "ForwardWatches",
+        Message::ForwardWatchesReply(_) => "ForwardWatchesReply",
+        Message::ReverseWatches(_) => "ReverseWatches",
+        Message::ReverseWatchesReply(_) => "ReverseWatchesReply",
+        Message::AddBlock(_) => "AddBlock",
+        Message::AddBlockReply(_) => "AddBlockReply",
+        Message::RemoveBlock(_) => "RemoveBlock",
+        Message::RemoveBlockReply(_) => "RemoveBlockReply",
+        Message::GetHeartbeat(_) => "GetHeartbeat",
+        Message::GetHeartbeatReply(_) => "GetHeartbeatReply",
+        Message::NodeInfo(_) => "NodeInfo",
+        Message::NodeInfoReply(_) => "NodeInfoReply",
+        Message::Unknown(_) => "Unknown",
+    };
+    log::info!("VLS: => {}", m);
 }
