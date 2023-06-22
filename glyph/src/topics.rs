@@ -5,5 +5,7 @@ pub const CONTROL_RETURN: &str = "sphinx-control-return";
 pub const PROXY: &str = "sphinx-proxy";
 pub const PROXY_RETURN: &str = "sphinx-proxy-return";
 pub const ERROR: &str = "sphinx-error";
+pub const INIT_MSG: &str = "sphinx-init-msg";
+pub const INIT_RES: &str = "sphinx-init-res";
 pub const LSS_MSG: &str = "sphinx-lss-msg";
 pub const LSS_RES: &str = "sphinx-lss-res";

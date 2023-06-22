@@ -1,5 +1,6 @@
 use sphinx_glyph::types::{Interval, Policy};
 
+use lightning_signer::persist::Mutations;
 use lightning_signer::policy::filter::PolicyFilter;
 use lightning_signer::policy::simple_validator::{
     make_simple_policy, SimplePolicy, SimpleValidatorFactory,
@@ -11,12 +12,16 @@ use vls_protocol_signer::handler::{Handler, RootHandler};
 use vls_protocol_signer::lightning_signer;
 use vls_protocol_signer::lightning_signer::bitcoin::Network;
 
+use crate::root::SphinxApprover;
+
 pub fn update_controls(
     rh: &RootHandler,
     network: Network,
     msg: ControlMessage,
     mut res: ControlResponse,
-) -> ControlResponse {
+    approver: &SphinxApprover,
+) -> (ControlResponse, Option<Mutations>) {
+    let mut muts = None;
     match msg {
         ControlMessage::UpdatePolicy(new_policy) => {
             if let Err(e) = set_policy(rh, network, new_policy) {
@@ -24,12 +29,15 @@ pub fn update_controls(
                 res = ControlResponse::Error(format!("set policy failed {:?}", e))
             }
         }
-        ControlMessage::UpdateAllowlist(al) => {
-            if let Err(e) = set_allowlist(rh, &al) {
+        ControlMessage::UpdateAllowlist(al) => match set_allowlist(rh, &al) {
+            Ok(muts_) => {
+                muts = Some(muts_);
+            }
+            Err(e) => {
                 log::error!("set allowlist failed {:?}", e);
                 res = ControlResponse::Error(format!("set allowlist failed {:?}", e))
             }
-        }
+        },
         ControlMessage::QueryAllowlist => match get_allowlist(rh) {
             Ok(al) => res = ControlResponse::AllowlistCurrent(al),
             Err(e) => {
@@ -39,14 +47,17 @@ pub fn update_controls(
         },
         _ => (),
     }
-    res
+    (res, muts)
 }
 
-pub fn set_allowlist(root_handler: &RootHandler, allowlist: &Vec<String>) -> anyhow::Result<()> {
-    if let Err(e) = root_handler.node().set_allowlist(allowlist) {
-        return Err(anyhow::anyhow!("error setting allowlist {:?}", e));
-    }
-    Ok(())
+pub fn set_allowlist(
+    root_handler: &RootHandler,
+    allowlist: &Vec<String>,
+) -> anyhow::Result<Mutations> {
+    let muts = root_handler
+        .with_persist(|node| Ok(node.set_allowlist(allowlist)?))
+        .map_err(|e| anyhow::anyhow!("error setting allowlist {:?}", e))?;
+    Ok(muts)
 }
 
 pub fn get_allowlist(root_handler: &RootHandler) -> anyhow::Result<Vec<String>> {
