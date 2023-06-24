@@ -225,6 +225,7 @@ impl Persist for FsPersister {
                             log_prefix: "".to_string(),
                             velocity_control: state_entry.velocity_control.into(),
                             fee_velocity_control: state_entry.fee_velocity_control.into(),
+                            last_summary: String::new(),
                         };
                         let entry = CoreNodeEntry {
                             key_derivation_style: node.key_derivation_style,
