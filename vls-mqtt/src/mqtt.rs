@@ -46,6 +46,7 @@ pub async fn start(
             // let mut mqttoptions = MqttOptions::new(&client_id, broker_[0], broker_port);
             mqttoptions.set_credentials(pubkey.clone(), token.clone());
             mqttoptions.set_keep_alive(Duration::from_secs(5));
+            mqttoptions.set_max_packet_size(262144, 262144); // 1024*256
             let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
             match eventloop.poll().await {
                 Ok(event) => {
