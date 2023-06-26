@@ -59,6 +59,7 @@ fn handle_inner(
     bytes: Vec<u8>,
     do_log: bool,
 ) -> anyhow::Result<(Vec<u8>, Vec<(String, (u64, Vec<u8>))>)> {
+    //println!("Signer is handling these bytes: {:?}", bytes);
     let mut md = MsgDriver::new(bytes);
     let msgs::SerialRequestHeader {
         sequence,
@@ -102,6 +103,7 @@ fn handle_inner(
     let mut out_md = MsgDriver::new_empty();
     write_serial_response_header(&mut out_md, sequence)?;
     msgs::write_vec(&mut out_md, vls_msg.as_vec())?;
+    //println!("handled message, replying with: {:?}", out_md);
     Ok((out_md.bytes(), muts.into_inner()))
 }
 

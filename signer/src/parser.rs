@@ -5,6 +5,7 @@ use vls_protocol::msgs::{self, DeBolt, Message};
 use vls_protocol::serde_bolt::{Error, Read, Result, Write};
 use crate::vls_protocol;
 
+#[derive(Debug)]
 pub struct MsgDriver(Vec<u8>);
 
 impl MsgDriver {
