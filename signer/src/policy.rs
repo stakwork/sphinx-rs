@@ -12,11 +12,10 @@ use vls_protocol_signer::handler::{Handler, RootHandler};
 use vls_protocol_signer::lightning_signer;
 use vls_protocol_signer::lightning_signer::bitcoin::Network;
 
-use crate::root::SphinxApprover;
+use crate::approver::{approver_control, SphinxApprover};
 
 pub fn update_controls(
     rh: &RootHandler,
-    network: Network,
     msg: ControlMessage,
     mut res: ControlResponse,
     approver: &SphinxApprover,
@@ -24,7 +23,7 @@ pub fn update_controls(
     let mut muts = None;
     match msg {
         ControlMessage::UpdatePolicy(new_policy) => {
-            if let Err(e) = set_policy(rh, network, new_policy) {
+            if let Err(e) = set_approver_policy(approver, new_policy) {
                 log::error!("set policy failed {:?}", e);
                 res = ControlResponse::Error(format!("set policy failed {:?}", e))
             }
@@ -71,6 +70,12 @@ pub fn set_policy(root_handler: &RootHandler, network: Network, po: Policy) -> a
     let policy = make_policy(network, &po);
     let validator_factory = Arc::new(SimpleValidatorFactory::new_with_policy(policy));
     root_handler.node().set_validator_factory(validator_factory);
+    Ok(())
+}
+
+pub fn set_approver_policy(approver: &SphinxApprover, po: Policy) -> anyhow::Result<()> {
+    let app_control = approver_control(po, None);
+    approver.set_control(app_control);
     Ok(())
 }
 
