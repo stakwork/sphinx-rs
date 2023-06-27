@@ -21,6 +21,7 @@ use sphinx_signer::{self, approver::SphinxApprover, root, sphinx_glyph as glyph,
 use std::env;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 pub const ROOT_STORE: &str = "teststore";
 
@@ -151,9 +152,17 @@ async fn rocket() -> _ {
         }
     });
 
-    rocket::tokio::spawn(
-        async move { listen_for_commands(&mut ctrlr, ctrl_rx, &rh, &approver_).await },
-    );
+    let rh_ = rh.clone();
+    rocket::tokio::spawn(async move {
+        listen_for_commands(&mut ctrlr, ctrl_rx, &rh_, &approver_).await
+    });
+
+    rocket::tokio::spawn(async move {
+        loop {
+            rocket::tokio::time::sleep(Duration::from_secs(60)).await;
+            let _ = rh.node().get_heartbeat();
+        }
+    });
 
     routes::launch_rocket(ctrl_tx, error_tx)
 }
