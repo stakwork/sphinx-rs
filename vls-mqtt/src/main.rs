@@ -17,7 +17,7 @@ use sphinx_signer::lightning_signer::wallet::Wallet;
 use sphinx_signer::persist::{BackupPersister, FsPersister, ThreadMemoPersister};
 use sphinx_signer::policy::update_controls;
 use sphinx_signer::Handler;
-use sphinx_signer::{self, root, sphinx_glyph as glyph, RootHandler};
+use sphinx_signer::{self, approver::SphinxApprover, root, sphinx_glyph as glyph, RootHandler};
 use std::env;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
@@ -151,9 +151,9 @@ async fn rocket() -> _ {
         }
     });
 
-    rocket::tokio::spawn(async move {
-        listen_for_commands(&mut ctrlr, ctrl_rx, &rh, network, &approver_).await
-    });
+    rocket::tokio::spawn(
+        async move { listen_for_commands(&mut ctrlr, ctrl_rx, &rh, &approver_).await },
+    );
 
     routes::launch_rocket(ctrl_tx, error_tx)
 }
@@ -162,13 +162,12 @@ async fn listen_for_commands(
     ctrlr: &mut Controller,
     mut ctrl_rx: mpsc::Receiver<ChannelRequest>,
     rh: &RootHandler,
-    network: Network,
-    approver: &root::SphinxApprover,
+    approver: &SphinxApprover,
 ) {
     while let Some(msg) = ctrl_rx.recv().await {
         match ctrlr.handle(&msg.message) {
             Ok((cmsg, cres)) => {
-                let (res2, muts) = update_controls(rh, network, cmsg, cres, approver);
+                let (res2, muts) = update_controls(rh, cmsg, cres, approver);
                 if let Some(_) = muts {
                     log::warn!("some mutations that need to be sent to LSS!");
                 }

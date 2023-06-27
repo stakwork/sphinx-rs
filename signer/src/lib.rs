@@ -1,3 +1,4 @@
+pub mod approver;
 pub mod derive;
 pub mod parser;
 pub mod policy;

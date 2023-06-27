@@ -1,5 +1,6 @@
+use crate::approver::{create_approver, SphinxApprover};
 use crate::parser::MsgDriver;
-use crate::policy::{make_policy, policy_interval};
+use crate::policy::make_policy;
 use sphinx_glyph::types;
 use types::{Policy, Velocity};
 
@@ -8,9 +9,7 @@ use lightning_signer::bitcoin::blockdata::constants::ChainHash;
 use lightning_signer::node::NodeServices;
 use lightning_signer::persist::Persist;
 use lightning_signer::policy::simple_validator::SimpleValidatorFactory;
-use lightning_signer::util::clock::Clock;
 use lightning_signer::util::clock::StandardClock;
-use lightning_signer::util::velocity::{VelocityControl, VelocityControlSpec};
 use lss_connector::{
     msgs::{Response as LssResponse, SignerMutations},
     LssSigner,
@@ -18,13 +17,10 @@ use lss_connector::{
 use std::sync::Arc;
 use vls_protocol::model::PubKey;
 use vls_protocol::msgs::{self, read_serial_request_header, write_serial_response_header, Message};
-use vls_protocol_signer::approver::{NegativeApprover, VelocityApprover};
 use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
 use vls_protocol_signer::lightning_signer::bitcoin::Network;
 use vls_protocol_signer::lightning_signer::wallet::Wallet;
-
-pub type SphinxApprover = VelocityApprover<NegativeApprover>;
 
 pub fn builder(
     seed: [u8; 32],
@@ -55,23 +51,6 @@ pub fn builder(
     // FIXME need to be able to update approvder velocity control on the fly
     handler_builder = handler_builder.approver(approver.clone());
     Ok((handler_builder, approver))
-}
-
-pub fn create_approver(
-    clock: Arc<dyn Clock>,
-    initial_policy: Policy,
-    initial_velocity: Option<Velocity>,
-) -> SphinxApprover {
-    let delegate = NegativeApprover();
-    let spec = VelocityControlSpec {
-        limit_msat: initial_policy.msat_per_interval,
-        interval_type: policy_interval(initial_policy.interval),
-    };
-    let control = match initial_velocity {
-        Some(v) => VelocityControl::load_from_state(spec, v),
-        None => VelocityControl::new(spec),
-    };
-    VelocityApprover::new(clock.clone(), control, delegate)
 }
 
 // returns the VLS return msg and the muts
