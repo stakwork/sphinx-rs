@@ -1,5 +1,5 @@
 pub use crate::types::{
-    Config, ControlMessage, ControlResponse, Interval, OtaParams, Policy, Velocity,
+    All, Config, ControlMessage, ControlResponse, Interval, OtaParams, Policy, Velocity,
 };
 use anyhow::Result;
 use sphinx_auther::nonce;
@@ -104,12 +104,21 @@ impl Controller {
                 ControlResponse::PolicyUpdated(np)
             }
             ControlMessage::QueryVelocity => {
-                let v = store.read_velocity().unwrap_or_default();
+                let v = store.read_velocity().ok();
                 ControlResponse::VelocityCurrent(v)
             }
             ControlMessage::QueryAllowlist => ControlResponse::AllowlistCurrent(vec![]),
             ControlMessage::UpdateAllowlist(na) => ControlResponse::AllowlistUpdated(na),
             ControlMessage::Ota(params) => ControlResponse::OtaConfirm(params),
+            ControlMessage::QueryAll => {
+                let policy = store.read_policy().unwrap_or_default();
+                let velocity = store.read_velocity().ok();
+                ControlResponse::AllCurrent(All {
+                    policy,
+                    velocity,
+                    allowlist: Vec::new(),
+                })
+            }
         };
         Ok((msg, res))
     }

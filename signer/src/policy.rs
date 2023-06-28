@@ -6,7 +6,7 @@ use lightning_signer::policy::simple_validator::{
     make_simple_policy, SimplePolicy, SimpleValidatorFactory,
 };
 use lightning_signer::util::velocity::VelocityControlIntervalType;
-use sphinx_glyph::control::{ControlMessage, ControlResponse};
+use sphinx_glyph::control::{All, ControlMessage, ControlResponse};
 use std::sync::Arc;
 use vls_protocol_signer::handler::{Handler, RootHandler};
 use vls_protocol_signer::lightning_signer;
@@ -39,6 +39,23 @@ pub fn update_controls(
         },
         ControlMessage::QueryAllowlist => match get_allowlist(rh) {
             Ok(al) => res = ControlResponse::AllowlistCurrent(al),
+            Err(e) => {
+                log::error!("read allowlist failed {:?}", e);
+                res = ControlResponse::Error(format!("read allowlist failed {:?}", e))
+            }
+        },
+        ControlMessage::QueryAll => match get_allowlist(rh) {
+            Ok(al) => {
+                if let ControlResponse::AllCurrent(ac) = res {
+                    res = ControlResponse::AllCurrent(All {
+                        policy: ac.policy,
+                        velocity: ac.velocity,
+                        allowlist: al,
+                    })
+                } else {
+                    res = ControlResponse::Error(format!("wrong ControlResponse type"))
+                }
+            }
             Err(e) => {
                 log::error!("read allowlist failed {:?}", e);
                 res = ControlResponse::Error(format!("read allowlist failed {:?}", e))
