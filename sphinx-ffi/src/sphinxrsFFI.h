@@ -46,119 +46,55 @@ typedef struct RustCallStatus {
 // ⚠️ increment the version suffix in all instances of UNIFFI_SHARED_HEADER_V4 in this file.           ⚠️
 #endif // def UNIFFI_SHARED_H
 
-RustBuffer sphinxrs_b6a8_pubkey_from_secret_key(
+RustBuffer sphinxrs_7d9d_pubkey_from_secret_key(
       RustBuffer my_secret_key,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer sphinxrs_b6a8_derive_shared_secret(
+RustBuffer sphinxrs_7d9d_derive_shared_secret(
       RustBuffer their_pubkey,RustBuffer my_secret_key,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer sphinxrs_b6a8_encrypt(
+RustBuffer sphinxrs_7d9d_encrypt(
       RustBuffer plaintext,RustBuffer secret,RustBuffer nonce,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer sphinxrs_b6a8_decrypt(
+RustBuffer sphinxrs_7d9d_decrypt(
       RustBuffer ciphertext,RustBuffer secret,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer sphinxrs_b6a8_node_keys(
+RustBuffer sphinxrs_7d9d_node_keys(
       RustBuffer net,RustBuffer seed,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer sphinxrs_b6a8_mnemonic_from_entropy(
+RustBuffer sphinxrs_7d9d_mnemonic_from_entropy(
       RustBuffer seed,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer sphinxrs_b6a8_entropy_from_mnemonic(
+RustBuffer sphinxrs_7d9d_entropy_from_mnemonic(
       RustBuffer mnemonic,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer sphinxrs_b6a8_get_nonce_request(
-      RustBuffer secret,uint64_t nonce,
+RustBuffer sphinxrs_7d9d_build_request(
+      RustBuffer msg,RustBuffer secret,uint64_t nonce,
     RustCallStatus *_Nonnull out_status
     );
-uint64_t sphinxrs_b6a8_get_nonce_response(
-      RustBuffer bytes,
+RustBuffer sphinxrs_7d9d_parse_response(
+      RustBuffer res,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer sphinxrs_b6a8_reset_wifi_request(
-      RustBuffer secret,uint64_t nonce,
-    RustCallStatus *_Nonnull out_status
-    );
-void sphinxrs_b6a8_reset_wifi_response(
-      RustBuffer bytes,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_b6a8_reset_keys_request(
-      RustBuffer secret,uint64_t nonce,
-    RustCallStatus *_Nonnull out_status
-    );
-void sphinxrs_b6a8_reset_keys_response(
-      RustBuffer bytes,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_b6a8_reset_all_request(
-      RustBuffer secret,uint64_t nonce,
-    RustCallStatus *_Nonnull out_status
-    );
-void sphinxrs_b6a8_reset_all_response(
-      RustBuffer bytes,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_b6a8_get_policy_request(
-      RustBuffer secret,uint64_t nonce,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_b6a8_get_policy_response(
-      RustBuffer bytes,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_b6a8_update_policy_request(
-      RustBuffer secret,uint64_t nonce,RustBuffer policy,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_b6a8_update_policy_response(
-      RustBuffer bytes,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_b6a8_get_allowlist_request(
-      RustBuffer secret,uint64_t nonce,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_b6a8_get_allowlist_response(
-      RustBuffer bytes,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_b6a8_update_allowlist_request(
-      RustBuffer secret,uint64_t nonce,RustBuffer allowlist,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_b6a8_update_allowlist_response(
-      RustBuffer bytes,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_b6a8_ota_request(
-      RustBuffer secret,uint64_t nonce,uint64_t version,RustBuffer url,
-    RustCallStatus *_Nonnull out_status
-    );
-uint64_t sphinxrs_b6a8_ota_response(
-      RustBuffer bytes,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer ffi_sphinxrs_b6a8_rustbuffer_alloc(
+RustBuffer ffi_sphinxrs_7d9d_rustbuffer_alloc(
       int32_t size,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer ffi_sphinxrs_b6a8_rustbuffer_from_bytes(
+RustBuffer ffi_sphinxrs_7d9d_rustbuffer_from_bytes(
       ForeignBytes bytes,
     RustCallStatus *_Nonnull out_status
     );
-void ffi_sphinxrs_b6a8_rustbuffer_free(
+void ffi_sphinxrs_7d9d_rustbuffer_free(
       RustBuffer buf,
     RustCallStatus *_Nonnull out_status
     );
-RustBuffer ffi_sphinxrs_b6a8_rustbuffer_reserve(
+RustBuffer ffi_sphinxrs_7d9d_rustbuffer_reserve(
       RustBuffer buf,int32_t additional,
     RustCallStatus *_Nonnull out_status
     );
