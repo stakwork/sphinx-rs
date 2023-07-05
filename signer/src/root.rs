@@ -1,5 +1,4 @@
 use crate::approver::{create_approver, SphinxApprover};
-use crate::parser::MsgDriver;
 use crate::policy::make_policy;
 use sphinx_glyph::types;
 use types::{Policy, Velocity};
@@ -56,17 +55,16 @@ pub fn builder(
 // returns the VLS return msg and the muts
 fn handle_inner(
     root_handler: &RootHandler,
-    bytes: Vec<u8>,
+    mut bytes: Vec<u8>,
     do_log: bool,
 ) -> anyhow::Result<(Vec<u8>, Vec<(String, (u64, Vec<u8>))>)> {
     //println!("Signer is handling these bytes: {:?}", bytes);
-    let mut md = MsgDriver::new(bytes);
     let msgs::SerialRequestHeader {
         sequence,
         peer_id,
         dbid,
-    } = read_serial_request_header(&mut md)?;
-    let message = msgs::read(&mut md)?;
+    } = read_serial_request_header(&mut bytes)?;
+    let message = msgs::read(&mut bytes)?;
 
     if let Message::HsmdInit(ref m) = message {
         if ChainHash::using_genesis_block(root_handler.node().network()).as_bytes()
@@ -100,11 +98,11 @@ fn handle_inner(
     };
     let (vls_msg, muts) = reply;
     // make the VLS message bytes
-    let mut out_md = MsgDriver::new_empty();
-    write_serial_response_header(&mut out_md, sequence)?;
-    msgs::write_vec(&mut out_md, vls_msg.as_vec())?;
+    let mut buf = Vec::new();
+    write_serial_response_header(&mut &mut buf, sequence)?;
+    msgs::write_vec(&mut &mut buf, vls_msg.as_vec())?;
     //println!("handled message, replying with: {:?}", out_md);
-    Ok((out_md.bytes(), muts.into_inner()))
+    Ok((buf, muts.into_inner()))
 }
 
 pub fn handle(root_handler: &RootHandler, bytes: Vec<u8>, do_log: bool) -> anyhow::Result<Vec<u8>> {
@@ -129,23 +127,22 @@ pub fn handle_with_lss(
     Ok((out_bytes, lss_bytes))
 }
 
-pub fn parse_ping_and_form_response(msg_bytes: Vec<u8>) -> Vec<u8> {
-    let mut m = MsgDriver::new(msg_bytes);
+pub fn parse_ping_and_form_response(mut msg_bytes: Vec<u8>) -> Vec<u8> {
     let msgs::SerialRequestHeader {
         sequence,
         peer_id: _,
         dbid: _,
-    } = msgs::read_serial_request_header(&mut m).expect("read ping header");
-    let ping: msgs::Ping = msgs::read_message(&mut m).expect("failed to read ping message");
-    let mut md = MsgDriver::new_empty();
-    msgs::write_serial_response_header(&mut md, sequence)
+    } = msgs::read_serial_request_header(&mut msg_bytes).expect("read ping header");
+    let ping: msgs::Ping = msgs::read_message(&mut msg_bytes).expect("failed to read ping message");
+    let mut buf = Vec::new();
+    msgs::write_serial_response_header(&mut &mut buf, sequence)
         .expect("failed to write_serial_request_header");
     let pong = msgs::Pong {
         id: ping.id,
         message: ping.message,
     };
-    msgs::write(&mut md, pong).expect("failed to serial write");
-    md.bytes()
+    msgs::write(&mut &mut buf, pong).expect("failed to serial write");
+    buf
 }
 
 fn vls_log(msg: &Message) {
