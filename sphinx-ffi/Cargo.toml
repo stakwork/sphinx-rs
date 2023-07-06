@@ -12,6 +12,7 @@ crate-type = ["staticlib", "cdylib"]
 default = ["ffi"]
 ffi = ["uniffi", "uniffi_build"]
 wasm = []
+signer = []
 
 [dependencies]
 sphinx-crypter = { path = "../crypter" }

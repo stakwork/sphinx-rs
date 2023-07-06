@@ -6,22 +6,14 @@ use sphinx_glyph::control::{
 use sphinx_glyph::types::ControlMessage;
 
 pub fn build_request(msg: String, secret: String, nonce: u64) -> Result<String> {
-    let cm = match control_msg_from_json(msg.as_bytes()) {
-        Ok(s) => s,
-        Err(_) => return Err(SphinxError::BadRequest),
-    };
+    let cm = control_msg_from_json(msg.as_bytes()).map_err(|_| SphinxError::BadRequest)?;
     Ok(build_msg(cm, nonce, secret)?)
 }
 
 pub fn parse_response(inp: String) -> Result<String> {
-    let v = match hex::decode(inp) {
-        Ok(s) => s,
-        Err(_) => return Err(SphinxError::BadResponse),
-    };
-    match parse_control_response_to_json(&v) {
-        Ok(r) => Ok(r),
-        Err(_) => Err(SphinxError::BadResponse),
-    }
+    let v = hex::decode(inp).map_err(|_| SphinxError::BadResponse)?;
+    let r = parse_control_response_to_json(&v).map_err(|_| SphinxError::BadResponse)?;
+    Ok(r)
 }
 
 ///////////
@@ -30,16 +22,12 @@ pub fn parse_response(inp: String) -> Result<String> {
 
 fn build_msg(msg: ControlMessage, nonce: u64, secret: String) -> Result<String> {
     let sk = parse_secret_key(secret)?;
-    match build_control_msg(msg, nonce, &sk) {
-        Ok(r) => Ok(hex::encode(r)),
-        Err(_) => Err(SphinxError::BadRequest),
-    }
+    let r = build_control_msg(msg, nonce, &sk).map_err(|_| SphinxError::BadRequest)?;
+    Ok(hex::encode(r))
 }
 
 fn parse_secret_key(secret: String) -> Result<SecretKey> {
     let secret_key = parse::parse_secret_string(secret)?;
-    match SecretKey::from_slice(&secret_key[..]) {
-        Ok(s) => Ok(s),
-        Err(_) => Err(SphinxError::BadSecret),
-    }
+    let sk = SecretKey::from_slice(&secret_key[..]).map_err(|_| SphinxError::BadSecret)?;
+    Ok(sk)
 }

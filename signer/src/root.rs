@@ -5,10 +5,12 @@ use types::{Policy, Velocity};
 
 use anyhow::anyhow;
 use lightning_signer::bitcoin::blockdata::constants::ChainHash;
+use lightning_signer::bitcoin::Network;
 use lightning_signer::node::NodeServices;
 use lightning_signer::persist::Persist;
 use lightning_signer::policy::simple_validator::SimpleValidatorFactory;
-use lightning_signer::util::clock::StandardClock;
+use lightning_signer::util::clock::{Clock, StandardClock};
+use lightning_signer::wallet::Wallet;
 use lss_connector::{
     msgs::{Response as LssResponse, SignerMutations},
     LssSigner,
@@ -18,8 +20,6 @@ use vls_protocol::model::PubKey;
 use vls_protocol::msgs::{self, read_serial_request_header, write_serial_response_header, Message};
 use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
-use vls_protocol_signer::lightning_signer::bitcoin::Network;
-use vls_protocol_signer::lightning_signer::wallet::Wallet;
 
 pub fn builder(
     seed: [u8; 32],
@@ -29,11 +29,32 @@ pub fn builder(
     initial_allowlist: Vec<String>,
     persister: Arc<dyn Persist>,
 ) -> anyhow::Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
+    let clock = Arc::new(StandardClock());
+    Ok(builder_inner(
+        seed,
+        network,
+        initial_policy,
+        initial_velocity,
+        initial_allowlist,
+        persister,
+        clock,
+    )?)
+}
+
+pub fn builder_inner(
+    seed: [u8; 32],
+    network: Network,
+    initial_policy: Policy,
+    initial_velocity: Option<Velocity>,
+    initial_allowlist: Vec<String>,
+    persister: Arc<dyn Persist>,
+    clock: Arc<dyn Clock>,
+) -> anyhow::Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
     //
     let policy = make_policy(network, &initial_policy);
     let validator_factory = Arc::new(SimpleValidatorFactory::new_with_policy(policy));
     let random_time_factory = crate::rst::RandomStartingTimeFactory::new();
-    let clock = Arc::new(StandardClock());
+    // let clock = Arc::new(StandardClock());
     let services = NodeServices {
         validator_factory,
         starting_time_factory: random_time_factory,

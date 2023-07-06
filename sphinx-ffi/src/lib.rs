@@ -1,6 +1,9 @@
 mod control;
 mod parse;
 
+#[cfg(feature = "signer")]
+mod signer;
+
 pub use control::*;
 
 use sphinx_crypter::chacha::{decrypt as chacha_decrypt, encrypt as chacha_encrypt};
@@ -42,10 +45,7 @@ pub enum SphinxError {
 
 pub fn pubkey_from_secret_key(my_secret_key: String) -> Result<String> {
     let secret_key = parse::parse_secret_string(my_secret_key)?;
-    let sk = match SecretKey::from_slice(&secret_key[..]) {
-        Ok(s) => s,
-        Err(_) => return Err(SphinxError::BadSecret),
-    };
+    let sk = SecretKey::from_slice(&secret_key[..]).map_err(|_| SphinxError::BadSecret)?;
     let ctx = Secp256k1::new();
     let pk = PublicKey::from_secret_key(&ctx, &sk).serialize();
     Ok(hex::encode(pk))
@@ -57,10 +57,8 @@ pub fn pubkey_from_secret_key(my_secret_key: String) -> Result<String> {
 pub fn derive_shared_secret(their_pubkey: String, my_secret_key: String) -> Result<String> {
     let pubkey = parse::parse_public_key_string(their_pubkey)?;
     let secret_key = parse::parse_secret_string(my_secret_key)?;
-    let secret = match derive_shared_secret_from_slice(pubkey, secret_key) {
-        Ok(s) => s,
-        Err(_) => return Err(SphinxError::DeriveSharedSecret),
-    };
+    let secret = derive_shared_secret_from_slice(pubkey, secret_key)
+        .map_err(|_| SphinxError::DeriveSharedSecret)?;
     Ok(hex::encode(secret))
 }
 
@@ -72,10 +70,7 @@ pub fn encrypt(plaintext: String, secret: String, nonce: String) -> Result<Strin
     let plain = parse::parse_secret_string(plaintext)?;
     let sec = parse::parse_secret_string(secret)?;
     let non = parse::parse_nonce_string(nonce)?;
-    let cipher = match chacha_encrypt(plain, sec, non) {
-        Ok(c) => c,
-        Err(_) => return Err(SphinxError::Encrypt),
-    };
+    let cipher = chacha_encrypt(plain, sec, non).map_err(|_| SphinxError::Encrypt)?;
     Ok(hex::encode(cipher))
 }
 
@@ -85,10 +80,7 @@ pub fn encrypt(plaintext: String, secret: String, nonce: String) -> Result<Strin
 pub fn decrypt(ciphertext: String, secret: String) -> Result<String> {
     let cipher = parse::parse_cipher_string(ciphertext)?;
     let sec = parse::parse_secret_string(secret)?;
-    let plain = match chacha_decrypt(cipher, sec) {
-        Ok(c) => c,
-        Err(_) => return Err(SphinxError::Decrypt),
-    };
+    let plain = chacha_decrypt(cipher, sec).map_err(|_| SphinxError::Decrypt)?;
     Ok(hex::encode(plain))
 }
 
@@ -99,10 +91,7 @@ pub struct Keys {
 
 pub fn node_keys(net: String, seed: String) -> Result<Keys> {
     let seed = parse::parse_secret_string(seed)?;
-    let network: Network = match Network::from_str(&net) {
-        Ok(n) => n,
-        Err(_) => return Err(SphinxError::InvalidNetwork),
-    };
+    let network: Network = Network::from_str(&net).map_err(|_| SphinxError::InvalidNetwork)?;
     let ks = derive::node_keys(&network, &seed[..]);
     Ok(Keys {
         secret: hex::encode(ks.1.secret_bytes()),
@@ -112,17 +101,12 @@ pub fn node_keys(net: String, seed: String) -> Result<Keys> {
 
 pub fn mnemonic_from_entropy(seed: String) -> Result<String> {
     let seed = parse::parse_secret_string(seed)?;
-    match derive::mnemonic_from_entropy(&seed[..]) {
-        Ok(m) => Ok(m),
-        Err(_) => Err(SphinxError::BadSecret),
-    }
+    Ok(derive::mnemonic_from_entropy(&seed[..]).map_err(|_| SphinxError::BadSecret)?)
 }
 
 pub fn entropy_from_mnemonic(mnemonic: String) -> Result<String> {
-    match derive::entropy_from_mnemonic(&mnemonic) {
-        Ok(m) => Ok(hex::encode(m)),
-        Err(_) => Err(SphinxError::BadSecret),
-    }
+    let m = derive::entropy_from_mnemonic(&mnemonic).map_err(|_| SphinxError::BadSecret)?;
+    Ok(hex::encode(m))
 }
 
 #[cfg(test)]
