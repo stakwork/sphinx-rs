@@ -9,6 +9,7 @@ use lightning_signer::bitcoin::Network;
 use lightning_signer::node::NodeServices;
 use lightning_signer::persist::Persist;
 use lightning_signer::policy::simple_validator::SimpleValidatorFactory;
+use lightning_signer::signer::StartingTimeFactory;
 use lightning_signer::util::clock::{Clock, StandardClock};
 use lightning_signer::wallet::Wallet;
 use lss_connector::{
@@ -30,6 +31,7 @@ pub fn builder(
     persister: Arc<dyn Persist>,
 ) -> anyhow::Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
     let clock = Arc::new(StandardClock());
+    let random_time_factory = crate::rst::RandomStartingTimeFactory::new();
     Ok(builder_inner(
         seed,
         network,
@@ -38,6 +40,7 @@ pub fn builder(
         initial_allowlist,
         persister,
         clock,
+        random_time_factory,
     )?)
 }
 
@@ -49,15 +52,15 @@ pub fn builder_inner(
     initial_allowlist: Vec<String>,
     persister: Arc<dyn Persist>,
     clock: Arc<dyn Clock>,
+    starting_time_factory: Arc<dyn StartingTimeFactory>,
 ) -> anyhow::Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
     //
     let policy = make_policy(network, &initial_policy);
     let validator_factory = Arc::new(SimpleValidatorFactory::new_with_policy(policy));
-    let random_time_factory = crate::rst::RandomStartingTimeFactory::new();
-    // let clock = Arc::new(StandardClock());
+
     let services = NodeServices {
         validator_factory,
-        starting_time_factory: random_time_factory,
+        starting_time_factory,
         persister,
         clock: clock.clone(),
     };
