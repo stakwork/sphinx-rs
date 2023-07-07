@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use rmp_serde::encode::Error as RmpError;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
@@ -46,9 +47,21 @@ pub struct InitResponse {
 
 impl Msg {
     pub fn to_vec(&self) -> Result<Vec<u8>> {
-        let arr: Box<[u8]> = Box::new([0u8; 9000]);
+        let mut size = 1000;
+        let mut arr = vec![0u8; size].into_boxed_slice();
         let mut buff = std::io::Cursor::new(arr);
-        rmp_serde::encode::write_named(&mut buff, &self)?;
+        loop {
+            match rmp_serde::encode::write_named(&mut buff, &self) {
+                Ok(()) => break Ok(()),
+                Err(RmpError::InvalidValueWrite(_)) => {
+                    size = size + 1000;
+                    drop(buff);
+                    arr = vec![0u8; size].into_boxed_slice();
+                    buff = std::io::Cursor::new(arr);
+                }
+                Err(e) => break Err(e),
+            }
+        }?;
         let ret = buff.into_inner().into_vec();
         Ok(ret)
     }
@@ -77,9 +90,21 @@ impl Msg {
 }
 impl Response {
     pub fn to_vec(&self) -> Result<Vec<u8>> {
-        let arr: Box<[u8]> = Box::new([0u8; 9000]);
+        let mut size = 1000;
+        let mut arr = vec![0u8; size].into_boxed_slice();
         let mut buff = std::io::Cursor::new(arr);
-        rmp_serde::encode::write_named(&mut buff, &self)?;
+        loop {
+            match rmp_serde::encode::write_named(&mut buff, &self) {
+                Ok(()) => break Ok(()),
+                Err(RmpError::InvalidValueWrite(_)) => {
+                    size = size + 1000;
+                    drop(buff);
+                    arr = vec![0u8; size].into_boxed_slice();
+                    buff = std::io::Cursor::new(arr);
+                }
+                Err(e) => break Err(e),
+            }
+        }?;
         let ret = buff.into_inner().into_vec();
         Ok(ret)
     }
