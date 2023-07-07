@@ -104,6 +104,9 @@ async fn main_listener(
     client_id: String,
     lss_tx: mpsc::Sender<LssChanMsg>,
 ) {
+    // say hello to start
+    publish(client, &client_id, topics::HELLO, &[]).await;
+
     let mut msgs: Option<(Vec<u8>, Vec<u8>)> = None;
     loop {
         match eventloop.poll().await {
@@ -145,7 +148,7 @@ async fn got_msg(
             Ok((vls_bytes, lss_bytes)) => {
                 if lss_bytes.len() == 0 {
                     // no muts, respond directly back!
-                    (topics::VLS_RETURN.to_string(), vls_bytes)
+                    (topics::VLS_RES.to_string(), vls_bytes)
                 } else {
                     // muts! do LSS first!
                     *msgs = Some((vls_bytes, lss_bytes.clone()));
