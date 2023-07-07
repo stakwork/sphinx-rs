@@ -11,11 +11,21 @@ enum SphinxError {
   "InvalidNetwork",
   "BadRequest",
   "BadResponse",
+  "BadArgs",
+  "InitFailed",
+  "LssFailed",
+  "VlsFailed",
 };
 
 dictionary Keys {
     string secret;
     string pubkey;
+};
+
+dictionary VlsResponse {
+    string topic;
+    bytes? vls_bytes;
+    bytes? lss_bytes;
 };
 
 namespace sphinxrs {
@@ -37,4 +47,12 @@ namespace sphinxrs {
   string build_request(string msg, string secret, u64 nonce);
   [Throws=SphinxError]
   string parse_response(string res);
+  [Throws=SphinxError]
+  VlsResponse run_init_1(string args, bytes msg1);
+  [Throws=SphinxError]
+  VlsResponse run_init_2(string args, bytes msg1, bytes msg2);
+  [Throws=SphinxError]
+  VlsResponse run_vls(string args, bytes msg1, bytes msg2, bytes vls_msg);
+  [Throws=SphinxError]
+  VlsResponse run_lss(string args, bytes msg1, bytes msg2, bytes lss_msg, bytes prev_vls, bytes prev_lss);
 };

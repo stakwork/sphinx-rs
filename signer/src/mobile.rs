@@ -7,6 +7,7 @@ use lightning_signer::signer::StartingTimeFactory;
 use lightning_signer::util::clock::Clock;
 use lss_connector::secp256k1::PublicKey;
 use lss_connector::{handle_lss_msg, LssSigner, Msg};
+use serde::{Deserialize, Serialize};
 use sphinx_glyph::topics;
 use sphinx_glyph::types::{Policy, Velocity};
 use std::sync::Arc;
@@ -16,11 +17,11 @@ use vls_protocol_signer::lightning_signer;
 
 // fully create a VLS node run the command on it
 // returning muts to be stored in phone persistence
-// 1. get initial lss init message:
+// 1. get initial lss init_1 message:
 //     - store it on phone
 //     - run_init_1(args, msg1)
 //     - return lss_bytes
-// 2. get further lss init message:
+// 2. get further lss init_2 message:
 //     - store it on phone
 //     - run_init_2(args, msg1, msg2)
 //     - return lss_bytes
@@ -31,6 +32,7 @@ use vls_protocol_signer::lightning_signer;
 // 4. get LSS msg:
 //     - run_lss(args, msg1, msg2, lss_msg, prev_vls, prev_lss)
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Args {
     seed: [u8; 32],
     network: Network,

@@ -1,10 +1,9 @@
 mod control;
 mod parse;
-
-#[cfg(feature = "signer")]
 mod signer;
 
 pub use control::*;
+pub use signer::*;
 
 use sphinx_crypter::chacha::{decrypt as chacha_decrypt, encrypt as chacha_encrypt};
 use sphinx_crypter::ecdh::derive_shared_secret_from_slice;
@@ -13,7 +12,7 @@ use sphinx_signer::{derive, lightning_signer::bitcoin::Network};
 use std::str::FromStr;
 
 #[cfg(not(feature = "wasm"))]
-include!("sphinxrs.uniffi.rs");
+uniffi::include_scaffolding!("sphinxrs");
 
 pub type Result<T> = std::result::Result<T, SphinxError>;
 
@@ -41,6 +40,14 @@ pub enum SphinxError {
     BadRequest,
     #[error("Bad Response")]
     BadResponse,
+    #[error("Bad Args")]
+    BadArgs,
+    #[error("Init Failed")]
+    InitFailed,
+    #[error("LSS Failed")]
+    LssFailed,
+    #[error("VLS Failed")]
+    VlsFailed,
 }
 
 pub fn pubkey_from_secret_key(my_secret_key: String) -> Result<String> {

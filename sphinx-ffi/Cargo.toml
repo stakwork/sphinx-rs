@@ -10,20 +10,19 @@ crate-type = ["staticlib", "cdylib"]
 
 [features]
 default = ["ffi"]
-ffi = ["uniffi", "uniffi_build"]
+ffi = ["uniffi"]
 wasm = []
-signer = []
 
 [dependencies]
 sphinx-crypter = { path = "../crypter" }
 sphinx-signer = { path = "../signer" }
 sphinx-glyph = { path = "../glyph" }
-uniffi = { version = "0.19.2", optional = true }
+uniffi = { version = "0.24.1", optional = true }
 hex = "0.4.3"
 thiserror = "1.0.31"
 
 [build-dependencies]
-uniffi_build = { version = "0.19.2", optional = true }
+uniffi = { version = "0.24.1", optional = true, features = ["build"] }
 
 [profile.release]
 opt-level = 'z'     # Optimize for size.
