@@ -147,7 +147,7 @@ pub fn handle_lss_msg(
             let sm = prev_lssmsg.as_vls_muts()?;
             if sm.muts.is_empty() {
                 // empty muts? dont need to check server hmac
-                Ok((topics::VLS_RETURN.to_string(), previous.0))
+                Ok((topics::VLS_RES.to_string(), previous.0))
             } else {
                 let shmac: [u8; 32] = bm
                     .server_hmac
@@ -157,7 +157,7 @@ pub fn handle_lss_msg(
                 let server_hmac = lss_signer.server_hmac(sm.muts);
                 // send back the original VLS response finally
                 if server_hmac == shmac {
-                    Ok((topics::VLS_RETURN.to_string(), previous.0))
+                    Ok((topics::VLS_RES.to_string(), previous.0))
                 } else {
                     Err(anyhow!("Invalid server hmac"))
                 }

@@ -82,7 +82,7 @@ pub fn run_vls(
 
     let (vls_res, lss_res) = handle_with_lss(&rh, &lss_signer, vls_msg, false)?;
     let ret = if lss_res.is_empty() {
-        RunReturn::new_vls(topics::VLS_RETURN, vls_res)
+        RunReturn::new_vls(topics::VLS_RES, vls_res)
     } else {
         RunReturn::new(topics::LSS_RES, vls_res, lss_res)
     };
@@ -101,7 +101,7 @@ pub fn run_lss(
 
     let prev = (previous_vls, previous_lss);
     let (topic, res) = handle_lss_msg(&lss_msg, &Some(prev), &lss_signer)?;
-    let ret = if &topic == topics::VLS_RETURN {
+    let ret = if &topic == topics::VLS_RES {
         RunReturn::new_vls(&topic, res)
     } else {
         RunReturn::new_lss(&topic, res)
