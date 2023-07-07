@@ -27,5 +27,3 @@ vls-frontend = { git = "https://gitlab.com/lightning-signer/validating-lightning
 # lightning-storage-server = { path = "../../validating-lightning-signer/lightning-storage-server", optional = true }
 # vls-frontend = { path = "../../validating-lightning-signer/vls-frontend", optional = true }
 tokio = { version = "1.27", features = ["macros", "rt-multi-thread"], optional = true }
-
-

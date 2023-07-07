@@ -46,10 +46,15 @@ pub struct InitResponse {
 
 impl Msg {
     pub fn to_vec(&self) -> Result<Vec<u8>> {
-        Ok(rmp_serde::to_vec_named(&self)?)
+        let arr: Box<[u8]> = Box::new([0u8; 9000]);
+        let mut buff = std::io::Cursor::new(arr);
+        rmp_serde::encode::write_named(&mut buff, &self)?;
+        let ret = buff.into_inner().into_vec();
+        Ok(ret)
     }
     pub fn from_slice(s: &[u8]) -> Result<Self> {
-        Ok(rmp_serde::from_slice(s)?)
+        let ret = rmp_serde::from_slice(s)?;
+        Ok(ret)
     }
     pub fn as_init(&self) -> Result<Init> {
         match self {
@@ -72,10 +77,15 @@ impl Msg {
 }
 impl Response {
     pub fn to_vec(&self) -> Result<Vec<u8>> {
-        Ok(rmp_serde::to_vec_named(&self)?)
+        let arr: Box<[u8]> = Box::new([0u8; 9000]);
+        let mut buff = std::io::Cursor::new(arr);
+        rmp_serde::encode::write_named(&mut buff, &self)?;
+        let ret = buff.into_inner().into_vec();
+        Ok(ret)
     }
     pub fn from_slice(s: &[u8]) -> Result<Self> {
-        Ok(rmp_serde::from_slice(s)?)
+        let ret = rmp_serde::from_slice(s)?;
+        Ok(ret)
     }
     pub fn as_init(&self) -> Result<InitResponse> {
         match self {
