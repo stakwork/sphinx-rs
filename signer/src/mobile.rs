@@ -54,7 +54,11 @@ pub fn run_init_1(
 
     let rhb = root_handler_builder(args)?;
     let (lss_signer, res1) = LssSigner::new(&rhb, &server_pubkey);
-    Ok((RunReturn::new_lss(topics::INIT_RES, res1), rhb, lss_signer))
+    Ok((
+        RunReturn::new_lss(topics::INIT_1_RES, res1),
+        rhb,
+        lss_signer,
+    ))
 }
 
 pub fn run_init_2(
@@ -66,7 +70,7 @@ pub fn run_init_2(
     let created = Msg::from_slice(&lss_msg2)?.as_created()?;
     let (root_handler, res2) = lss_signer.build_with_lss(created, rhb)?;
     Ok((
-        RunReturn::new_lss(topics::INIT_RES, res2),
+        RunReturn::new_lss(topics::INIT_2_RES, res2),
         root_handler,
         lss_signer,
     ))

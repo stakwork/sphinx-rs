@@ -78,11 +78,16 @@ pub async fn start(
             .subscribe(lss_topic, QoS::AtMostOnce)
             .await
             .expect("could not subscribe LSS");
-        let init_topic = format!("{}/{}", client_id, topics::INIT_MSG);
+        let init_1_topic = format!("{}/{}", client_id, topics::INIT_1_MSG);
         client
-            .subscribe(init_topic, QoS::AtMostOnce)
+            .subscribe(init_1_topic, QoS::AtMostOnce)
             .await
-            .expect("could not subscribe LSS");
+            .expect("could not subscribe LSS 1");
+        let init_2_topic = format!("{}/{}", client_id, topics::INIT_2_MSG);
+        client
+            .subscribe(init_2_topic, QoS::AtMostOnce)
+            .await
+            .expect("could not subscribe LSS 2");
 
         main_listener(
             vls_tx.clone(),
@@ -157,7 +162,10 @@ async fn got_msg(
             }
             Err(e) => (topics::ERROR.to_string(), e.to_string().as_bytes().to_vec()),
         }
-    } else if topic.ends_with(topics::LSS_MSG) || topic.ends_with(topics::INIT_MSG) {
+    } else if topic.ends_with(topics::LSS_MSG)
+        || topic.ends_with(topics::INIT_1_MSG)
+        || topic.ends_with(topics::INIT_2_MSG)
+    {
         let (lss_msg, reply_rx) = LssChanMsg::new(msg_bytes.to_vec(), msgs.clone());
         let _ = lss_tx.send(lss_msg).await;
         match reply_rx.await.unwrap() {

@@ -9,7 +9,6 @@ pub async fn init_lss(
     mut lss_rx: mpsc::Receiver<LssChanMsg>,
 ) -> Result<(RootHandler, LssSigner)> {
     use sphinx_signer::sphinx_glyph::topics;
-    let res_topic = topics::INIT_RES.to_string();
 
     println!("INIT LSS!");
 
@@ -18,7 +17,8 @@ pub async fn init_lss(
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
 
     let (lss_signer, res1) = LssSigner::new(&handler_builder, &server_pubkey);
-    if let Err(e) = first_lss_msg.reply_tx.send(Ok((res_topic.clone(), res1))) {
+    let res_topic_1 = topics::INIT_1_RES.to_string();
+    if let Err(e) = first_lss_msg.reply_tx.send(Ok((res_topic_1, res1))) {
         log::warn!("could not send on first_lss_msg.reply_tx, {:?}", e);
     }
 
@@ -29,7 +29,8 @@ pub async fn init_lss(
     // build the root handler
     let (root_handler, res2) = lss_signer.build_with_lss(created, handler_builder)?;
     println!("root handler built!!!!!");
-    if let Err(e) = second_lss_msg.reply_tx.send(Ok((res_topic, res2))) {
+    let res_topic_2 = topics::INIT_2_RES.to_string();
+    if let Err(e) = second_lss_msg.reply_tx.send(Ok((res_topic_2, res2))) {
         log::warn!("could not send on second_lss_msg.reply_tx, {:?}", e);
     }
 
