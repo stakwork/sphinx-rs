@@ -11,6 +11,9 @@ pub use vls_protocol;
 #[cfg(feature = "fspersist")]
 pub mod persist;
 
+#[cfg(feature = "fspersist")]
+pub mod mobile;
+
 pub use derive::node_keys as derive_node_keys;
 pub use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};
 pub use vls_protocol_signer::lightning_signer;
