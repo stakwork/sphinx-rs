@@ -144,7 +144,7 @@ pub fn handle_lss_msg(
             // get the previous lss msg (where i sent signer muts)
             let prev_lssmsg = Response::from_slice(&previous.1)?;
             // println!("previous lss res: {:?}", prev_lssmsg);
-            let sm = prev_lssmsg.as_vls_muts()?;
+            let sm = prev_lssmsg.into_vls_muts()?;
             if sm.muts.is_empty() {
                 // empty muts? dont need to check server hmac
                 Ok((topics::VLS_RES.to_string(), previous.0))

@@ -51,7 +51,7 @@ pub fn run_init_1(
     args: Args,
     lss_msg1: Vec<u8>,
 ) -> Result<(RunReturn, RootHandlerBuilder, LssSigner)> {
-    let init = Msg::from_slice(&lss_msg1)?.as_init()?;
+    let init = Msg::from_slice(&lss_msg1)?.into_init()?;
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
 
     let rhb = root_handler_builder(args)?;
@@ -69,7 +69,7 @@ pub fn run_init_2(
     lss_msg2: Vec<u8>,
 ) -> Result<(RunReturn, RootHandler, LssSigner)> {
     let (_res1, rhb, lss_signer) = run_init_1(args, lss_msg1)?;
-    let created = Msg::from_slice(&lss_msg2)?.as_created()?;
+    let created = Msg::from_slice(&lss_msg2)?.into_created()?;
     let (root_handler, res2) = lss_signer.build_with_lss(created, rhb)?;
     Ok((
         RunReturn::new_lss(topics::INIT_2_RES, res2),

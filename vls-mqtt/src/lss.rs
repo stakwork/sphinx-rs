@@ -13,7 +13,7 @@ pub async fn init_lss(
     println!("INIT LSS!");
 
     let first_lss_msg = lss_rx.recv().await.ok_or(anyhow!("couldnt receive"))?;
-    let init = Msg::from_slice(&first_lss_msg.message)?.as_init()?;
+    let init = Msg::from_slice(&first_lss_msg.message)?.into_init()?;
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
 
     let (lss_signer, res1) = LssSigner::new(&handler_builder, &server_pubkey);
@@ -23,7 +23,7 @@ pub async fn init_lss(
     }
 
     let second_lss_msg = lss_rx.recv().await.ok_or(anyhow!("couldnt receive"))?;
-    let created = Msg::from_slice(&second_lss_msg.message)?.as_created()?;
+    let created = Msg::from_slice(&second_lss_msg.message)?.into_created()?;
     println!("GOT THE CREATED MSG! {:?}", created);
 
     // build the root handler
