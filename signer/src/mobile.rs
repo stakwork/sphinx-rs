@@ -57,7 +57,7 @@ pub fn run_init_1(
     state: State,
     lss_msg1: Vec<u8>,
 ) -> Result<(RunReturn, RootHandlerBuilder, LssSigner)> {
-    let init = Msg::from_slice(&lss_msg1)?.as_init()?;
+    let init = Msg::from_slice(&lss_msg1)?.into_init()?;
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
 
     let nonce = args.lss_nonce.clone();
@@ -77,7 +77,8 @@ pub fn run_init_2(
     lss_msg2: Vec<u8>,
 ) -> Result<(RunReturn, RootHandler, LssSigner)> {
     let (_res1, rhb, lss_signer) = run_init_1(args, state, lss_msg1)?;
-    let created = Msg::from_slice(&lss_msg2)?.as_created()?;
+    let created = Msg::from_slice(&lss_msg2)?.into_created()?;
+
     let (root_handler, res2) = lss_signer.build_with_lss(created, rhb)?;
     Ok((
         RunReturn::new_lss(topics::INIT_2_RES, res2),
@@ -262,7 +263,7 @@ mod tests {
         let (res1, _rhb, _lss_signer) = run_init_1(args.clone(), state.clone(), bi1.clone())?;
         let lss_bytes = res1.lss_bytes.unwrap();
 
-        let si1 = Response::from_slice(&lss_bytes)?.as_init()?;
+        let si1 = Response::from_slice(&lss_bytes)?.into_init()?;
 
         let lss_broker = LssBroker::new(lss_uri, si1.clone(), spk).await?;
 
@@ -272,7 +273,7 @@ mod tests {
             run_init_2(args.clone(), state.clone(), bi1.clone(), bi2.clone())?;
         let lss_bytes2 = res2.lss_bytes.unwrap();
 
-        let si2 = Response::from_slice(&lss_bytes2)?.as_created()?;
+        let si2 = Response::from_slice(&lss_bytes2)?.into_created()?;
 
         lss_broker.handle(Response::Created(si2)).await?;
 

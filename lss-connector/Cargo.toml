@@ -18,7 +18,7 @@ sphinx-glyph = { path = '../glyph' }
 vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "163bade8dc4a97fdb516b68fbfdff8e43a74e795", default-features = false, features = ["secp-lowmemory"] }
 # vls-protocol-signer = { path = "../../../evanf/vls-evanf/vls-protocol-signer", default-features = false, features = ["secp-lowmemory"] }
 log = "0.4"
-serde = "1.0.1"
+serde = "1.0.168"
 anyhow = "1"
 secp256k1 = { version = "0.24.0", features = ["rand-std", "bitcoin_hashes"] }
 rmp-serde = "1.1.0"
@@ -30,4 +30,6 @@ vls-frontend = { git = "https://gitlab.com/lightning-signer/validating-lightning
 # vls-frontend = { path = "../../../evanf/vls-evanf/vls-frontend", optional = true }
 tokio = { version = "1.27", features = ["macros", "rt-multi-thread"], optional = true }
 
-
+[[bin]]
+name = "playground"
+path = "src/playground.rs"

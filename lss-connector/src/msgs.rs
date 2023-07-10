@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use rmp_serde::encode::Error as RmpError;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
@@ -46,52 +47,86 @@ pub struct InitResponse {
 
 impl Msg {
     pub fn to_vec(&self) -> Result<Vec<u8>> {
-        Ok(rmp_serde::to_vec_named(&self)?)
+        let mut size = 1000;
+        let mut arr = vec![0u8; size].into_boxed_slice();
+        let mut buff = std::io::Cursor::new(arr);
+        loop {
+            match rmp_serde::encode::write_named(&mut buff, &self) {
+                Ok(()) => break Ok(()),
+                Err(RmpError::InvalidValueWrite(_)) => {
+                    size = size + 1000;
+                    drop(buff);
+                    arr = vec![0u8; size].into_boxed_slice();
+                    buff = std::io::Cursor::new(arr);
+                }
+                Err(e) => break Err(e),
+            }
+        }?;
+        let ret = buff.into_inner().into_vec();
+        Ok(ret)
     }
     pub fn from_slice(s: &[u8]) -> Result<Self> {
-        Ok(rmp_serde::from_slice(s)?)
+        let ret = rmp_serde::from_slice(s)?;
+        Ok(ret)
     }
-    pub fn as_init(&self) -> Result<Init> {
+    pub fn into_init(self) -> Result<Init> {
         match self {
-            Msg::Init(i) => Ok(i.clone()),
+            Msg::Init(i) => Ok(i),
             _ => Err(anyhow!("not an init msg")),
         }
     }
-    pub fn as_created(&self) -> Result<BrokerMutations> {
+    pub fn into_created(self) -> Result<BrokerMutations> {
         match self {
-            Msg::Created(m) => Ok(m.clone()),
+            Msg::Created(m) => Ok(m),
             _ => Err(anyhow!("not a created msg")),
         }
     }
-    pub fn as_stored(&self) -> Result<BrokerMutations> {
+    pub fn into_stored(self) -> Result<BrokerMutations> {
         match self {
-            Msg::Stored(m) => Ok(m.clone()),
+            Msg::Stored(m) => Ok(m),
             _ => Err(anyhow!("not a stored msg")),
         }
     }
 }
 impl Response {
     pub fn to_vec(&self) -> Result<Vec<u8>> {
-        Ok(rmp_serde::to_vec_named(&self)?)
+        let mut size = 1000;
+        let mut arr = vec![0u8; size].into_boxed_slice();
+        let mut buff = std::io::Cursor::new(arr);
+        loop {
+            match rmp_serde::encode::write_named(&mut buff, &self) {
+                Ok(()) => break Ok(()),
+                Err(RmpError::InvalidValueWrite(_)) => {
+                    size = size + 1000;
+                    drop(buff);
+                    arr = vec![0u8; size].into_boxed_slice();
+                    buff = std::io::Cursor::new(arr);
+                }
+                Err(e) => break Err(e),
+            }
+        }?;
+        let ret = buff.into_inner().into_vec();
+        Ok(ret)
     }
     pub fn from_slice(s: &[u8]) -> Result<Self> {
-        Ok(rmp_serde::from_slice(s)?)
+        let ret = rmp_serde::from_slice(s)?;
+        Ok(ret)
     }
-    pub fn as_init(&self) -> Result<InitResponse> {
+    pub fn into_init(self) -> Result<InitResponse> {
         match self {
-            Response::Init(i) => Ok(i.clone()),
+            Response::Init(i) => Ok(i),
             _ => Err(anyhow!("not an init msg")),
         }
     }
-    pub fn as_created(&self) -> Result<SignerMutations> {
+    pub fn into_created(self) -> Result<SignerMutations> {
         match self {
-            Response::Created(m) => Ok(m.clone()),
+            Response::Created(m) => Ok(m),
             _ => Err(anyhow!("not a created msg")),
         }
     }
-    pub fn as_vls_muts(&self) -> Result<SignerMutations> {
+    pub fn into_vls_muts(self) -> Result<SignerMutations> {
         match self {
-            Response::VlsMuts(m) => Ok(m.clone()),
+            Response::VlsMuts(m) => Ok(m),
             _ => Err(anyhow!("not a VlsMuts msg")),
         }
     }
