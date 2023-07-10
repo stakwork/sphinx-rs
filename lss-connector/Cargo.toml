@@ -16,7 +16,7 @@ sphinx-glyph = { path = '../glyph' }
 vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "e199c70cbacd3404e7cecf95bb75ca02afd4cffd", default-features = false, features = ["std", "secp-lowmemory"] }
 # vls-protocol-signer = { path = "../../validating-lightning-signer/vls-protocol-signer", default-features = false, features = ["std", "secp-lowmemory"] }
 log = "0.4"
-serde = "1.0.1"
+serde = "1.0.168"
 anyhow = "1"
 secp256k1 = { version = "0.24.0", features = ["rand-std", "bitcoin_hashes"] }
 rmp-serde = "1.1.0"
