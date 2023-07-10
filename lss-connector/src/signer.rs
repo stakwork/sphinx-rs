@@ -95,11 +95,11 @@ impl LssSigner {
 
         Ok((handler, res_bytes))
     }
-    pub fn client_hmac(&self, muts: Muts) -> [u8; 32] {
-        self.helper.client_hmac(&Mutations::from_vec(muts))
+    pub fn client_hmac(&self, mutations: &Mutations) -> [u8; 32] {
+        self.helper.client_hmac(mutations)
     }
-    pub fn server_hmac(&self, muts: Muts) -> [u8; 32] {
-        self.helper.server_hmac(&Mutations::from_vec(muts))
+    pub fn server_hmac(&self, mutations: &Mutations) -> [u8; 32] {
+        self.helper.server_hmac(mutations)
     }
     pub fn check_hmac(&self, bm: BrokerMutations) -> bool {
         self.helper
@@ -144,7 +144,7 @@ pub fn handle_lss_msg(
             // get the previous lss msg (where i sent signer muts)
             let prev_lssmsg = Response::from_slice(&previous.1)?;
             // println!("previous lss res: {:?}", prev_lssmsg);
-            let sm = prev_lssmsg.as_vls_muts()?;
+            let sm = prev_lssmsg.into_vls_muts()?;
             if sm.muts.is_empty() {
                 // empty muts? dont need to check server hmac
                 Ok((topics::VLS_RES.to_string(), previous.0))
@@ -154,7 +154,7 @@ pub fn handle_lss_msg(
                     .try_into()
                     .map_err(|_| anyhow!("Invalid server hmac (not 32 bytes)"))?;
                 // check the original muts
-                let server_hmac = lss_signer.server_hmac(sm.muts);
+                let server_hmac = lss_signer.server_hmac(&Mutations::from_vec(sm.muts));
                 // send back the original VLS response finally
                 if server_hmac == shmac {
                     Ok((topics::VLS_RES.to_string(), previous.0))
