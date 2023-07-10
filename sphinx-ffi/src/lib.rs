@@ -42,6 +42,8 @@ pub enum SphinxError {
     BadResponse,
     #[error("Bad Args")]
     BadArgs,
+    #[error("Bad State")]
+    BadState,
     #[error("Init Failed")]
     InitFailed,
     #[error("LSS Failed")]

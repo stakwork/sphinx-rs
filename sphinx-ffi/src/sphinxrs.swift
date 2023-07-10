@@ -19,13 +19,13 @@ fileprivate extension RustBuffer {
     }
 
     static func from(_ ptr: UnsafeBufferPointer<UInt8>) -> RustBuffer {
-        try! rustCall { ffi_sphinxrs_7d9d_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
+        try! rustCall { ffi_sphinxrs_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
     }
 
     // Frees the buffer in place.
     // The buffer must not be used after this is called.
     func deallocate() {
-        try! rustCall { ffi_sphinxrs_7d9d_rustbuffer_free(self, $0) }
+        try! rustCall { ffi_sphinxrs_rustbuffer_free(self, $0) }
     }
 }
 
@@ -40,7 +40,7 @@ fileprivate extension ForeignBytes {
 // values of that type in a buffer.
 
 // Helper classes/extensions that don't change.
-// Someday, this will be in a libray of its own.
+// Someday, this will be in a library of its own.
 
 fileprivate extension Data {
     init(rustBuffer: RustBuffer) {
@@ -50,101 +50,100 @@ fileprivate extension Data {
     }
 }
 
-// A helper class to read values out of a byte buffer.
-fileprivate class Reader {
-    let data: Data
-    var offset: Data.Index
+// Define reader functionality.  Normally this would be defined in a class or
+// struct, but we use standalone functions instead in order to make external
+// types work.
+//
+// With external types, one swift source file needs to be able to call the read
+// method on another source file's FfiConverter, but then what visibility
+// should Reader have?
+// - If Reader is fileprivate, then this means the read() must also
+//   be fileprivate, which doesn't work with external types.
+// - If Reader is internal/public, we'll get compile errors since both source
+//   files will try define the same type.
+//
+// Instead, the read() method and these helper functions input a tuple of data
 
-    init(data: Data) {
-        self.data = data
-        self.offset = 0
-    }
-
-    // Reads an integer at the current offset, in big-endian order, and advances
-    // the offset on success. Throws if reading the integer would move the
-    // offset past the end of the buffer.
-    func readInt<T: FixedWidthInteger>() throws -> T {
-        let range = offset..<offset + MemoryLayout<T>.size
-        guard data.count >= range.upperBound else {
-            throw UniffiInternalError.bufferOverflow
-        }
-        if T.self == UInt8.self {
-            let value = data[offset]
-            offset += 1
-            return value as! T
-        }
-        var value: T = 0
-        let _ = withUnsafeMutableBytes(of: &value, { data.copyBytes(to: $0, from: range)})
-        offset = range.upperBound
-        return value.bigEndian
-    }
-
-    // Reads an arbitrary number of bytes, to be used to read
-    // raw bytes, this is useful when lifting strings
-    func readBytes(count: Int) throws -> Array<UInt8> {
-        let range = offset..<(offset+count)
-        guard data.count >= range.upperBound else {
-            throw UniffiInternalError.bufferOverflow
-        }
-        var value = [UInt8](repeating: 0, count: count)
-        value.withUnsafeMutableBufferPointer({ buffer in
-            data.copyBytes(to: buffer, from: range)
-        })
-        offset = range.upperBound
-        return value
-    }
-
-    // Reads a float at the current offset.
-    @inlinable
-    func readFloat() throws -> Float {
-        return Float(bitPattern: try readInt())
-    }
-
-    // Reads a float at the current offset.
-    @inlinable
-    func readDouble() throws -> Double {
-        return Double(bitPattern: try readInt())
-    }
-
-    // Indicates if the offset has reached the end of the buffer.
-    @inlinable
-    func hasRemaining() -> Bool {
-        return offset < data.count
-    }
+fileprivate func createReader(data: Data) -> (data: Data, offset: Data.Index) {
+    (data: data, offset: 0)
 }
 
-// A helper class to write values into a byte buffer.
-fileprivate class Writer {
-    var bytes: [UInt8]
-    var offset: Array<UInt8>.Index
-
-    init() {
-        self.bytes = []
-        self.offset = 0
+// Reads an integer at the current offset, in big-endian order, and advances
+// the offset on success. Throws if reading the integer would move the
+// offset past the end of the buffer.
+fileprivate func readInt<T: FixedWidthInteger>(_ reader: inout (data: Data, offset: Data.Index)) throws -> T {
+    let range = reader.offset..<reader.offset + MemoryLayout<T>.size
+    guard reader.data.count >= range.upperBound else {
+        throw UniffiInternalError.bufferOverflow
     }
-
-    func writeBytes<S>(_ byteArr: S) where S: Sequence, S.Element == UInt8 {
-        bytes.append(contentsOf: byteArr)
+    if T.self == UInt8.self {
+        let value = reader.data[reader.offset]
+        reader.offset += 1
+        return value as! T
     }
+    var value: T = 0
+    let _ = withUnsafeMutableBytes(of: &value, { reader.data.copyBytes(to: $0, from: range)})
+    reader.offset = range.upperBound
+    return value.bigEndian
+}
 
-    // Writes an integer in big-endian order.
-    //
-    // Warning: make sure what you are trying to write
-    // is in the correct type!
-    func writeInt<T: FixedWidthInteger>(_ value: T) {
-        var value = value.bigEndian
-        withUnsafeBytes(of: &value) { bytes.append(contentsOf: $0) }
+// Reads an arbitrary number of bytes, to be used to read
+// raw bytes, this is useful when lifting strings
+fileprivate func readBytes(_ reader: inout (data: Data, offset: Data.Index), count: Int) throws -> Array<UInt8> {
+    let range = reader.offset..<(reader.offset+count)
+    guard reader.data.count >= range.upperBound else {
+        throw UniffiInternalError.bufferOverflow
     }
+    var value = [UInt8](repeating: 0, count: count)
+    value.withUnsafeMutableBufferPointer({ buffer in
+        reader.data.copyBytes(to: buffer, from: range)
+    })
+    reader.offset = range.upperBound
+    return value
+}
 
-    @inlinable
-    func writeFloat(_ value: Float) {
-        writeInt(value.bitPattern)
-    }
+// Reads a float at the current offset.
+fileprivate func readFloat(_ reader: inout (data: Data, offset: Data.Index)) throws -> Float {
+    return Float(bitPattern: try readInt(&reader))
+}
 
-    @inlinable
-    func writeDouble(_ value: Double) {
-        writeInt(value.bitPattern)
-    }
+// Reads a float at the current offset.
+fileprivate func readDouble(_ reader: inout (data: Data, offset: Data.Index)) throws -> Double {
+    return Double(bitPattern: try readInt(&reader))
+}
+
+// Indicates if the offset has reached the end of the buffer.
+fileprivate func hasRemaining(_ reader: (data: Data, offset: Data.Index)) -> Bool {
+    return reader.offset < reader.data.count
+}
+
+// Define writer functionality.  Normally this would be defined in a class or
+// struct, but we use standalone functions instead in order to make external
+// types work.  See the above discussion on Readers for details.
+
+fileprivate func createWriter() -> [UInt8] {
+    return []
+}
+
+fileprivate func writeBytes<S>(_ writer: inout [UInt8], _ byteArr: S) where S: Sequence, S.Element == UInt8 {
+    writer.append(contentsOf: byteArr)
+}
+
+// Writes an integer in big-endian order.
+//
+// Warning: make sure what you are trying to write
+// is in the correct type!
+fileprivate func writeInt<T: FixedWidthInteger>(_ writer: inout [UInt8], _ value: T) {
+    var value = value.bigEndian
+    withUnsafeBytes(of: &value) { writer.append(contentsOf: $0) }
+}
+
+fileprivate func writeFloat(_ writer: inout [UInt8], _ value: Float) {
+    writeInt(&writer, value.bitPattern)
+}
+
+fileprivate func writeDouble(_ writer: inout [UInt8], _ value: Double) {
+    writeInt(&writer, value.bitPattern)
 }
 
 // Protocol for types that transfer other types across the FFI. This is
@@ -155,19 +154,19 @@ fileprivate protocol FfiConverter {
 
     static func lift(_ value: FfiType) throws -> SwiftType
     static func lower(_ value: SwiftType) -> FfiType
-    static func read(from buf: Reader) throws -> SwiftType
-    static func write(_ value: SwiftType, into buf: Writer)
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType
+    static func write(_ value: SwiftType, into buf: inout [UInt8])
 }
 
 // Types conforming to `Primitive` pass themselves directly over the FFI.
 fileprivate protocol FfiConverterPrimitive: FfiConverter where FfiType == SwiftType { }
 
 extension FfiConverterPrimitive {
-    static func lift(_ value: FfiType) throws -> SwiftType {
+    public static func lift(_ value: FfiType) throws -> SwiftType {
         return value
     }
 
-    static func lower(_ value: SwiftType) -> FfiType {
+    public static func lower(_ value: SwiftType) -> FfiType {
         return value
     }
 }
@@ -177,20 +176,20 @@ extension FfiConverterPrimitive {
 fileprivate protocol FfiConverterRustBuffer: FfiConverter where FfiType == RustBuffer {}
 
 extension FfiConverterRustBuffer {
-    static func lift(_ buf: RustBuffer) throws -> SwiftType {
-        let reader = Reader(data: Data(rustBuffer: buf))
-        let value = try read(from: reader)
-        if reader.hasRemaining() {
+    public static func lift(_ buf: RustBuffer) throws -> SwiftType {
+        var reader = createReader(data: Data(rustBuffer: buf))
+        let value = try read(from: &reader)
+        if hasRemaining(reader) {
             throw UniffiInternalError.incompleteData
         }
         buf.deallocate()
         return value
     }
 
-    static func lower(_ value: SwiftType) -> RustBuffer {
-          let writer = Writer()
-          write(value, into: writer)
-          return RustBuffer(bytes: writer.bytes)
+    public static func lower(_ value: SwiftType) -> RustBuffer {
+          var writer = createWriter()
+          write(value, into: &writer)
+          return RustBuffer(bytes: writer)
     }
 }
 // An error type for FFI errors. These errors occur at the UniFFI level, not
@@ -239,28 +238,41 @@ fileprivate extension RustCallStatus {
 }
 
 private func rustCall<T>(_ callback: (UnsafeMutablePointer<RustCallStatus>) -> T) throws -> T {
-    try makeRustCall(callback, errorHandler: {
-        $0.deallocate()
-        return UniffiInternalError.unexpectedRustCallError
-    })
+    try makeRustCall(callback, errorHandler: nil)
 }
 
-private func rustCallWithError<T, F: FfiConverter>
-    (_ errorFfiConverter: F.Type, _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T) throws -> T
-    where F.SwiftType: Error, F.FfiType == RustBuffer
-    {
-    try makeRustCall(callback, errorHandler: { return try errorFfiConverter.lift($0) })
+private func rustCallWithError<T>(
+    _ errorHandler: @escaping (RustBuffer) throws -> Error,
+    _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T) throws -> T {
+    try makeRustCall(callback, errorHandler: errorHandler)
 }
 
-private func makeRustCall<T>(_ callback: (UnsafeMutablePointer<RustCallStatus>) -> T, errorHandler: (RustBuffer) throws -> Error) throws -> T {
+private func makeRustCall<T>(
+    _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T,
+    errorHandler: ((RustBuffer) throws -> Error)?
+) throws -> T {
+    uniffiEnsureInitialized()
     var callStatus = RustCallStatus.init()
     let returnedVal = callback(&callStatus)
+    try uniffiCheckCallStatus(callStatus: callStatus, errorHandler: errorHandler)
+    return returnedVal
+}
+
+private func uniffiCheckCallStatus(
+    callStatus: RustCallStatus,
+    errorHandler: ((RustBuffer) throws -> Error)?
+) throws {
     switch callStatus.code {
         case CALL_SUCCESS:
-            return returnedVal
+            return
 
         case CALL_ERROR:
-            throw try errorHandler(callStatus.errorBuf)
+            if let errorHandler = errorHandler {
+                throw try errorHandler(callStatus.errorBuf)
+            } else {
+                callStatus.errorBuf.deallocate()
+                throw UniffiInternalError.unexpectedRustCallError
+            }
 
         case CALL_PANIC:
             // When the rust code sees a panic, it tries to construct a RustBuffer
@@ -285,12 +297,12 @@ fileprivate struct FfiConverterUInt64: FfiConverterPrimitive {
     typealias FfiType = UInt64
     typealias SwiftType = UInt64
 
-    static func read(from buf: Reader) throws -> UInt64 {
-        return try lift(buf.readInt())
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt64 {
+        return try lift(readInt(&buf))
     }
 
-    static func write(_ value: SwiftType, into buf: Writer) {
-        buf.writeInt(lower(value))
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
     }
 }
 
@@ -298,7 +310,7 @@ fileprivate struct FfiConverterString: FfiConverter {
     typealias SwiftType = String
     typealias FfiType = RustBuffer
 
-    static func lift(_ value: RustBuffer) throws -> String {
+    public static func lift(_ value: RustBuffer) throws -> String {
         defer {
             value.deallocate()
         }
@@ -309,7 +321,7 @@ fileprivate struct FfiConverterString: FfiConverter {
         return String(bytes: bytes, encoding: String.Encoding.utf8)!
     }
 
-    static func lower(_ value: String) -> RustBuffer {
+    public static func lower(_ value: String) -> RustBuffer {
         return value.utf8CString.withUnsafeBufferPointer { ptr in
             // The swift string gives us int8_t, we want uint8_t.
             ptr.withMemoryRebound(to: UInt8.self) { ptr in
@@ -320,64 +332,150 @@ fileprivate struct FfiConverterString: FfiConverter {
         }
     }
 
-    static func read(from buf: Reader) throws -> String {
-        let len: Int32 = try buf.readInt()
-        return String(bytes: try buf.readBytes(count: Int(len)), encoding: String.Encoding.utf8)!
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> String {
+        let len: Int32 = try readInt(&buf)
+        return String(bytes: try readBytes(&buf, count: Int(len)), encoding: String.Encoding.utf8)!
     }
 
-    static func write(_ value: String, into buf: Writer) {
+    public static func write(_ value: String, into buf: inout [UInt8]) {
         let len = Int32(value.utf8.count)
-        buf.writeInt(len)
-        buf.writeBytes(value.utf8)
+        writeInt(&buf, len)
+        writeBytes(&buf, value.utf8)
+    }
+}
+
+fileprivate struct FfiConverterData: FfiConverterRustBuffer {
+    typealias SwiftType = Data
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Data {
+        let len: Int32 = try readInt(&buf)
+        return Data(bytes: try readBytes(&buf, count: Int(len)))
+    }
+
+    public static func write(_ value: Data, into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        writeBytes(&buf, value)
     }
 }
 
 
 public struct Keys {
-    public var secret: String
-    public var pubkey: String
+    public var `secret`: String
+    public var `pubkey`: String
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(secret: String, pubkey: String) {
-        self.secret = secret
-        self.pubkey = pubkey
+    public init(`secret`: String, `pubkey`: String) {
+        self.`secret` = `secret`
+        self.`pubkey` = `pubkey`
     }
 }
 
 
 extension Keys: Equatable, Hashable {
     public static func ==(lhs: Keys, rhs: Keys) -> Bool {
-        if lhs.secret != rhs.secret {
+        if lhs.`secret` != rhs.`secret` {
             return false
         }
-        if lhs.pubkey != rhs.pubkey {
+        if lhs.`pubkey` != rhs.`pubkey` {
             return false
         }
         return true
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(secret)
-        hasher.combine(pubkey)
+        hasher.combine(`secret`)
+        hasher.combine(`pubkey`)
     }
 }
 
 
-fileprivate struct FfiConverterTypeKeys: FfiConverterRustBuffer {
-    fileprivate static func read(from buf: Reader) throws -> Keys {
+public struct FfiConverterTypeKeys: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Keys {
         return try Keys(
-            secret: FfiConverterString.read(from: buf), 
-            pubkey: FfiConverterString.read(from: buf)
+            `secret`: FfiConverterString.read(from: &buf), 
+            `pubkey`: FfiConverterString.read(from: &buf)
         )
     }
 
-    fileprivate static func write(_ value: Keys, into buf: Writer) {
-        FfiConverterString.write(value.secret, into: buf)
-        FfiConverterString.write(value.pubkey, into: buf)
+    public static func write(_ value: Keys, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.`secret`, into: &buf)
+        FfiConverterString.write(value.`pubkey`, into: &buf)
     }
 }
 
+
+public func FfiConverterTypeKeys_lift(_ buf: RustBuffer) throws -> Keys {
+    return try FfiConverterTypeKeys.lift(buf)
+}
+
+public func FfiConverterTypeKeys_lower(_ value: Keys) -> RustBuffer {
+    return FfiConverterTypeKeys.lower(value)
+}
+
+
+public struct VlsResponse {
+    public var `topic`: String
+    public var `vlsBytes`: Data?
+    public var `lssBytes`: Data?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(`topic`: String, `vlsBytes`: Data?, `lssBytes`: Data?) {
+        self.`topic` = `topic`
+        self.`vlsBytes` = `vlsBytes`
+        self.`lssBytes` = `lssBytes`
+    }
+}
+
+
+extension VlsResponse: Equatable, Hashable {
+    public static func ==(lhs: VlsResponse, rhs: VlsResponse) -> Bool {
+        if lhs.`topic` != rhs.`topic` {
+            return false
+        }
+        if lhs.`vlsBytes` != rhs.`vlsBytes` {
+            return false
+        }
+        if lhs.`lssBytes` != rhs.`lssBytes` {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(`topic`)
+        hasher.combine(`vlsBytes`)
+        hasher.combine(`lssBytes`)
+    }
+}
+
+
+public struct FfiConverterTypeVlsResponse: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> VlsResponse {
+        return try VlsResponse(
+            `topic`: FfiConverterString.read(from: &buf), 
+            `vlsBytes`: FfiConverterOptionData.read(from: &buf), 
+            `lssBytes`: FfiConverterOptionData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: VlsResponse, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.`topic`, into: &buf)
+        FfiConverterOptionData.write(value.`vlsBytes`, into: &buf)
+        FfiConverterOptionData.write(value.`lssBytes`, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeVlsResponse_lift(_ buf: RustBuffer) throws -> VlsResponse {
+    return try FfiConverterTypeVlsResponse.lift(buf)
+}
+
+public func FfiConverterTypeVlsResponse_lower(_ value: VlsResponse) -> RustBuffer {
+    return FfiConverterTypeVlsResponse.lower(value)
+}
 
 public enum SphinxError {
 
@@ -416,60 +514,100 @@ public enum SphinxError {
     // Simple error enums only carry a message
     case BadResponse(message: String)
     
+    // Simple error enums only carry a message
+    case BadArgs(message: String)
+    
+    // Simple error enums only carry a message
+    case BadState(message: String)
+    
+    // Simple error enums only carry a message
+    case InitFailed(message: String)
+    
+    // Simple error enums only carry a message
+    case LssFailed(message: String)
+    
+    // Simple error enums only carry a message
+    case VlsFailed(message: String)
+    
+
+    fileprivate static func uniffiErrorHandler(_ error: RustBuffer) throws -> Error {
+        return try FfiConverterTypeSphinxError.lift(error)
+    }
 }
 
-fileprivate struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
+
+public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
     typealias SwiftType = SphinxError
 
-    static func read(from buf: Reader) throws -> SphinxError {
-        let variant: Int32 = try buf.readInt()
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SphinxError {
+        let variant: Int32 = try readInt(&buf)
         switch variant {
 
         
 
         
         case 1: return .DerivePublicKey(
-            message: try FfiConverterString.read(from: buf)
+            message: try FfiConverterString.read(from: &buf)
         )
         
         case 2: return .DeriveSharedSecret(
-            message: try FfiConverterString.read(from: buf)
+            message: try FfiConverterString.read(from: &buf)
         )
         
         case 3: return .Encrypt(
-            message: try FfiConverterString.read(from: buf)
+            message: try FfiConverterString.read(from: &buf)
         )
         
         case 4: return .Decrypt(
-            message: try FfiConverterString.read(from: buf)
+            message: try FfiConverterString.read(from: &buf)
         )
         
         case 5: return .BadPubkey(
-            message: try FfiConverterString.read(from: buf)
+            message: try FfiConverterString.read(from: &buf)
         )
         
         case 6: return .BadSecret(
-            message: try FfiConverterString.read(from: buf)
+            message: try FfiConverterString.read(from: &buf)
         )
         
         case 7: return .BadNonce(
-            message: try FfiConverterString.read(from: buf)
+            message: try FfiConverterString.read(from: &buf)
         )
         
         case 8: return .BadCiper(
-            message: try FfiConverterString.read(from: buf)
+            message: try FfiConverterString.read(from: &buf)
         )
         
         case 9: return .InvalidNetwork(
-            message: try FfiConverterString.read(from: buf)
+            message: try FfiConverterString.read(from: &buf)
         )
         
         case 10: return .BadRequest(
-            message: try FfiConverterString.read(from: buf)
+            message: try FfiConverterString.read(from: &buf)
         )
         
         case 11: return .BadResponse(
-            message: try FfiConverterString.read(from: buf)
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 12: return .BadArgs(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 13: return .BadState(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 14: return .InitFailed(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 15: return .LssFailed(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 16: return .VlsFailed(
+            message: try FfiConverterString.read(from: &buf)
         )
         
 
@@ -477,45 +615,44 @@ fileprivate struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
         }
     }
 
-    static func write(_ value: SphinxError, into buf: Writer) {
+    public static func write(_ value: SphinxError, into buf: inout [UInt8]) {
         switch value {
 
         
 
         
         case let .DerivePublicKey(message):
-            buf.writeInt(Int32(1))
-            FfiConverterString.write(message, into: buf)
+            writeInt(&buf, Int32(1))
         case let .DeriveSharedSecret(message):
-            buf.writeInt(Int32(2))
-            FfiConverterString.write(message, into: buf)
+            writeInt(&buf, Int32(2))
         case let .Encrypt(message):
-            buf.writeInt(Int32(3))
-            FfiConverterString.write(message, into: buf)
+            writeInt(&buf, Int32(3))
         case let .Decrypt(message):
-            buf.writeInt(Int32(4))
-            FfiConverterString.write(message, into: buf)
+            writeInt(&buf, Int32(4))
         case let .BadPubkey(message):
-            buf.writeInt(Int32(5))
-            FfiConverterString.write(message, into: buf)
+            writeInt(&buf, Int32(5))
         case let .BadSecret(message):
-            buf.writeInt(Int32(6))
-            FfiConverterString.write(message, into: buf)
+            writeInt(&buf, Int32(6))
         case let .BadNonce(message):
-            buf.writeInt(Int32(7))
-            FfiConverterString.write(message, into: buf)
+            writeInt(&buf, Int32(7))
         case let .BadCiper(message):
-            buf.writeInt(Int32(8))
-            FfiConverterString.write(message, into: buf)
+            writeInt(&buf, Int32(8))
         case let .InvalidNetwork(message):
-            buf.writeInt(Int32(9))
-            FfiConverterString.write(message, into: buf)
+            writeInt(&buf, Int32(9))
         case let .BadRequest(message):
-            buf.writeInt(Int32(10))
-            FfiConverterString.write(message, into: buf)
+            writeInt(&buf, Int32(10))
         case let .BadResponse(message):
-            buf.writeInt(Int32(11))
-            FfiConverterString.write(message, into: buf)
+            writeInt(&buf, Int32(11))
+        case let .BadArgs(message):
+            writeInt(&buf, Int32(12))
+        case let .BadState(message):
+            writeInt(&buf, Int32(13))
+        case let .InitFailed(message):
+            writeInt(&buf, Int32(14))
+        case let .LssFailed(message):
+            writeInt(&buf, Int32(15))
+        case let .VlsFailed(message):
+            writeInt(&buf, Int32(16))
 
         
         }
@@ -527,148 +664,231 @@ extension SphinxError: Equatable, Hashable {}
 
 extension SphinxError: Error { }
 
-public func pubkeyFromSecretKey(mySecretKey: String) throws -> String {
-    return try FfiConverterString.lift(
-        try
-    
-    rustCallWithError(FfiConverterTypeSphinxError.self) {
-    
-    sphinxrs_7d9d_pubkey_from_secret_key(
-        FfiConverterString.lower(mySecretKey), $0)
+fileprivate struct FfiConverterOptionData: FfiConverterRustBuffer {
+    typealias SwiftType = Data?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterData.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterData.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+public func `pubkeyFromSecretKey`(`mySecretKey`: String) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_pubkey_from_secret_key(
+        FfiConverterString.lower(`mySecretKey`),$0)
 }
     )
 }
 
-
-
-public func deriveSharedSecret(theirPubkey: String, mySecretKey: String) throws -> String {
-    return try FfiConverterString.lift(
-        try
-    
-    rustCallWithError(FfiConverterTypeSphinxError.self) {
-    
-    sphinxrs_7d9d_derive_shared_secret(
-        FfiConverterString.lower(theirPubkey), 
-        FfiConverterString.lower(mySecretKey), $0)
+public func `deriveSharedSecret`(`theirPubkey`: String, `mySecretKey`: String) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_derive_shared_secret(
+        FfiConverterString.lower(`theirPubkey`),
+        FfiConverterString.lower(`mySecretKey`),$0)
 }
     )
 }
 
-
-
-public func encrypt(plaintext: String, secret: String, nonce: String) throws -> String {
-    return try FfiConverterString.lift(
-        try
-    
-    rustCallWithError(FfiConverterTypeSphinxError.self) {
-    
-    sphinxrs_7d9d_encrypt(
-        FfiConverterString.lower(plaintext), 
-        FfiConverterString.lower(secret), 
-        FfiConverterString.lower(nonce), $0)
+public func `encrypt`(`plaintext`: String, `secret`: String, `nonce`: String) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_encrypt(
+        FfiConverterString.lower(`plaintext`),
+        FfiConverterString.lower(`secret`),
+        FfiConverterString.lower(`nonce`),$0)
 }
     )
 }
 
-
-
-public func decrypt(ciphertext: String, secret: String) throws -> String {
-    return try FfiConverterString.lift(
-        try
-    
-    rustCallWithError(FfiConverterTypeSphinxError.self) {
-    
-    sphinxrs_7d9d_decrypt(
-        FfiConverterString.lower(ciphertext), 
-        FfiConverterString.lower(secret), $0)
+public func `decrypt`(`ciphertext`: String, `secret`: String) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_decrypt(
+        FfiConverterString.lower(`ciphertext`),
+        FfiConverterString.lower(`secret`),$0)
 }
     )
 }
 
-
-
-public func nodeKeys(net: String, seed: String) throws -> Keys {
-    return try FfiConverterTypeKeys.lift(
-        try
-    
-    rustCallWithError(FfiConverterTypeSphinxError.self) {
-    
-    sphinxrs_7d9d_node_keys(
-        FfiConverterString.lower(net), 
-        FfiConverterString.lower(seed), $0)
+public func `nodeKeys`(`net`: String, `seed`: String) throws -> Keys {
+    return try  FfiConverterTypeKeys.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_node_keys(
+        FfiConverterString.lower(`net`),
+        FfiConverterString.lower(`seed`),$0)
 }
     )
 }
 
-
-
-public func mnemonicFromEntropy(seed: String) throws -> String {
-    return try FfiConverterString.lift(
-        try
-    
-    rustCallWithError(FfiConverterTypeSphinxError.self) {
-    
-    sphinxrs_7d9d_mnemonic_from_entropy(
-        FfiConverterString.lower(seed), $0)
+public func `mnemonicFromEntropy`(`seed`: String) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_mnemonic_from_entropy(
+        FfiConverterString.lower(`seed`),$0)
 }
     )
 }
 
-
-
-public func entropyFromMnemonic(mnemonic: String) throws -> String {
-    return try FfiConverterString.lift(
-        try
-    
-    rustCallWithError(FfiConverterTypeSphinxError.self) {
-    
-    sphinxrs_7d9d_entropy_from_mnemonic(
-        FfiConverterString.lower(mnemonic), $0)
+public func `entropyFromMnemonic`(`mnemonic`: String) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_entropy_from_mnemonic(
+        FfiConverterString.lower(`mnemonic`),$0)
 }
     )
 }
 
-
-
-public func buildRequest(msg: String, secret: String, nonce: UInt64) throws -> String {
-    return try FfiConverterString.lift(
-        try
-    
-    rustCallWithError(FfiConverterTypeSphinxError.self) {
-    
-    sphinxrs_7d9d_build_request(
-        FfiConverterString.lower(msg), 
-        FfiConverterString.lower(secret), 
-        FfiConverterUInt64.lower(nonce), $0)
+public func `buildRequest`(`msg`: String, `secret`: String, `nonce`: UInt64) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_build_request(
+        FfiConverterString.lower(`msg`),
+        FfiConverterString.lower(`secret`),
+        FfiConverterUInt64.lower(`nonce`),$0)
 }
     )
 }
 
-
-
-public func parseResponse(res: String) throws -> String {
-    return try FfiConverterString.lift(
-        try
-    
-    rustCallWithError(FfiConverterTypeSphinxError.self) {
-    
-    sphinxrs_7d9d_parse_response(
-        FfiConverterString.lower(res), $0)
+public func `parseResponse`(`res`: String) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_parse_response(
+        FfiConverterString.lower(`res`),$0)
 }
     )
 }
 
+public func `runInit1`(`args`: String, `state`: Data, `msg1`: Data) throws -> VlsResponse {
+    return try  FfiConverterTypeVlsResponse.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_run_init_1(
+        FfiConverterString.lower(`args`),
+        FfiConverterData.lower(`state`),
+        FfiConverterData.lower(`msg1`),$0)
+}
+    )
+}
 
+public func `runInit2`(`args`: String, `state`: Data, `msg1`: Data, `msg2`: Data) throws -> VlsResponse {
+    return try  FfiConverterTypeVlsResponse.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_run_init_2(
+        FfiConverterString.lower(`args`),
+        FfiConverterData.lower(`state`),
+        FfiConverterData.lower(`msg1`),
+        FfiConverterData.lower(`msg2`),$0)
+}
+    )
+}
 
-/**
- * Top level initializers and tear down methods.
- *
- * This is generated by uniffi.
- */
-public enum SphinxrsLifecycle {
-    /**
-     * Initialize the FFI and Rust library. This should be only called once per application.
-     */
-    func initialize() {
+public func `runVls`(`args`: String, `state`: Data, `msg1`: Data, `msg2`: Data, `vlsMsg`: Data) throws -> VlsResponse {
+    return try  FfiConverterTypeVlsResponse.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_run_vls(
+        FfiConverterString.lower(`args`),
+        FfiConverterData.lower(`state`),
+        FfiConverterData.lower(`msg1`),
+        FfiConverterData.lower(`msg2`),
+        FfiConverterData.lower(`vlsMsg`),$0)
+}
+    )
+}
+
+public func `runLss`(`args`: String, `state`: Data, `msg1`: Data, `msg2`: Data, `lssMsg`: Data, `prevVls`: Data, `prevLss`: Data) throws -> VlsResponse {
+    return try  FfiConverterTypeVlsResponse.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_run_lss(
+        FfiConverterString.lower(`args`),
+        FfiConverterData.lower(`state`),
+        FfiConverterData.lower(`msg1`),
+        FfiConverterData.lower(`msg2`),
+        FfiConverterData.lower(`lssMsg`),
+        FfiConverterData.lower(`prevVls`),
+        FfiConverterData.lower(`prevLss`),$0)
+}
+    )
+}
+
+private enum InitializationResult {
+    case ok
+    case contractVersionMismatch
+    case apiChecksumMismatch
+}
+// Use a global variables to perform the versioning checks. Swift ensures that
+// the code inside is only computed once.
+private var initializationResult: InitializationResult {
+    // Get the bindings contract version from our ComponentInterface
+    let bindings_contract_version = 22
+    // Get the scaffolding contract version by calling the into the dylib
+    let scaffolding_contract_version = ffi_sphinxrs_uniffi_contract_version()
+    if bindings_contract_version != scaffolding_contract_version {
+        return InitializationResult.contractVersionMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_pubkey_from_secret_key() != 14435) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_derive_shared_secret() != 20125) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_encrypt() != 43446) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_decrypt() != 47725) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_node_keys() != 21192) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_mnemonic_from_entropy() != 16221) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_entropy_from_mnemonic() != 33294) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_build_request() != 31264) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_parse_response() != 12980) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_run_init_1() != 42322) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_run_init_2() != 13191) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_run_vls() != 59450) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_run_lss() != 63303) {
+        return InitializationResult.apiChecksumMismatch
+    }
+
+    return InitializationResult.ok
+}
+
+private func uniffiEnsureInitialized() {
+    switch initializationResult {
+    case .ok:
+        break
+    case .contractVersionMismatch:
+        fatalError("UniFFI contract version mismatch: try cleaning and rebuilding your project")
+    case .apiChecksumMismatch:
+        fatalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }

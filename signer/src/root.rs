@@ -87,8 +87,9 @@ fn handle_inner(
         sequence,
         peer_id,
         dbid,
-    } = read_serial_request_header(&mut bytes)?;
-    let message = msgs::read(&mut bytes)?;
+    } = read_serial_request_header(&mut bytes)
+        .map_err(|e| anyhow!("failed read_serial_request_header {:?}", e))?;
+    let message = msgs::read(&mut bytes).map_err(|e| anyhow!("failed msgs::read: {:?}", e))?;
 
     if let Message::HsmdInit(ref m) = message {
         if ChainHash::using_genesis_block(root_handler.node().network()).as_bytes()
@@ -123,8 +124,10 @@ fn handle_inner(
     let (vls_msg, muts) = reply;
     // make the VLS message bytes
     let mut buf = Vec::new();
-    write_serial_response_header(&mut &mut buf, sequence)?;
-    msgs::write_vec(&mut &mut buf, vls_msg.as_vec())?;
+    write_serial_response_header(&mut &mut buf, sequence)
+        .map_err(|e| anyhow!("failed write_serial_response_header: {:?}", e))?;
+    msgs::write_vec(&mut &mut buf, vls_msg.as_vec())
+        .map_err(|e| anyhow!("failed msgs::write_vec: {:?}", e))?;
     //println!("handled message, replying with: {:?}", out_md);
     Ok((buf, muts.into_inner()))
 }

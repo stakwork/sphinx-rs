@@ -244,8 +244,8 @@ mod tests {
         let msg = "{\"type\":\"Nonce\"}";
         let _m1 = control_msg_from_json(msg.as_bytes()).expect("Nonce failed");
 
-        let msg = "{\"type\":\"UpdatePolicy\", \"content\":{\"sat_limit\":0, \"interval\":\"hourly\", \"htlc_limit\":10}}";
-        control_msg_from_json(msg.as_bytes()).expect("Nonce failed");
+        let msg = "{\"type\":\"UpdatePolicy\", \"content\":{\"htlc_limit_msat\":0, \"interval\":\"hourly\", \"msat_per_interval\":10}}";
+        control_msg_from_json(msg.as_bytes()).expect("UpdatePolicy failed");
     }
 
     #[test]

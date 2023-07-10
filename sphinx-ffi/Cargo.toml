@@ -15,7 +15,7 @@ wasm = []
 
 [dependencies]
 sphinx-crypter = { path = "../crypter" }
-sphinx-signer = { path = "../signer" }
+sphinx-signer = { path = "../signer", default-features = false, features = ["no-std","persist"] }
 sphinx-glyph = { path = "../glyph" }
 uniffi = { version = "0.24.1", optional = true }
 hex = "0.4.3"
@@ -29,3 +29,7 @@ opt-level = 'z'     # Optimize for size.
 lto = true          # Enable Link Time Optimization
 codegen-units = 1   # Reduce number of codegen units to increase optimizations.
 debug = true # Enable debug symbols. For example, we can use `dwarfdump` to check crash traces.
+
+# [[bin]]
+# name = "uniffi-bindgen"
+# path = "uniffi-bindgen.rs"

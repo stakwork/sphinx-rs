@@ -1,12 +1,18 @@
 use crate::msgs::*;
 use anyhow::{anyhow, Result};
+use lightning_signer::persist::ExternalPersistHelper;
 use lightning_signer::persist::Mutations;
-use lightning_signer::persist::{ExternalPersistHelper, SimpleEntropy};
 use secp256k1::PublicKey;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use vls_protocol_signer::handler::{RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
+
+#[cfg(feature = "std")]
+use lightning_signer::persist::SimpleEntropy;
+
+#[cfg(not(feature = "std"))]
+use crate::not_entropy::NotEntropy;
 
 #[derive(Clone)]
 pub struct LssSigner {
@@ -17,7 +23,11 @@ pub struct LssSigner {
 }
 
 impl LssSigner {
-    pub fn new(builder: &RootHandlerBuilder, server_pubkey: &PublicKey) -> (Self, Vec<u8>) {
+    pub fn new(
+        builder: &RootHandlerBuilder,
+        server_pubkey: &PublicKey,
+        nonce: Option<[u8; 32]>,
+    ) -> (Self, Vec<u8>) {
         let (keys_manager, _node_id) = builder.build_keys_manager();
         let client_id = keys_manager.get_persistence_pubkey();
         let shared_secret = keys_manager.get_persistence_shared_secret(server_pubkey);
@@ -25,12 +35,24 @@ impl LssSigner {
 
         let mut helper = ExternalPersistHelper::new(shared_secret);
 
-        let entropy = SimpleEntropy::new();
+        let mut new_nonce = [0; 32];
+        #[cfg(feature = "std")]
+        {
+            let entropy = SimpleEntropy::new();
+            helper.new_nonce(&entropy);
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            let n = nonce.expect("nonce must be provided in no-std mode");
+            let entropy = NotEntropy::new(n);
+            new_nonce = helper.new_nonce(&entropy);
+        }
+
         // send client_id and auth_token back to broker
         let msg = Response::Init(InitResponse {
             client_id: client_id.serialize(),
             auth_token: auth_token.to_vec(),
-            nonce: Some(helper.new_nonce(&entropy)),
+            nonce: Some(new_nonce),
         });
         let msg_bytes = msg.to_vec().unwrap();
 

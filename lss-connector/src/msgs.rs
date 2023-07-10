@@ -114,4 +114,12 @@ mod tests {
         // println!("M {:?}", m);
         Ok(())
     }
+
+    #[test]
+    fn test_muts() -> anyhow::Result<()> {
+        let m = vec![("hi".to_string(), (23, vec![1, 2, 3]))];
+        let bytes = rmp_serde::to_vec_named(&m);
+        println!("bytes {:?}", bytes);
+        Ok(())
+    }
 }

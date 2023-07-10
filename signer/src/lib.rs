@@ -11,7 +11,7 @@ pub use vls_protocol;
 #[cfg(feature = "fspersist")]
 pub mod persist;
 
-#[cfg(feature = "fspersist")]
+#[cfg(feature = "vls-persist")]
 pub mod mobile;
 
 pub use derive::node_keys as derive_node_keys;
