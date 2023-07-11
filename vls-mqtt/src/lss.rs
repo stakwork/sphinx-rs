@@ -16,7 +16,7 @@ pub async fn init_lss(
     let init = Msg::from_slice(&first_lss_msg.message)?.into_init()?;
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
 
-    let (lss_signer, res1) = LssSigner::new(&handler_builder, &server_pubkey, None);
+    let (lss_signer, res1) = LssSigner::new(&handler_builder, &server_pubkey, None, None);
     let res_topic_1 = topics::INIT_1_RES.to_string();
     if let Err(e) = first_lss_msg.reply_tx.send(Ok((res_topic_1, res1))) {
         log::warn!("could not send on first_lss_msg.reply_tx, {:?}", e);

@@ -18,9 +18,9 @@ no-std = ["vls-protocol-signer/no-std", "vls-persist/no-std", "lss-connector/no-
 [dependencies]
 sphinx-glyph = { path = '../glyph', default-features = false }
 lss-connector = { path = "../lss-connector", default-features = false }
-vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "163bade8dc4a97fdb516b68fbfdff8e43a74e795", default-features = false, features = ["secp-lowmemory"] }
-vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "163bade8dc4a97fdb516b68fbfdff8e43a74e795", default-features = false }
-vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "163bade8dc4a97fdb516b68fbfdff8e43a74e795", default-features = false, features = ["memo"], optional = true }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "de25fc60bce03e9be16a698ffd8e8bdc48ed975d", default-features = false, features = ["secp-lowmemory"] }
+vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "de25fc60bce03e9be16a698ffd8e8bdc48ed975d", default-features = false }
+vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "de25fc60bce03e9be16a698ffd8e8bdc48ed975d", default-features = false, features = ["memo"], optional = true }
 # vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory"] }
 # vls-protocol = { path = "../../vls/vls-protocol" }
 # vls-persist = { path = "../../vls/vls-persist", default-features = false, features = ["memo"], optional = true }
@@ -32,4 +32,5 @@ hex = { version = "0.4.3", default-features = false }
 anyhow = { version = "1", default-features = false }
 fsdb = { version = "0.1.11", optional = true }
 
-
+[dev-dependencies]
+simple_logger = "4.2.0"
