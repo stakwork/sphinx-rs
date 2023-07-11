@@ -12,11 +12,11 @@ use lightning_signer::policy::simple_validator::SimpleValidatorFactory;
 use lightning_signer::signer::StartingTimeFactory;
 use lightning_signer::util::clock::{Clock, StandardClock};
 use lightning_signer::wallet::Wallet;
+use lightning_signer::Arc;
 use lss_connector::{
     msgs::{Response as LssResponse, SignerMutations},
     LssSigner,
 };
-use std::sync::Arc;
 use vls_protocol::model::PubKey;
 use vls_protocol::msgs::{self, read_serial_request_header, write_serial_response_header, Message};
 use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};
@@ -148,7 +148,10 @@ pub fn handle_with_lss(
         Vec::new()
     } else {
         let client_hmac = lss_signer.client_hmac(&mutations);
-        let lss_msg = LssResponse::VlsMuts(SignerMutations { client_hmac, muts: mutations.into_inner() });
+        let lss_msg = LssResponse::VlsMuts(SignerMutations {
+            client_hmac,
+            muts: mutations.into_inner(),
+        });
         lss_msg.to_vec()?
     };
     Ok((out_bytes, lss_bytes))

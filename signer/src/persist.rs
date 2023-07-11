@@ -9,9 +9,9 @@ use lightning_signer::persist::model::{
 };
 use lightning_signer::persist::Persist;
 use lightning_signer::policy::validator::{EnforcementState, ValidatorFactory};
+use lightning_signer::Arc;
 use lightning_signer::SendSync;
 use std::string::String;
-use std::sync::Arc;
 use vls_persist::model::{
     AllowlistItemEntry, ChainTrackerEntry, ChannelEntry, NodeEntry, NodeStateEntry,
 };
