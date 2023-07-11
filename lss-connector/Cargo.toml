@@ -9,18 +9,18 @@ license = "MIT"
 
 [features]
 default = ["broker", "std"]
-std = ["vls-protocol-signer/std"]
+std = ["vls-protocol-signer/std", "anyhow/std", "secp256k1/rand-std", "secp256k1/std", "sphinx-glyph/std"]
 no-std = ["vls-protocol-signer/no-std"]
 broker = ["lightning-storage-server", "vls-frontend", "tokio"]
 
 [dependencies]
-sphinx-glyph = { path = '../glyph' }
+sphinx-glyph = { path = '../glyph', default-features = false }
 vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "163bade8dc4a97fdb516b68fbfdff8e43a74e795", default-features = false, features = ["secp-lowmemory"] }
 # vls-protocol-signer = { path = "../../../evanf/vls-evanf/vls-protocol-signer", default-features = false, features = ["secp-lowmemory"] }
 log = "0.4"
 serde = "1.0.168"
-anyhow = "1"
-secp256k1 = { version = "0.24.0", features = ["rand-std", "bitcoin_hashes"] }
+anyhow = { version = "1", default-features = false }
+secp256k1 = { version = "0.24.0", default-features = false, features = ["bitcoin_hashes"] }
 rmp-serde = "1.1.0"
 serde-big-array = "0.5.1"
 # broker libs
