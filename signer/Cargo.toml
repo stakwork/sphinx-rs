@@ -8,8 +8,8 @@ repository = "https://github.com/stakwork/sphinx-rs"
 license = "MIT"
 
 [features]
-default = ["fspersist", "vls-persist", "std"]
-fspersist = ["fsdb", "vls-persist/memo"]
+default = ["fspersist", "persist", "std"]
+fspersist = ["fsdb"]
 persist = ["vls-persist"]
 std = ["vls-persist/std", "vls-protocol-signer/std", "vls-protocol/std", "lss-connector/std", "rand/std", "anyhow/std", "sphinx-glyph/std", "hex/std"]
 broker-test = ["lss-connector/broker"]
