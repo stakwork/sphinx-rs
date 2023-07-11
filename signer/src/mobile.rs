@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use sphinx_glyph::topics;
 use sphinx_glyph::types::{Policy, Velocity};
 use std::collections::BTreeMap;
-// use std::sync::{Arc, Mutex};
 use std::time::Duration;
 pub use vls_persist::thread_memo_persister::ThreadMemoPersister;
 use vls_protocol_signer::handler::{RootHandler, RootHandlerBuilder};

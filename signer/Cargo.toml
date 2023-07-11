@@ -19,11 +19,11 @@ no-std = ["vls-protocol-signer/no-std", "vls-persist/no-std", "lss-connector/no-
 sphinx-glyph = { path = '../glyph', default-features = false }
 lss-connector = { path = "../lss-connector", default-features = false }
 vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "163bade8dc4a97fdb516b68fbfdff8e43a74e795", default-features = false, features = ["secp-lowmemory"] }
-vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "163bade8dc4a97fdb516b68fbfdff8e43a74e795" }
+vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "163bade8dc4a97fdb516b68fbfdff8e43a74e795", default-features = false }
 vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "163bade8dc4a97fdb516b68fbfdff8e43a74e795", default-features = false, features = ["memo"], optional = true }
-# vls-protocol-signer = { path = "../../../evanf/vls-evanf/vls-protocol-signer", default-features = false, features = ["secp-lowmemory"] }
-# vls-protocol = { path = "../../../evanf/vls-evanf/vls-protocol" }
-# vls-persist = { path = "../../../evanf/vls-evanf/vls-persist", default-features = false, features = ["memo"], optional = true }
+# vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory"] }
+# vls-protocol = { path = "../../vls/vls-protocol" }
+# vls-persist = { path = "../../vls/vls-persist", default-features = false, features = ["memo"], optional = true }
 log = "0.4"
 bip39 = "1.0.1"
 rand = { version = "0.8", default-features = false }

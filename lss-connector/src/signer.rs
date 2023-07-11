@@ -39,7 +39,7 @@ impl LssSigner {
         #[cfg(feature = "std")]
         {
             let entropy = SimpleEntropy::new();
-            helper.new_nonce(&entropy);
+            new_nonce = helper.new_nonce(&entropy);
         }
         #[cfg(not(feature = "std"))]
         {
