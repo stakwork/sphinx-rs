@@ -1,7 +1,7 @@
 use crate::{recover_pubkey, sign_message, verify_message};
 
 use anyhow::{anyhow, Result};
-use base64::{decode_config, encode_config, URL_SAFE};
+use base64::{Engine, engine::general_purpose::URL_SAFE};
 use secp256k1::{PublicKey, SecretKey};
 use std::convert::TryInto;
 
@@ -25,10 +25,10 @@ pub fn bytes_to_u32(bytes: [u8; 4]) -> u32 {
 }
 
 pub fn base64_encode(input: &[u8]) -> String {
-    encode_config(input, URL_SAFE)
+    URL_SAFE.encode(input)
 }
 pub fn base64_decode(input: &str) -> Result<Vec<u8>> {
-    let r = decode_config(input, URL_SAFE)?;
+    let r = URL_SAFE.decode(input)?;
     Ok(r)
 }
 
