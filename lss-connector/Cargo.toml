@@ -10,7 +10,7 @@ license = "MIT"
 [features]
 default = ["broker", "std"]
 std = ["vls-protocol-signer/std", "anyhow/std", "secp256k1/rand-std", "secp256k1/std", "sphinx-glyph/std"]
-no-std = ["vls-protocol-signer/no-std"]
+no-std = ["vls-protocol-signer/no-std", "sphinx-glyph/no-std"]
 broker = ["lightning-storage-server", "vls-frontend", "tokio"]
 
 [dependencies]

@@ -13,7 +13,7 @@ fspersist = ["fsdb", "vls-persist/memo"]
 persist = ["vls-persist"]
 std = ["vls-persist/std", "vls-protocol-signer/std", "vls-protocol/std", "lss-connector/std", "bip39/std", "rand/std", "anyhow/std", "sphinx-glyph/std", "hex/std"]
 broker-test = ["lss-connector/broker"]
-no-std = ["vls-protocol-signer/no-std", "vls-persist/no-std", "lss-connector/no-std"]
+no-std = ["vls-protocol-signer/no-std", "vls-persist/no-std", "lss-connector/no-std", "sphinx-glyph/no-std"]
 
 [dependencies]
 sphinx-glyph = { path = '../glyph', default-features = false }
