@@ -11,7 +11,7 @@ license = "MIT"
 default = ["fspersist", "vls-persist", "std"]
 fspersist = ["fsdb", "vls-persist/memo"]
 persist = ["vls-persist"]
-std = ["vls-persist/std", "vls-protocol-signer/std", "vls-protocol/std", "lss-connector/std", "bip39/std", "rand/std", "anyhow/std", "sphinx-glyph/std", "hex/std"]
+std = ["vls-persist/std", "vls-protocol-signer/std", "vls-protocol/std", "lss-connector/std", "rand/std", "anyhow/std", "sphinx-glyph/std", "hex/std"]
 broker-test = ["lss-connector/broker"]
 no-std = ["vls-protocol-signer/no-std", "vls-persist/no-std", "lss-connector/no-std", "sphinx-glyph/no-std"]
 
@@ -25,10 +25,10 @@ vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-
 # vls-protocol = { path = "../../../evanf/vls-evanf/vls-protocol" }
 # vls-persist = { path = "../../../evanf/vls-evanf/vls-persist", default-features = false, features = ["memo"], optional = true }
 log = "0.4"
+bip39 = "1.0.1"
 rand = { version = "0.8", default-features = false }
 serde = { version = "1.0.168", default-features = false, features = ["derive"] }
 hex = { version = "0.4.3", default-features = false }
-bip39 = { version = "1.0.1", default-features = false }
 anyhow = { version = "1", default-features = false }
 fsdb = { version = "0.1.11", optional = true }
 
