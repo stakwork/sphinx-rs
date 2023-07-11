@@ -1,8 +1,6 @@
-echo "=> creating C FFI scaffolding"
-uniffi-bindgen scaffolding src/sphinxrs.udl
 
 echo "=> creating kotlin bindings"
-uniffi-bindgen generate src/sphinxrs.udl --language kotlin
+cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language kotlin
 
 echo "=> renaming uniffi_sphinxrs to sphinxrs"
 sed -i '' 's/return "uniffi_sphinxrs"/return "sphinxrs"/' src/uniffi/sphinxrs/sphinxrs.kt

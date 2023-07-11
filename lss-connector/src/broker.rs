@@ -10,6 +10,8 @@ use vls_frontend::external_persist::lss::Client as LssClient;
 use vls_frontend::external_persist::ExternalPersist;
 use vls_protocol_signer::lightning_signer;
 
+pub use tokio;
+
 pub type LssPersister = Arc<AsyncMutex<Box<dyn ExternalPersist>>>;
 
 #[derive(Clone)]

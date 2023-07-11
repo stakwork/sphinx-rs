@@ -6,8 +6,8 @@ use lightning_signer::policy::simple_validator::{
     make_simple_policy, SimplePolicy, SimpleValidatorFactory,
 };
 use lightning_signer::util::velocity::VelocityControlIntervalType;
+use lightning_signer::Arc;
 use sphinx_glyph::control::{All, ControlMessage, ControlResponse};
-use std::sync::Arc;
 use vls_protocol_signer::handler::{Handler, RootHandler};
 use vls_protocol_signer::lightning_signer;
 use vls_protocol_signer::lightning_signer::bitcoin::Network;

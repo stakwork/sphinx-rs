@@ -7,11 +7,17 @@ description = "Sphinx lightning hardware signer"
 repository = "https://github.com/stakwork/sphinx-rs"
 license = "MIT"
 
+[features]
+default = ["std"]
+std = ["anyhow/std", "hex/std", "serde_json/std", "sphinx-auther/std"]
+no-std = ["serde_json/alloc"]
+
 [dependencies]
-sphinx-auther = { path = "../auther", version = "0.1.12" }
-anyhow = "1"
-serde_json = "1.0"
-serde = { version = "1.0.168", default-features = false, features = ["derive"] }
+sphinx-auther = { path = "../auther", version = "0.1.12", default-features = false }
+anyhow = { version = "1", default-features = false }
+hex = { version = "0.4.3", default-features = false }
 rmp-serde = "1.1.0"
+serde = { version = "1.0.168", default-features = false, features = ["derive"] }
+# serde_json requires either std or alloc enabled
+serde_json = { version = "1.0", default-features = false }
 # serde_bolt = { version = "0.2", default-features = false }
-hex = "0.4.3"

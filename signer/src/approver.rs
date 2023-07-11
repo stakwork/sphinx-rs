@@ -4,7 +4,7 @@ use types::{Policy, Velocity};
 
 use lightning_signer::util::clock::Clock;
 use lightning_signer::util::velocity::{VelocityControl, VelocityControlSpec};
-use std::sync::Arc;
+use lightning_signer::Arc;
 use vls_protocol_signer::approver::{NegativeApprover, VelocityApprover};
 use vls_protocol_signer::lightning_signer;
 

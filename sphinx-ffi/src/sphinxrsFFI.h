@@ -4,6 +4,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 // The following structs are used to implement the lowest level
@@ -28,7 +29,19 @@ typedef struct RustBuffer
     uint8_t *_Nullable data;
 } RustBuffer;
 
-typedef int32_t (*ForeignCallback)(uint64_t, int32_t, RustBuffer, RustBuffer *_Nonnull);
+typedef int32_t (*ForeignCallback)(uint64_t, int32_t, const uint8_t *_Nonnull, int32_t, RustBuffer *_Nonnull);
+
+// Task defined in Rust that Swift executes
+typedef void (*UniFfiRustTaskCallback)(const void * _Nullable);
+
+// Callback to execute Rust tasks using a Swift Task
+//
+// Args:
+//   executor: ForeignExecutor lowered into a size_t value
+//   delay: Delay in MS
+//   task: UniFfiRustTaskCallback to call
+//   task_data: data to pass the task callback
+typedef void (*UniFfiForeignExecutorCallback)(size_t, uint32_t, UniFfiRustTaskCallback _Nullable, const void * _Nullable);
 
 typedef struct ForeignBytes
 {
@@ -46,55 +59,84 @@ typedef struct RustCallStatus {
 // ⚠️ increment the version suffix in all instances of UNIFFI_SHARED_HEADER_V4 in this file.           ⚠️
 #endif // def UNIFFI_SHARED_H
 
-RustBuffer sphinxrs_7d9d_pubkey_from_secret_key(
-      RustBuffer my_secret_key,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_7d9d_derive_shared_secret(
-      RustBuffer their_pubkey,RustBuffer my_secret_key,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_7d9d_encrypt(
-      RustBuffer plaintext,RustBuffer secret,RustBuffer nonce,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_7d9d_decrypt(
-      RustBuffer ciphertext,RustBuffer secret,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_7d9d_node_keys(
-      RustBuffer net,RustBuffer seed,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_7d9d_mnemonic_from_entropy(
-      RustBuffer seed,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_7d9d_entropy_from_mnemonic(
-      RustBuffer mnemonic,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_7d9d_build_request(
-      RustBuffer msg,RustBuffer secret,uint64_t nonce,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer sphinxrs_7d9d_parse_response(
-      RustBuffer res,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer ffi_sphinxrs_7d9d_rustbuffer_alloc(
-      int32_t size,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer ffi_sphinxrs_7d9d_rustbuffer_from_bytes(
-      ForeignBytes bytes,
-    RustCallStatus *_Nonnull out_status
-    );
-void ffi_sphinxrs_7d9d_rustbuffer_free(
-      RustBuffer buf,
-    RustCallStatus *_Nonnull out_status
-    );
-RustBuffer ffi_sphinxrs_7d9d_rustbuffer_reserve(
-      RustBuffer buf,int32_t additional,
-    RustCallStatus *_Nonnull out_status
-    );
+// Callbacks for UniFFI Futures
+typedef void (*UniFfiFutureCallbackRustBuffer)(const void * _Nonnull, RustBuffer, RustCallStatus);
+
+// Scaffolding functions
+RustBuffer uniffi_sphinxrs_fn_func_pubkey_from_secret_key(RustBuffer my_secret_key, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_derive_shared_secret(RustBuffer their_pubkey, RustBuffer my_secret_key, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_encrypt(RustBuffer plaintext, RustBuffer secret, RustBuffer nonce, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_decrypt(RustBuffer ciphertext, RustBuffer secret, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_node_keys(RustBuffer net, RustBuffer seed, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_mnemonic_from_entropy(RustBuffer seed, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_entropy_from_mnemonic(RustBuffer mnemonic, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_build_request(RustBuffer msg, RustBuffer secret, uint64_t nonce, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_parse_response(RustBuffer res, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_run_init_1(RustBuffer args, RustBuffer state, RustBuffer msg1, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_run_init_2(RustBuffer args, RustBuffer state, RustBuffer msg1, RustBuffer msg2, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_run_vls(RustBuffer args, RustBuffer state, RustBuffer msg1, RustBuffer msg2, RustBuffer vls_msg, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_run_lss(RustBuffer args, RustBuffer state, RustBuffer msg1, RustBuffer msg2, RustBuffer lss_msg, RustBuffer prev_vls, RustBuffer prev_lss, RustCallStatus *_Nonnull out_status
+);
+RustBuffer ffi_sphinxrs_rustbuffer_alloc(int32_t size, RustCallStatus *_Nonnull out_status
+);
+RustBuffer ffi_sphinxrs_rustbuffer_from_bytes(ForeignBytes bytes, RustCallStatus *_Nonnull out_status
+);
+void ffi_sphinxrs_rustbuffer_free(RustBuffer buf, RustCallStatus *_Nonnull out_status
+);
+RustBuffer ffi_sphinxrs_rustbuffer_reserve(RustBuffer buf, int32_t additional, RustCallStatus *_Nonnull out_status
+);
+uint16_t uniffi_sphinxrs_checksum_func_pubkey_from_secret_key(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_derive_shared_secret(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_encrypt(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_decrypt(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_node_keys(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_mnemonic_from_entropy(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_entropy_from_mnemonic(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_build_request(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_parse_response(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_run_init_1(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_run_init_2(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_run_vls(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_run_lss(void
+    
+);
+uint32_t ffi_sphinxrs_uniffi_contract_version(void
+    
+);
+

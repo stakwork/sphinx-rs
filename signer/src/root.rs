@@ -12,11 +12,11 @@ use lightning_signer::policy::simple_validator::SimpleValidatorFactory;
 use lightning_signer::signer::StartingTimeFactory;
 use lightning_signer::util::clock::{Clock, StandardClock};
 use lightning_signer::wallet::Wallet;
+use lightning_signer::Arc;
 use lss_connector::{
     msgs::{Response as LssResponse, SignerMutations},
     LssSigner,
 };
-use std::sync::Arc;
 use vls_protocol::model::PubKey;
 use vls_protocol::msgs::{self, read_serial_request_header, write_serial_response_header, Message};
 use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};
@@ -87,8 +87,9 @@ fn handle_inner(
         sequence,
         peer_id,
         dbid,
-    } = read_serial_request_header(&mut bytes)?;
-    let message = msgs::read(&mut bytes)?;
+    } = read_serial_request_header(&mut bytes)
+        .map_err(|e| anyhow!("failed read_serial_request_header {:?}", e))?;
+    let message = msgs::read(&mut bytes).map_err(|e| anyhow!("failed msgs::read: {:?}", e))?;
 
     if let Message::HsmdInit(ref m) = message {
         if ChainHash::using_genesis_block(root_handler.node().network()).as_bytes()
@@ -123,8 +124,10 @@ fn handle_inner(
     let (vls_msg, mutations) = reply;
     // make the VLS message bytes
     let mut buf = Vec::new();
-    write_serial_response_header(&mut &mut buf, sequence)?;
-    msgs::write_vec(&mut &mut buf, vls_msg.as_vec())?;
+    write_serial_response_header(&mut &mut buf, sequence)
+        .map_err(|e| anyhow!("failed write_serial_response_header: {:?}", e))?;
+    msgs::write_vec(&mut &mut buf, vls_msg.as_vec())
+        .map_err(|e| anyhow!("failed msgs::write_vec: {:?}", e))?;
     //println!("handled message, replying with: {:?}", out_md);
     Ok((buf, mutations))
 }
@@ -145,7 +148,10 @@ pub fn handle_with_lss(
         Vec::new()
     } else {
         let client_hmac = lss_signer.client_hmac(&mutations);
-        let lss_msg = LssResponse::VlsMuts(SignerMutations { client_hmac, muts: mutations.into_inner() });
+        let lss_msg = LssResponse::VlsMuts(SignerMutations {
+            client_hmac,
+            muts: mutations.into_inner(),
+        });
         lss_msg.to_vec()?
     };
     Ok((out_bytes, lss_bytes))
