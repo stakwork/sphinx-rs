@@ -27,6 +27,7 @@ impl LssSigner {
         builder: &RootHandlerBuilder,
         server_pubkey: &PublicKey,
         nonce: Option<[u8; 32]>,
+        initial_state: Option<BTreeMap<String, (u64, Vec<u8>)>>,
     ) -> (Self, Vec<u8>) {
         let (keys_manager, _node_id) = builder.build_keys_manager();
         let client_id = keys_manager.get_persistence_pubkey();
@@ -56,8 +57,7 @@ impl LssSigner {
         });
         let msg_bytes = msg.to_vec().unwrap();
 
-        let state = Arc::new(Mutex::new(Default::default()));
-        // let helper = Arc::new(Mutex::new(helper));
+        let state = Arc::new(Mutex::new(initial_state.unwrap_or_default()));
         (
             Self {
                 state,

@@ -65,7 +65,7 @@ pub fn builder_inner(
         clock: clock.clone(),
     };
 
-    log::info!("create root handler builder with network {:?}", network);
+    log::debug!("create root handler builder with network {:?}", network);
     let mut handler_builder =
         RootHandlerBuilder::new(network, 0, services, seed).allowlist(initial_allowlist);
     // FIXME set up a manual approver (ui_approver)
@@ -82,7 +82,7 @@ fn handle_inner(
     mut bytes: Vec<u8>,
     do_log: bool,
 ) -> anyhow::Result<(Vec<u8>, Mutations)> {
-    //println!("Signer is handling these bytes: {:?}", bytes);
+    // println!("Signer is handling these bytes: {:?}", bytes);
     let msgs::SerialRequestHeader {
         sequence,
         peer_id,
@@ -105,7 +105,6 @@ fn handle_inner(
     if do_log {
         vls_log(&message);
         // log::info!("VLS: {:?}", message);
-        // println!("VLS msg: {:?}", message);
     }
     let reply = if dbid > 0 {
         let handler = root_handler.for_new_client(dbid, PubKey(peer_id), dbid);
