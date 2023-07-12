@@ -12,15 +12,18 @@ pub fn node_keys(network: &Network, seed: &[u8]) -> (PublicKey, SecretKey) {
 }
 
 pub fn mnemonic_from_entropy(entropy: &[u8]) -> anyhow::Result<String> {
-    let mn = bip39::Mnemonic::from_entropy(entropy)?;
+    let mn = bip39::Mnemonic::from_entropy(entropy)
+        .map_err(|e| anyhow::anyhow!("Mnemonic::from_entropy failed {:?}", e))?;
     let mut ret = Vec::new();
     mn.word_iter().for_each(|w| ret.push(w.to_string()));
     Ok(ret.join(" "))
 }
 
 pub fn entropy_from_mnemonic(mn: &str) -> anyhow::Result<Vec<u8>> {
-    let mn = bip39::Mnemonic::parse_normalized(mn)?;
-    Ok(mn.to_entropy())
+    let mn = bip39::Mnemonic::parse_normalized(mn)
+        .map_err(|e| anyhow::anyhow!("Mnemonic::parse_normalized failed {:?}", e))?;
+    let e = mn.to_entropy_array();
+    Ok(e.0.to_vec())
 }
 
 #[cfg(test)]

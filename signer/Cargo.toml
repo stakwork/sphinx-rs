@@ -25,7 +25,7 @@ vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-
 # vls-protocol = { path = "../../vls/vls-protocol" }
 # vls-persist = { path = "../../vls/vls-persist", default-features = false, features = ["memo"], optional = true }
 log = "0.4"
-bip39 = "1.0.1"
+bip39 = { version = "1.0.1", default-features = false }
 rand = { version = "0.8", default-features = false }
 serde = { version = "1.0.168", default-features = false, features = ["derive"] }
 hex = { version = "0.4.3", default-features = false }
