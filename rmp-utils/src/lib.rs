@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-pub fn serialize_vec(v: &Vec<(String, (u64, Vec<u8>))>) -> Vec<u8> {
+pub fn serialize_state_vec(v: &Vec<(String, (u64, Vec<u8>))>) -> Vec<u8> {
     let mut buff = rmp::encode::buffer::ByteBuf::new();
     rmp::encode::write_array_len(&mut buff, v.len() as u32).unwrap();
     v.iter().for_each(|(x, (y, z))| {
@@ -16,7 +16,7 @@ pub fn serialize_vec(v: &Vec<(String, (u64, Vec<u8>))>) -> Vec<u8> {
     buff.into_vec()
 }
 
-pub fn serialize_map(map: &BTreeMap<String, (u64, Vec<u8>)>) -> Vec<u8> {
+pub fn serialize_state_map(map: &BTreeMap<String, (u64, Vec<u8>)>) -> Vec<u8> {
     let mut buff = rmp::encode::buffer::ByteBuf::new();
     rmp::encode::write_map_len(&mut buff, map.len() as u32).unwrap();
     map.iter().for_each(|(x, (y, z))| {
@@ -38,7 +38,7 @@ fn vector_serialize_test() {
         ("bbbb".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
         ("cccc".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
     ];
-    let buff = serialize_vec(&test);
+    let buff = serialize_state_vec(&test);
     let reference = rmp_serde::to_vec(&test).unwrap();
     // Test bytes equality
     assert_eq!(reference, buff);
@@ -53,7 +53,7 @@ fn btree_serialize_test() {
     test.insert("aaaa".to_string(), (0, vec![u8::MAX, u8::MAX, u8::MAX]));
     test.insert("bbbb".to_string(), (0, vec![u8::MAX, u8::MAX, u8::MAX]));
     test.insert("cccc".to_string(), (0, vec![u8::MAX, u8::MAX, u8::MAX]));
-    let buff = serialize_map(&test);
+    let buff = serialize_state_map(&test);
     let reference = rmp_serde::to_vec(&test).unwrap();
     // Test bytes equality
     assert_eq!(reference, buff);
