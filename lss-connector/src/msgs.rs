@@ -27,14 +27,14 @@ pub struct Init {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct BrokerMutations {
-    pub muts: Muts,
     pub server_hmac: Vec<u8>,
+    pub muts: Muts,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SignerMutations {
-    pub muts: Muts,
     pub client_hmac: [u8; 32],
+    pub muts: Muts,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
