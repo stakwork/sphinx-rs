@@ -1,9 +1,15 @@
-use anyhow::{anyhow, Result};
+extern crate alloc;
+use alloc::string::String;
+use anyhow::{anyhow, Error, Result};
+use rmp::{
+    decode::{self, RmpRead},
+    encode,
+};
 use rmp_serde::encode::Error as RmpError;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Msg {
     Init(Init),
     Created(BrokerMutations),
@@ -18,15 +24,41 @@ pub enum Response {
 }
 
 fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
+    let mut buff = encode::buffer::ByteBuf::new();
     match msg {
-        Msg::Init(init) => todo!(),
+        Msg::Init(init) => {
+            encode::write_map_len(&mut buff, 1u32).map_err(Error::msg)?;
+            encode::write_str(&mut buff, "Init").map_err(Error::msg)?;
+            encode::write_bin(&mut buff, &init.server_pubkey).map_err(Error::msg)?;
+            Ok(buff.into_vec())
+        }
         Msg::Created(bm) => todo!(),
         Msg::Stored(bm) => todo!(),
     }
 }
 
 fn deserialize_lssmsg(b: &[u8]) -> Result<Msg> {
-    todo!();
+    let mut bytes = decode::bytes::Bytes::new(b);
+    let length =
+        decode::read_map_len(&mut bytes).map_err(|_| Error::msg("could not read map lenght"));
+    let mut buff = vec![0u8; 64];
+    let variant =
+        decode::read_str(&mut bytes, &mut buff).map_err(|_| Error::msg("could not read str"))?;
+    match variant {
+        "Init" => {
+            let length = decode::read_bin_len(&mut bytes)
+                .map_err(|_| Error::msg("could not read bin length"))?;
+            assert!(length == 33);
+            let mut server_pubkey = [0u8; 33];
+            bytes
+                .read_exact_buf(&mut server_pubkey)
+                .map_err(Error::msg)?;
+            Ok(Msg::Init(Init { server_pubkey }))
+        }
+        "Created" => todo!(),
+        "Stored" => todo!(),
+        m => panic!("wrong: {:?}", m),
+    }
 }
 
 fn serialize_lssres(res: &Response) -> Result<Vec<u8>> {
@@ -43,13 +75,13 @@ fn deserialize_lssres(b: &[u8]) -> Result<Response> {
 
 pub type Muts = Vec<(String, (u64, Vec<u8>))>;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Init {
     #[serde(with = "BigArray")]
     pub server_pubkey: [u8; 33],
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 pub struct BrokerMutations {
     pub server_hmac: Vec<u8>,
     pub muts: Muts,
@@ -180,5 +212,15 @@ mod tests {
         let bytes = rmp_serde::to_vec_named(&m);
         println!("bytes {:?}", bytes);
         Ok(())
+    }
+
+    #[test]
+    fn test_msginit_serde() {
+        let test = Msg::Init(Init {
+            server_pubkey: [u8::MAX; 33],
+        });
+        let bytes = serialize_lssmsg(&test).unwrap();
+        let object = deserialize_lssmsg(&bytes).unwrap();
+        assert_eq!(test, object);
     }
 }
