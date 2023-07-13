@@ -1,2 +1,3 @@
 notes.md
 src/sphinxrs.uniffi.rs
+build.rs-nope

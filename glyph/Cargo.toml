@@ -10,8 +10,7 @@ license = "MIT"
 [features]
 default = ["std"]
 std = ["rmp-serde", "anyhow/std", "hex/std", "serde_json/std", "sphinx-auther/std"]
-# FIXME remove rmp-serde from no-std
-no-std = ["rmp-serde", "serde_json/alloc"]
+no-std = ["serde_json/alloc"]
 
 [dependencies]
 sphinx-auther = { path = "../auther", version = "0.1.12", default-features = false }
