@@ -17,6 +17,30 @@ pub enum Response {
     VlsMuts(SignerMutations),
 }
 
+fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
+    match msg {
+        Msg::Init(init) => todo!(),
+        Msg::Created(bm) => todo!(),
+        Msg::Stored(bm) => todo!(),
+    }
+}
+
+fn deserialize_lssmsg(b: &[u8]) -> Result<Msg> {
+    todo!();
+}
+
+fn serialize_lssres(res: &Response) -> Result<Vec<u8>> {
+    match res {
+        Response::Init(init_response) => todo!(),
+        Response::Created(sm) => todo!(),
+        Response::VlsMuts(sm) => todo!(),
+    }
+}
+
+fn deserialize_lssres(b: &[u8]) -> Result<Response> {
+    todo!();
+}
+
 pub type Muts = Vec<(String, (u64, Vec<u8>))>;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
