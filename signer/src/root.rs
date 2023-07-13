@@ -71,7 +71,6 @@ pub fn builder_inner(
     // FIXME set up a manual approver (ui_approver)
     let approv = create_approver(clock.clone(), initial_policy, initial_velocity);
     let approver = Arc::new(approv);
-    // FIXME need to be able to update approvder velocity control on the fly
     handler_builder = handler_builder.approver(approver.clone());
     Ok((handler_builder, approver))
 }

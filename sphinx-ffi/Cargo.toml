@@ -33,6 +33,3 @@ debug = true # Enable debug symbols. For example, we can use `dwarfdump` to chec
 # [[bin]]
 # name = "uniffi-bindgen"
 # path = "uniffi-bindgen.rs"
-
-[patch.crates-io]
-serde_bolt = { path = "../../../evanf/serde-bolt" }
