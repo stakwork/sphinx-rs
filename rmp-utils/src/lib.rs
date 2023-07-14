@@ -9,25 +9,23 @@ use rmp::{
     encode,
 };
 
-pub fn serialize_state_vec(v: &Vec<(String, (u64, Vec<u8>))>) -> Result<Vec<u8>> {
-    let mut buff = encode::buffer::ByteBuf::new();
-    encode::write_array_len(&mut buff, v.len() as u32).map_err(Error::msg)?;
+pub fn serialize_state_vec(buff: &mut encode::buffer::ByteBuf, v: &Vec<(String, (u64, Vec<u8>))>) -> Result<()> {
+    encode::write_array_len(buff, v.len() as u32).map_err(Error::msg)?;
     for (x, (y, z)) in v {
-        encode::write_array_len(&mut buff, 2).map_err(Error::msg)?;
-        serialize_state_element(&mut buff, x, y, z)?;
+        encode::write_array_len(buff, 2).map_err(Error::msg)?;
+        serialize_state_element(buff, x, y, z)?;
     }
-    Ok(buff.into_vec())
+    Ok(())
 }
 
-pub fn deserialize_state_vec(b: &[u8]) -> Result<Vec<(String, (u64, Vec<u8>))>> {
-    let mut bytes = decode::bytes::Bytes::new(b);
-    let length = decode::read_array_len(&mut bytes)
+pub fn deserialize_state_vec(bytes: &mut decode::bytes::Bytes) -> Result<Vec<(String, (u64, Vec<u8>))>> {
+    let length = decode::read_array_len(bytes)
         .map_err(|_| Error::msg("could not read array length"))?;
     let mut object: Vec<(String, (u64, Vec<u8>))> = Vec::with_capacity(length as usize);
     for _ in 0..length {
-        let _ = decode::read_array_len(&mut bytes)
+        let _ = decode::read_array_len(bytes)
             .map_err(|_| Error::msg("could not read array length"))?;
-        let (x, (y, z)) = deserialize_state_element(&mut bytes)?;
+        let (x, (y, z)) = deserialize_state_element(bytes)?;
         object.push((x, (y, z)));
     }
     Ok(object)

@@ -6,6 +6,7 @@ use rmp::{
     encode,
 };
 use rmp_serde::encode::Error as RmpError;
+use rmp_utils::*;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
@@ -16,7 +17,7 @@ pub enum Msg {
     Stored(BrokerMutations),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Response {
     Init(InitResponse),
     Created(SignerMutations),
@@ -29,23 +30,110 @@ fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
         Msg::Init(init) => {
             encode::write_map_len(&mut buff, 1u32).map_err(Error::msg)?;
             encode::write_str(&mut buff, "Init").map_err(Error::msg)?;
+            encode::write_map_len(&mut buff, 1u32).map_err(Error::msg)?;
+            encode::write_str(&mut buff, "server_pubkey").map_err(Error::msg)?;
             encode::write_bin(&mut buff, &init.server_pubkey).map_err(Error::msg)?;
             Ok(buff.into_vec())
         }
-        Msg::Created(bm) => todo!(),
-        Msg::Stored(bm) => todo!(),
+        Msg::Created(bm) => {
+            serialize_muts(
+                &mut buff,
+                "Created",
+                "server_hmac",
+                &bm.server_hmac,
+                &bm.muts,
+            )?;
+            Ok(buff.into_vec())
+        }
+        Msg::Stored(bm) => {
+            serialize_muts(
+                &mut buff,
+                "Stored",
+                "server_hmac",
+                &bm.server_hmac,
+                &bm.muts,
+            )?;
+            Ok(buff.into_vec())
+        }
     }
+}
+
+fn serialize_lssres(res: &Response) -> Result<Vec<u8>> {
+    let mut buff = encode::buffer::ByteBuf::new();
+    match res {
+        Response::Init(init) => {
+            encode::write_map_len(&mut buff, 1u32).map_err(Error::msg)?;
+            encode::write_str(&mut buff, "Init").map_err(Error::msg)?;
+            encode::write_map_len(&mut buff, 3u32).map_err(Error::msg)?;
+            encode::write_str(&mut buff, "client_id").map_err(Error::msg)?;
+            encode::write_bin(&mut buff, &init.client_id).map_err(Error::msg)?;
+            encode::write_str(&mut buff, "auth_token").map_err(Error::msg)?;
+            encode::write_bin(&mut buff, &init.auth_token).map_err(Error::msg)?;
+            encode::write_str(&mut buff, "nonce").map_err(Error::msg)?;
+            if let Some(arr) = init.nonce {
+                encode::write_bin(&mut buff, &arr).map_err(Error::msg)?;
+            } else {
+                encode::write_bin(&mut buff, &[0u8; 0]).map_err(Error::msg)?;
+            }
+            Ok(buff.into_vec())
+        }
+        Response::Created(sm) => {
+            serialize_muts(
+                &mut buff,
+                "Created",
+                "client_hmac",
+                &sm.client_hmac,
+                &sm.muts,
+            )?;
+            Ok(buff.into_vec())
+        }
+        Response::VlsMuts(sm) => {
+            serialize_muts(
+                &mut buff,
+                "VlsMuts",
+                "client_hmac",
+                &sm.client_hmac,
+                &sm.muts,
+            )?;
+            Ok(buff.into_vec())
+        }
+    }
+}
+
+fn serialize_muts(
+    buff: &mut encode::buffer::ByteBuf,
+    variant: &str,
+    hmac_type: &str,
+    hmac: &Vec<u8>,
+    muts: &Muts,
+) -> Result<()> {
+    encode::write_map_len(buff, 1u32).map_err(Error::msg)?;
+    encode::write_str(buff, variant).map_err(Error::msg)?;
+    encode::write_map_len(buff, 2u32).map_err(Error::msg)?;
+    encode::write_str(buff, hmac_type).map_err(Error::msg)?;
+    encode::write_bin(buff, hmac).map_err(Error::msg)?;
+    encode::write_str(buff, "muts").map_err(Error::msg)?;
+    serialize_state_vec(buff, muts).map_err(Error::msg)?;
+    Ok(())
 }
 
 fn deserialize_lssmsg(b: &[u8]) -> Result<Msg> {
     let mut bytes = decode::bytes::Bytes::new(b);
     let length =
-        decode::read_map_len(&mut bytes).map_err(|_| Error::msg("could not read map lenght"));
+        decode::read_map_len(&mut bytes).map_err(|_| Error::msg("could not read map length"))?;
+    assert!(length == 1);
     let mut buff = vec![0u8; 64];
     let variant =
         decode::read_str(&mut bytes, &mut buff).map_err(|_| Error::msg("could not read str"))?;
     match variant {
         "Init" => {
+            let length = decode::read_map_len(&mut bytes)
+                .map_err(|_| Error::msg("could not read map length"))?;
+            assert!(length == 1);
+            let mut buff = vec![0u8; 64];
+            let field_name = decode::read_str(&mut bytes, &mut buff)
+                .map_err(|_| Error::msg("could not read str"))?;
+            assert!(field_name == "server_pubkey");
             let length = decode::read_bin_len(&mut bytes)
                 .map_err(|_| Error::msg("could not read bin length"))?;
             assert!(length == 33);
@@ -55,22 +143,126 @@ fn deserialize_lssmsg(b: &[u8]) -> Result<Msg> {
                 .map_err(Error::msg)?;
             Ok(Msg::Init(Init { server_pubkey }))
         }
-        "Created" => todo!(),
-        "Stored" => todo!(),
+        "Created" => Ok(Msg::Created(
+            deserialize_brokermuts(&mut bytes).map_err(Error::msg)?,
+        )),
+        "Stored" => Ok(Msg::Stored(
+            deserialize_brokermuts(&mut bytes).map_err(Error::msg)?,
+        )),
         m => panic!("wrong: {:?}", m),
     }
 }
 
-fn serialize_lssres(res: &Response) -> Result<Vec<u8>> {
-    match res {
-        Response::Init(init_response) => todo!(),
-        Response::Created(sm) => todo!(),
-        Response::VlsMuts(sm) => todo!(),
+fn deserialize_lssres(b: &[u8]) -> Result<Response> {
+    let mut bytes = decode::bytes::Bytes::new(b);
+    let length =
+        decode::read_map_len(&mut bytes).map_err(|_| Error::msg("could not read map length"))?;
+    assert!(length == 1);
+    let mut buff = vec![0u8; 64];
+    let variant =
+        decode::read_str(&mut bytes, &mut buff).map_err(|_| Error::msg("could not read str"))?;
+    match variant {
+        "Init" => {
+            let length = decode::read_map_len(&mut bytes)
+                .map_err(|_| Error::msg("could not read map length"))?;
+            println!("{}", length);
+            assert!(length == 3);
+
+            // client_id
+            let mut buff = vec![0u8; 64];
+            let field_name = decode::read_str(&mut bytes, &mut buff)
+                .map_err(|_| Error::msg("could not read str"))?;
+            assert!(field_name == "client_id");
+            let length = decode::read_bin_len(&mut bytes)
+                .map_err(|_| Error::msg("could not read bin length"))?;
+            assert!(length == 33);
+            let mut client_id = [0u8; 33];
+            bytes.read_exact_buf(&mut client_id).map_err(Error::msg)?;
+
+            // auth_token
+            let mut buff = vec![0u8; 64];
+            let field_name = decode::read_str(&mut bytes, &mut buff)
+                .map_err(|_| Error::msg("could not read str"))?;
+            assert!(field_name == "auth_token");
+            let length = decode::read_bin_len(&mut bytes)
+                .map_err(|_| Error::msg("could not read bin length"))?;
+            assert!(length == 32);
+            let mut auth_token = [0u8; 32];
+            bytes.read_exact_buf(&mut auth_token).map_err(Error::msg)?;
+            let auth_token = auth_token.to_vec();
+
+            // nonce
+            let mut buff = vec![0u8; 64];
+            let field_name = decode::read_str(&mut bytes, &mut buff)
+                .map_err(|_| Error::msg("could not read str"))?;
+            assert!(field_name == "nonce");
+            let length = decode::read_bin_len(&mut bytes)
+                .map_err(|_| Error::msg("could not read bin length"))?;
+            let mut nonce = match length {
+                32 => {
+                    let mut arr = [0u8; 32];
+                    bytes.read_exact_buf(&mut arr).map_err(Error::msg)?;
+                    Some(arr)
+                }
+                0 => None,
+                n => panic!("wrong: {}", n),
+            };
+            Ok(Response::Init(InitResponse {
+                client_id,
+                auth_token,
+                nonce,
+            }))
+        }
+        "Created" => Ok(Response::Created(
+            deserialize_signermuts(&mut bytes).map_err(Error::msg)?,
+        )),
+        "VlsMuts" => Ok(Response::VlsMuts(
+            deserialize_signermuts(&mut bytes).map_err(Error::msg)?,
+        )),
+        m => panic!("wrong: {:?}", m),
     }
 }
 
-fn deserialize_lssres(b: &[u8]) -> Result<Response> {
-    todo!();
+enum MutsDeserializeVariant {
+    Broker,
+    Signer,
+}
+
+fn deserialize_brokermuts(bytes: &mut decode::bytes::Bytes) -> Result<BrokerMutations> {
+    let (server_hmac, muts) = deserialize_lssmuts(bytes, MutsDeserializeVariant::Broker)?;
+    Ok(BrokerMutations { server_hmac, muts })
+}
+
+fn deserialize_signermuts(bytes: &mut decode::bytes::Bytes) -> Result<SignerMutations> {
+    let (client_hmac, muts) = deserialize_lssmuts(bytes, MutsDeserializeVariant::Signer)?;
+    Ok(SignerMutations { client_hmac, muts })
+}
+
+fn deserialize_lssmuts(
+    bytes: &mut decode::bytes::Bytes,
+    variant: MutsDeserializeVariant,
+) -> Result<(Vec<u8>, Muts)> {
+    let length =
+        decode::read_map_len(bytes).map_err(|_| Error::msg("could not read map length"))?;
+    assert!(length == 2);
+    let mut buff = vec![0u8; 64];
+    let field_name =
+        decode::read_str(bytes, &mut buff).map_err(|_| Error::msg("could not read str"))?;
+    match variant {
+        self::MutsDeserializeVariant::Broker => assert!(field_name == "server_hmac"),
+        self::MutsDeserializeVariant::Signer => assert!(field_name == "client_hmac"),
+    }
+    let length =
+        decode::read_bin_len(bytes).map_err(|_| Error::msg("could not read bin length"))?;
+    assert!(length == 32);
+    let mut hmac = [0u8; 32];
+    bytes.read_exact_buf(&mut hmac).map_err(Error::msg)?;
+    let field_name =
+        decode::read_str(bytes, &mut buff).map_err(|_| Error::msg("could not read str"))?;
+    assert!(field_name == "muts");
+    let hmac = hmac.to_vec();
+    let muts = deserialize_state_vec(bytes).map_err(Error::msg)?;
+    Ok((hmac, muts))
 }
 
 pub type Muts = Vec<(String, (u64, Vec<u8>))>;
@@ -87,13 +279,13 @@ pub struct BrokerMutations {
     pub muts: Muts,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SignerMutations {
-    pub client_hmac: [u8; 32],
+    pub client_hmac: Vec<u8>,
     pub muts: Muts,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct InitResponse {
     #[serde(with = "BigArray")]
     pub client_id: [u8; 33],
@@ -146,6 +338,17 @@ impl Msg {
 }
 impl Response {
     pub fn to_vec(&self) -> Result<Vec<u8>> {
+        match self {
+            Response::Init(res) => {
+                println!("I am here!");
+                println!("{}", res.client_id.len());
+                println!("{}", res.auth_token.len());
+                if res.nonce.is_some() {
+                    println!("{}", res.nonce.unwrap().len());
+                }
+            }
+            _ => (),
+        }
         let mut size = 1000;
         let mut arr = vec![0u8; size].into_boxed_slice();
         let mut buff = std::io::Cursor::new(arr);
@@ -221,6 +424,91 @@ mod tests {
         });
         let bytes = serialize_lssmsg(&test).unwrap();
         let object = deserialize_lssmsg(&bytes).unwrap();
+        assert_eq!(test, object);
+    }
+
+    #[test]
+    fn test_msgcreated_serde() {
+        let muts = vec![
+            ("aaaa".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
+            ("bbbb".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
+            ("cccc".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
+        ];
+        let test = Msg::Created(BrokerMutations {
+            server_hmac: [u8::MAX; 32].to_vec(),
+            muts,
+        });
+        let bytes = serialize_lssmsg(&test).unwrap();
+        let object = deserialize_lssmsg(&bytes).unwrap();
+        assert_eq!(test, object);
+    }
+
+    #[test]
+    fn test_msgstored_serde() {
+        let muts = vec![
+            ("aaaa".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
+            ("bbbb".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
+            ("cccc".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
+        ];
+        let test = Msg::Stored(BrokerMutations {
+            server_hmac: [u8::MAX; 32].to_vec(),
+            muts,
+        });
+        let bytes = serialize_lssmsg(&test).unwrap();
+        let object = deserialize_lssmsg(&bytes).unwrap();
+        assert_eq!(test, object);
+    }
+
+    #[test]
+    fn test_resinit_serde() {
+        let test = Response::Init(InitResponse {
+            client_id: [u8::MAX; 33],
+            auth_token: [u8::MAX; 32].to_vec(),
+            nonce: Some([u8::MAX; 32]),
+        });
+        let bytes = serialize_lssres(&test).unwrap();
+        let object = deserialize_lssres(&bytes).unwrap();
+        assert_eq!(test, object);
+
+        let test = Response::Init(InitResponse {
+            client_id: [u8::MAX; 33],
+            auth_token: [u8::MAX; 32].to_vec(),
+            nonce: None,
+        });
+        let bytes = serialize_lssres(&test).unwrap();
+        let object = deserialize_lssres(&bytes).unwrap();
+        assert_eq!(test, object);
+    }
+
+    #[test]
+    fn test_rescreated_serde() {
+        let muts = vec![
+            ("aaaa".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
+            ("bbbb".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
+            ("cccc".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
+        ];
+        let test = Response::Created(SignerMutations {
+            client_hmac: [u8::MAX; 32].to_vec(),
+            muts,
+        });
+        let bytes = serialize_lssres(&test).unwrap();
+        let object = deserialize_lssres(&bytes).unwrap();
+        assert_eq!(test, object);
+    }
+
+    #[test]
+    fn test_resvlsmuts_serde() {
+        let muts = vec![
+            ("aaaa".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
+            ("bbbb".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
+            ("cccc".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
+        ];
+        let test = Response::VlsMuts(SignerMutations {
+            client_hmac: [u8::MAX; 32].to_vec(),
+            muts,
+        });
+        let bytes = serialize_lssres(&test).unwrap();
+        let object = deserialize_lssres(&bytes).unwrap();
         assert_eq!(test, object);
     }
 }

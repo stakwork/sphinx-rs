@@ -82,7 +82,7 @@ impl LssSigner {
     pub fn empty_created(&self) -> Vec<u8> {
         let res = Response::Created(SignerMutations {
             muts: Vec::new(),
-            client_hmac: [0; 32],
+            client_hmac: [0; 32].to_vec(),
         });
         res.to_vec().unwrap()
     }
@@ -107,7 +107,7 @@ impl LssSigner {
         let (handler, muts) = handler_builder
             .build()
             .map_err(|_| anyhow!("failed to build"))?;
-        let client_hmac = self.helper.client_hmac(&muts);
+        let client_hmac = self.helper.client_hmac(&muts).to_vec();
 
         let res = Response::Created(SignerMutations {
             muts: muts.into_inner(),
