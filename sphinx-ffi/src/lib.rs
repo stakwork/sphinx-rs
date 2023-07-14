@@ -1,8 +1,12 @@
-mod control;
 mod parse;
 mod signer;
 
+#[cfg(feature = "control")]
+mod control;
+
+#[cfg(feature = "control")]
 pub use control::*;
+
 pub use signer::*;
 
 use sphinx_crypter::chacha::{decrypt as chacha_decrypt, encrypt as chacha_encrypt};
