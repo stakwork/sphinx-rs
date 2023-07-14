@@ -5,19 +5,16 @@ use rmp::{
     decode::{self, RmpRead},
     encode,
 };
-use rmp_serde::encode::Error as RmpError;
 use rmp_utils::*;
-use serde::{Deserialize, Serialize};
-use serde_big_array::BigArray;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Msg {
     Init(Init),
     Created(BrokerMutations),
     Stored(BrokerMutations),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Response {
     Init(InitResponse),
     Created(SignerMutations),
@@ -198,7 +195,7 @@ fn deserialize_lssres(b: &[u8]) -> Result<Response> {
             assert!(field_name == "nonce");
             let length = decode::read_bin_len(&mut bytes)
                 .map_err(|_| Error::msg("could not read bin length"))?;
-            let mut nonce = match length {
+            let nonce = match length {
                 32 => {
                     let mut arr = [0u8; 32];
                     bytes.read_exact_buf(&mut arr).map_err(Error::msg)?;
@@ -267,27 +264,25 @@ fn deserialize_lssmuts(
 
 pub type Muts = Vec<(String, (u64, Vec<u8>))>;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Init {
-    #[serde(with = "BigArray")]
     pub server_pubkey: [u8; 33],
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct BrokerMutations {
     pub server_hmac: Vec<u8>,
     pub muts: Muts,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SignerMutations {
     pub client_hmac: Vec<u8>,
     pub muts: Muts,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct InitResponse {
-    #[serde(with = "BigArray")]
     pub client_id: [u8; 33],
     pub auth_token: Vec<u8>,
     pub nonce: Option<[u8; 32]>,
@@ -295,27 +290,10 @@ pub struct InitResponse {
 
 impl Msg {
     pub fn to_vec(&self) -> Result<Vec<u8>> {
-        let mut size = 1000;
-        let mut arr = vec![0u8; size].into_boxed_slice();
-        let mut buff = std::io::Cursor::new(arr);
-        loop {
-            match rmp_serde::encode::write_named(&mut buff, &self) {
-                Ok(()) => break Ok(()),
-                Err(RmpError::InvalidValueWrite(_)) => {
-                    size = size + 1000;
-                    drop(buff);
-                    arr = vec![0u8; size].into_boxed_slice();
-                    buff = std::io::Cursor::new(arr);
-                }
-                Err(e) => break Err(e),
-            }
-        }?;
-        let ret = buff.into_inner().into_vec();
-        Ok(ret)
+        serialize_lssmsg(&self)
     }
     pub fn from_slice(s: &[u8]) -> Result<Self> {
-        let ret = rmp_serde::from_slice(s)?;
-        Ok(ret)
+        deserialize_lssmsg(s)
     }
     pub fn into_init(self) -> Result<Init> {
         match self {
@@ -338,38 +316,10 @@ impl Msg {
 }
 impl Response {
     pub fn to_vec(&self) -> Result<Vec<u8>> {
-        match self {
-            Response::Init(res) => {
-                println!("I am here!");
-                println!("{}", res.client_id.len());
-                println!("{}", res.auth_token.len());
-                if res.nonce.is_some() {
-                    println!("{}", res.nonce.unwrap().len());
-                }
-            }
-            _ => (),
-        }
-        let mut size = 1000;
-        let mut arr = vec![0u8; size].into_boxed_slice();
-        let mut buff = std::io::Cursor::new(arr);
-        loop {
-            match rmp_serde::encode::write_named(&mut buff, &self) {
-                Ok(()) => break Ok(()),
-                Err(RmpError::InvalidValueWrite(_)) => {
-                    size = size + 1000;
-                    drop(buff);
-                    arr = vec![0u8; size].into_boxed_slice();
-                    buff = std::io::Cursor::new(arr);
-                }
-                Err(e) => break Err(e),
-            }
-        }?;
-        let ret = buff.into_inner().into_vec();
-        Ok(ret)
+        serialize_lssres(&self)
     }
     pub fn from_slice(s: &[u8]) -> Result<Self> {
-        let ret = rmp_serde::from_slice(s)?;
-        Ok(ret)
+        deserialize_lssres(s)
     }
     pub fn into_init(self) -> Result<InitResponse> {
         match self {
@@ -406,14 +356,6 @@ mod tests {
         // println!("LEN {:?}", s.len());
         // let m = Msg::from_slice(&s)?;
         // println!("M {:?}", m);
-        Ok(())
-    }
-
-    #[test]
-    fn test_muts() -> anyhow::Result<()> {
-        let m = vec![("hi".to_string(), (23, vec![1, 2, 3]))];
-        let bytes = rmp_serde::to_vec_named(&m);
-        println!("bytes {:?}", bytes);
         Ok(())
     }
 
