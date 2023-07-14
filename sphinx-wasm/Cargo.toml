@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 wasm-bindgen = "0.2"
-sphinx-ffi = { path = "../sphinx-ffi", default-features = false, features = ["wasm"] }
+sphinx-ffi = { path = "../sphinx-ffi", default-features = false, features = ["no-std","wasm"] }
 getrandom = { version = "0.2.7", features = ["js"] }
 secp256k1 = { version = "0.24.0", default-features = false }
 

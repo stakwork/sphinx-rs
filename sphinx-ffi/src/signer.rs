@@ -1,5 +1,5 @@
 use crate::{Result, SphinxError};
-use sphinx_glyph::{rmp_serde, serde_json};
+use sphinx_glyph::serde_json;
 use sphinx_signer::mobile;
 
 pub type VlsResponse = mobile::RunReturn;
@@ -55,7 +55,7 @@ pub fn run_lss(
 
 fn state_from_mp(state_mp: &[u8]) -> Result<mobile::State> {
     let state: mobile::State =
-        rmp_serde::from_slice(state_mp).map_err(|_| SphinxError::BadState)?;
+        rmp_utils::deserialize_state_map(state_mp).map_err(|_| SphinxError::BadState)?;
     Ok(state)
 }
 fn args_from_json(args_string: &str) -> Result<mobile::Args> {

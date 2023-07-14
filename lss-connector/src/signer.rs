@@ -2,9 +2,10 @@ use crate::msgs::*;
 use anyhow::{anyhow, Result};
 use lightning_signer::persist::ExternalPersistHelper;
 use lightning_signer::persist::Mutations;
+use lightning_signer::prelude::Mutex;
+use lightning_signer::Arc;
 use secp256k1::PublicKey;
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
 use vls_protocol_signer::handler::{RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
 

@@ -1,9 +1,11 @@
 pub mod approver;
 pub mod derive;
 pub mod parser;
-pub mod policy;
 pub mod root;
 pub mod rst;
+
+#[cfg(feature = "std")]
+pub mod policy;
 
 pub use sphinx_glyph;
 pub use vls_protocol;

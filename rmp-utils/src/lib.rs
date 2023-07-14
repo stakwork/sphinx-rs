@@ -9,7 +9,10 @@ use rmp::{
     encode,
 };
 
-pub fn serialize_state_vec(buff: &mut encode::buffer::ByteBuf, v: &Vec<(String, (u64, Vec<u8>))>) -> Result<()> {
+pub fn serialize_state_vec(
+    buff: &mut encode::buffer::ByteBuf,
+    v: &Vec<(String, (u64, Vec<u8>))>,
+) -> Result<()> {
     encode::write_array_len(buff, v.len() as u32).map_err(Error::msg)?;
     for (x, (y, z)) in v {
         encode::write_array_len(buff, 2).map_err(Error::msg)?;
@@ -18,13 +21,15 @@ pub fn serialize_state_vec(buff: &mut encode::buffer::ByteBuf, v: &Vec<(String, 
     Ok(())
 }
 
-pub fn deserialize_state_vec(bytes: &mut decode::bytes::Bytes) -> Result<Vec<(String, (u64, Vec<u8>))>> {
-    let length = decode::read_array_len(bytes)
-        .map_err(|_| Error::msg("could not read array length"))?;
+pub fn deserialize_state_vec(
+    bytes: &mut decode::bytes::Bytes,
+) -> Result<Vec<(String, (u64, Vec<u8>))>> {
+    let length =
+        decode::read_array_len(bytes).map_err(|_| Error::msg("could not read array length"))?;
     let mut object: Vec<(String, (u64, Vec<u8>))> = Vec::with_capacity(length as usize);
     for _ in 0..length {
-        let _ = decode::read_array_len(bytes)
-            .map_err(|_| Error::msg("could not read array length"))?;
+        let _ =
+            decode::read_array_len(bytes).map_err(|_| Error::msg("could not read array length"))?;
         let (x, (y, z)) = deserialize_state_element(bytes)?;
         object.push((x, (y, z)));
     }
@@ -88,8 +93,10 @@ fn state_vec_serde() {
         ("bbbb".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
         ("cccc".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
     ];
-    let bytes = serialize_state_vec(&test).unwrap();
-    let object = deserialize_state_vec(&bytes).unwrap();
+    let mut buff = encode::buffer::ByteBuf::new();
+    serialize_state_vec(&mut buff, &test).unwrap();
+    let mut bytes = decode::bytes::Bytes::new(buff.as_slice());
+    let object = deserialize_state_vec(&mut bytes).unwrap();
     assert_eq!(test, object);
 }
 

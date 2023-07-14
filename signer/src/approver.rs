@@ -1,4 +1,4 @@
-use crate::policy::policy_interval;
+use crate::root::policy_interval;
 use sphinx_glyph::types;
 use types::{Policy, Velocity};
 

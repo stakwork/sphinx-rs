@@ -21,6 +21,32 @@ pub enum Response {
     VlsMuts(SignerMutations),
 }
 
+pub type Muts = Vec<(String, (u64, Vec<u8>))>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Init {
+    pub server_pubkey: [u8; 33],
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct BrokerMutations {
+    pub server_hmac: Vec<u8>,
+    pub muts: Muts,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SignerMutations {
+    pub client_hmac: Vec<u8>,
+    pub muts: Muts,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct InitResponse {
+    pub client_id: [u8; 33],
+    pub auth_token: Vec<u8>,
+    pub nonce: Option<[u8; 32]>,
+}
+
 fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
     let mut buff = encode::buffer::ByteBuf::new();
     match msg {
@@ -260,32 +286,6 @@ fn deserialize_lssmuts(
     let hmac = hmac.to_vec();
     let muts = deserialize_state_vec(bytes).map_err(Error::msg)?;
     Ok((hmac, muts))
-}
-
-pub type Muts = Vec<(String, (u64, Vec<u8>))>;
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Init {
-    pub server_pubkey: [u8; 33],
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct BrokerMutations {
-    pub server_hmac: Vec<u8>,
-    pub muts: Muts,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct SignerMutations {
-    pub client_hmac: Vec<u8>,
-    pub muts: Muts,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct InitResponse {
-    pub client_id: [u8; 33],
-    pub auth_token: Vec<u8>,
-    pub nonce: Option<[u8; 32]>,
 }
 
 impl Msg {

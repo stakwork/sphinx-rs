@@ -1,16 +1,19 @@
 use crate::approver::{create_approver, SphinxApprover};
-use crate::policy::make_policy;
 use sphinx_glyph::types;
-use types::{Policy, Velocity};
+use types::{Interval, Policy, Velocity};
 
 use anyhow::anyhow;
 use lightning_signer::bitcoin::blockdata::constants::ChainHash;
 use lightning_signer::bitcoin::Network;
 use lightning_signer::node::NodeServices;
 use lightning_signer::persist::{Mutations, Persist};
-use lightning_signer::policy::simple_validator::SimpleValidatorFactory;
+use lightning_signer::policy::filter::PolicyFilter;
+use lightning_signer::policy::simple_validator::{
+    make_simple_policy, SimplePolicy, SimpleValidatorFactory,
+};
 use lightning_signer::signer::StartingTimeFactory;
-use lightning_signer::util::clock::{Clock, StandardClock};
+use lightning_signer::util::clock::Clock;
+use lightning_signer::util::velocity::VelocityControlIntervalType;
 use lightning_signer::wallet::Wallet;
 use lightning_signer::Arc;
 use lss_connector::{
@@ -30,7 +33,7 @@ pub fn builder(
     initial_allowlist: Vec<String>,
     persister: Arc<dyn Persist>,
 ) -> anyhow::Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
-    let clock = Arc::new(StandardClock());
+    let clock = make_clock();
     let random_time_factory = crate::rst::RandomStartingTimeFactory::new();
     Ok(builder_inner(
         seed,
@@ -42,6 +45,22 @@ pub fn builder(
         clock,
         random_time_factory,
     )?)
+}
+
+fn make_clock() -> Arc<dyn Clock> {
+    #[cfg(feature = "std")]
+    {
+        Arc::new(lightning_signer::util::clock::StandardClock())
+    }
+    #[cfg(feature = "no-std")]
+    {
+        use lightning_signer::util::clock::ManualClock;
+        use std::time::SystemTime;
+        let timestamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
+        Arc::new(ManualClock::new(timestamp))
+    }
 }
 
 pub fn builder_inner(
@@ -73,6 +92,22 @@ pub fn builder_inner(
     let approver = Arc::new(approv);
     handler_builder = handler_builder.approver(approver.clone());
     Ok((handler_builder, approver))
+}
+
+pub fn make_policy(network: Network, _po: &Policy) -> SimplePolicy {
+    let mut p = make_simple_policy(network);
+    // let mut p = make_simple_policy(network);
+    // p.max_htlc_value_sat = po.htlc_limit_msat;
+    p.filter = PolicyFilter::new_permissive();
+    // FIXME for prod use a nempty filter
+    p
+}
+
+pub fn policy_interval(int: Interval) -> VelocityControlIntervalType {
+    match int {
+        Interval::Hourly => VelocityControlIntervalType::Hourly,
+        Interval::Daily => VelocityControlIntervalType::Daily,
+    }
 }
 
 // returns the VLS return msg and the muts

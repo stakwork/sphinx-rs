@@ -1,11 +1,7 @@
-use sphinx_glyph::types::{Interval, Policy};
+use sphinx_glyph::types::Policy;
 
 use lightning_signer::persist::Mutations;
-use lightning_signer::policy::filter::PolicyFilter;
-use lightning_signer::policy::simple_validator::{
-    make_simple_policy, SimplePolicy, SimpleValidatorFactory,
-};
-use lightning_signer::util::velocity::VelocityControlIntervalType;
+use lightning_signer::policy::simple_validator::SimpleValidatorFactory;
 use lightning_signer::Arc;
 use sphinx_glyph::control::{All, ControlMessage, ControlResponse};
 use vls_protocol_signer::handler::{Handler, RootHandler};
@@ -84,7 +80,7 @@ pub fn get_allowlist(root_handler: &RootHandler) -> anyhow::Result<Vec<String>> 
 }
 
 pub fn set_policy(root_handler: &RootHandler, network: Network, po: Policy) -> anyhow::Result<()> {
-    let policy = make_policy(network, &po);
+    let policy = crate::root::make_policy(network, &po);
     let validator_factory = Arc::new(SimpleValidatorFactory::new_with_policy(policy));
     root_handler.node().set_validator_factory(validator_factory);
     Ok(())
@@ -94,20 +90,4 @@ pub fn set_approver_policy(approver: &SphinxApprover, po: Policy) -> anyhow::Res
     let app_control = approver_control(po, None);
     approver.set_control(app_control);
     Ok(())
-}
-
-pub fn make_policy(network: Network, _po: &Policy) -> SimplePolicy {
-    let mut p = make_simple_policy(network);
-    // let mut p = make_simple_policy(network);
-    // p.max_htlc_value_sat = po.htlc_limit_msat;
-    p.filter = PolicyFilter::new_permissive();
-    // FIXME for prod use a nempty filter
-    p
-}
-
-pub fn policy_interval(int: Interval) -> VelocityControlIntervalType {
-    match int {
-        Interval::Hourly => VelocityControlIntervalType::Hourly,
-        Interval::Daily => VelocityControlIntervalType::Daily,
-    }
 }
