@@ -19,7 +19,6 @@ rmp-utils = { version = "0.1.0", path = "../rmp-utils" }
 vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "de25fc60bce03e9be16a698ffd8e8bdc48ed975d", default-features = false, features = ["secp-lowmemory"] }
 # vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory"] }
 log = "0.4"
-serde = { version = "1.0.168", default-features = false, features = ["derive"] }
 anyhow = { version = "1", default-features = false }
 secp256k1 = { version = "0.24.0", default-features = false, features = ["bitcoin_hashes"] }
 # broker libs
