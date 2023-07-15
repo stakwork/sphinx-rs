@@ -9,6 +9,8 @@ use rmp::{
     encode,
 };
 
+pub mod blocks;
+
 pub fn serialize_state_vec(
     buff: &mut encode::buffer::ByteBuf,
     v: &Vec<(String, (u64, Vec<u8>))>,

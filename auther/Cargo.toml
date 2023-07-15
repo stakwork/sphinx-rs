@@ -12,7 +12,7 @@ default = [ "std"]
 std = ["secp256k1/std", "hex/std", "anyhow/std", "base64/std"]
 
 [dependencies]
-secp256k1 = { version = "0.24.0", default-features = false, features = ["lowmemory", "recovery", "bitcoin_hashes"] }
+secp256k1 = { version = "0.24.0", default-features = false, features = ["lowmemory", "recovery", "bitcoin_hashes", "rand-std"] }
 anyhow = { version = "1", default-features = false }
 log = "0.4"
 base64 = { version = "0.21.2", default-features = false, features = ["alloc"] }
