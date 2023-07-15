@@ -3,7 +3,8 @@ use alloc::string::String;
 use anyhow::{anyhow, Error, Result};
 use rmp::{
     decode::{self, RmpRead},
-    encode,
+    encode::{self, RmpWrite},
+    Marker,
 };
 use rmp_utils::*;
 
@@ -96,7 +97,7 @@ fn serialize_lssres(res: &Response) -> Result<Vec<u8>> {
             if let Some(arr) = init.nonce {
                 encode::write_bin(&mut buff, &arr).map_err(Error::msg)?;
             } else {
-                encode::write_bin(&mut buff, &[0u8; 0]).map_err(Error::msg)?;
+                buff.write_u8(Marker::Null.to_u8()).map_err(Error::msg)?;
             }
             Ok(buff.into_vec())
         }
@@ -219,16 +220,15 @@ fn deserialize_lssres(b: &[u8]) -> Result<Response> {
             let field_name = decode::read_str(&mut bytes, &mut buff)
                 .map_err(|_| Error::msg("could not read str"))?;
             assert!(field_name == "nonce");
-            let length = decode::read_bin_len(&mut bytes)
-                .map_err(|_| Error::msg("could not read bin length"))?;
-            let nonce = match length {
-                32 => {
-                    let mut arr = [0u8; 32];
-                    bytes.read_exact_buf(&mut arr).map_err(Error::msg)?;
-                    Some(arr)
-                }
-                0 => None,
-                n => panic!("wrong: {}", n),
+            let peek = blocks::peek_byte(&mut bytes)?;
+            let nonce = if peek == blocks::null_marker_byte() {
+                None
+            } else {
+                let length = decode::read_bin_len(&mut bytes)
+                    .map_err(|_| Error::msg("could not read bin length"))?;
+                let mut arr = [0u8; 32];
+                bytes.read_exact_buf(&mut arr).map_err(Error::msg)?;
+                Some(arr)
             };
             Ok(Response::Init(InitResponse {
                 client_id,
