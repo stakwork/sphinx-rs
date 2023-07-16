@@ -60,7 +60,7 @@ export function root() {
 
 async function sendCmd(type: Cmd, content?: any) {
   log("=> sendCmd", type, content);
-  const j = JSON.stringify({ type, ...(content && { content }) });
+  const j = JSON.stringify({ [type]: content || null });
   const ks: sphinx.Keys = get(keys);
   let msg;
   try {

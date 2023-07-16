@@ -224,7 +224,7 @@ fn deserialize_lssres(b: &[u8]) -> Result<Response> {
             let nonce = if peek == blocks::null_marker_byte() {
                 None
             } else {
-                let length = decode::read_bin_len(&mut bytes)
+                let _length = decode::read_bin_len(&mut bytes)
                     .map_err(|_| Error::msg("could not read bin length"))?;
                 let mut arr = [0u8; 32];
                 bytes.read_exact_buf(&mut arr).map_err(Error::msg)?;

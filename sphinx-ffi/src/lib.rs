@@ -1,10 +1,7 @@
+mod control;
 mod parse;
 mod signer;
 
-#[cfg(feature = "control")]
-mod control;
-
-#[cfg(feature = "control")]
 pub use control::*;
 
 pub use signer::*;

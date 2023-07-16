@@ -37,6 +37,7 @@ impl LssSigner {
 
         let mut helper = ExternalPersistHelper::new(shared_secret);
 
+        #[allow(unused_assignments)]
         let mut new_nonce = [0; 32];
         #[cfg(feature = "std")]
         {

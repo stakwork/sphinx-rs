@@ -10,7 +10,6 @@ pub fn pubkey_from_secret_key(sec: &str) -> Result<String> {
     Ok(cy::pubkey_from_secret_key(sec.to_string())?)
 }
 
-#[cfg(feature = "control")]
 #[wasm_bindgen]
 pub fn build_control_request(msg: &str, secret: &str, nonce: u64) -> Result<String> {
     Ok(cy::build_request(
@@ -20,7 +19,6 @@ pub fn build_control_request(msg: &str, secret: &str, nonce: u64) -> Result<Stri
     )?)
 }
 
-#[cfg(feature = "control")]
 #[wasm_bindgen]
 pub fn parse_control_response(msg: &str) -> Result<String> {
     Ok(cy::parse_response(msg.to_string())?)

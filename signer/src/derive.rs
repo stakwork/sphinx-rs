@@ -22,8 +22,9 @@ pub fn mnemonic_from_entropy(entropy: &[u8]) -> anyhow::Result<String> {
 pub fn entropy_from_mnemonic(mn: &str) -> anyhow::Result<Vec<u8>> {
     let mn = bip39::Mnemonic::parse_normalized(mn)
         .map_err(|e| anyhow::anyhow!("Mnemonic::parse_normalized failed {:?}", e))?;
-    let e = mn.to_entropy_array();
-    Ok(e.0.to_vec())
+    let mut e = mn.to_entropy_array().0.to_vec();
+    e.remove(32);
+    Ok(e)
 }
 
 #[cfg(test)]

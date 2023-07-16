@@ -1,6 +1,5 @@
-pub use crate::types::{
-    All, Config, ControlMessage, ControlResponse, Interval, OtaParams, Policy, Velocity,
-};
+pub use crate::ser::*;
+pub use crate::types::*;
 use anyhow::Result;
 use sphinx_auther::nonce;
 use sphinx_auther::secp256k1::{PublicKey, SecretKey};
@@ -38,27 +37,33 @@ impl Controller {
         self.3.clone()
     }
     pub fn build_msg(&mut self, msg: ControlMessage) -> anyhow::Result<Vec<u8>> {
-        let data = rmp_serde::to_vec_named(&msg)?;
+        let mut buff = ByteBuf::new();
+        serialize_controlmessage(&mut buff, &msg)?;
         self.2 = self.2 + 1;
-        let ret = nonce::build_msg(&data, &self.0, self.2)?;
+        let ret = nonce::build_msg(buff.as_slice(), &self.0, self.2)?;
         Ok(ret)
     }
     pub fn build_response(&self, msg: ControlResponse) -> anyhow::Result<Vec<u8>> {
-        Ok(rmp_serde::to_vec_named(&msg)?)
+        let mut buff = ByteBuf::new();
+        serialize_controlresponse(&mut buff, &msg)?;
+        Ok(buff.into_vec())
     }
     pub fn parse_msg(&mut self, input: &[u8]) -> anyhow::Result<ControlMessage> {
         let msg = nonce::parse_msg(input, &self.1, self.2)?;
-        let ret = rmp_serde::from_slice(&msg)?;
+        let mut bytes = Bytes::new(&msg);
+        let ret = deserialize_controlmessage(&mut bytes)?;
         self.2 = self.2 + 1;
         Ok(ret)
     }
     pub fn parse_msg_no_nonce(&mut self, input: &[u8]) -> anyhow::Result<(ControlMessage, u64)> {
         let (msg, nonce) = nonce::parse_msg_no_nonce(input, &self.1)?;
-        let ret = rmp_serde::from_slice(&msg)?;
+        let mut bytes = Bytes::new(&msg);
+        let ret = deserialize_controlmessage(&mut bytes)?;
         Ok((ret, nonce))
     }
     pub fn parse_response(&self, input: &[u8]) -> anyhow::Result<ControlResponse> {
-        Ok(rmp_serde::from_slice(input)?)
+        let mut bytes = Bytes::new(input);
+        Ok(deserialize_controlresponse(&mut bytes)?)
     }
     // return the OG message for further processing
     pub fn handle(&mut self, input: &[u8]) -> anyhow::Result<(ControlMessage, ControlResponse)> {
@@ -129,22 +134,25 @@ pub fn build_control_msg(
     nonce: u64,
     secret: &SecretKey,
 ) -> anyhow::Result<Vec<u8>> {
-    let data = rmp_serde::to_vec_named(&msg)?;
-    let ret = nonce::build_msg(&data, secret, nonce)?;
+    let mut buff = ByteBuf::new();
+    serialize_controlmessage(&mut buff, &msg)?;
+    let ret = nonce::build_msg(buff.as_slice(), secret, nonce)?;
     Ok(ret)
 }
 
 pub fn parse_control_response(input: &[u8]) -> anyhow::Result<ControlResponse> {
-    Ok(rmp_serde::from_slice(input)?)
+    let mut bytes = Bytes::new(input);
+    let res: ControlResponse = deserialize_controlresponse(&mut bytes)?;
+    Ok(res)
 }
 
 pub fn parse_control_response_to_json(input: &[u8]) -> anyhow::Result<String> {
-    let res: ControlResponse = rmp_serde::from_slice(input)?;
-    Ok(serde_json::to_string(&res)?)
+    let res = parse_control_response(input)?;
+    Ok(serde_json::to_string(&res).map_err(anyhow::Error::msg)?)
 }
 
 pub fn control_msg_from_json(msg: &[u8]) -> anyhow::Result<ControlMessage> {
-    let data: ControlMessage = serde_json::from_slice(msg)?;
+    let data: ControlMessage = serde_json::from_slice(msg).map_err(anyhow::Error::msg)?;
     Ok(data)
 }
 
@@ -241,10 +249,10 @@ mod tests {
             panic!("should have failed");
         }
 
-        let msg = "{\"type\":\"Nonce\"}";
+        let msg = "{\"Nonce\":null}";
         let _m1 = control_msg_from_json(msg.as_bytes()).expect("Nonce failed");
 
-        let msg = "{\"type\":\"UpdatePolicy\", \"content\":{\"htlc_limit_msat\":0, \"interval\":\"hourly\", \"msat_per_interval\":10}}";
+        let msg = "{\"UpdatePolicy\":{\"htlc_limit_msat\":0, \"interval\":\"hourly\", \"msat_per_interval\":10}}";
         control_msg_from_json(msg.as_bytes()).expect("UpdatePolicy failed");
     }
 
@@ -266,7 +274,8 @@ mod tests {
         let secp = Secp256k1::new();
         let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
 
-        let msg = "{\"type\":\"Nonce\"}";
+        // let msg = "{\"type\":\"Nonce\"}";
+        let msg = "{\"Nonce\":null}";
         let m1 = control_msg_from_json(msg.as_bytes()).expect("Nonce failed");
         let m2 = build_control_msg(m1, 1, &secret_key).expect("FAIL");
 
