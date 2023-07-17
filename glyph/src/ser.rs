@@ -382,7 +382,7 @@ fn test_config_serde() {
     assert!(test == object);
 }
 
-fn serialize_velocity(
+pub fn serialize_velocity(
     buff: &mut ByteBuf,
     field_name: Option<&str>,
     object: Option<&Velocity>,
@@ -404,7 +404,10 @@ fn serialize_velocity(
     Ok(())
 }
 
-fn deserialize_velocity(bytes: &mut Bytes, field_name: Option<&str>) -> Result<Option<Velocity>> {
+pub fn deserialize_velocity(
+    bytes: &mut Bytes,
+    field_name: Option<&str>,
+) -> Result<Option<Velocity>> {
     deserialize_field_name(bytes, field_name)?;
     let peek = peek_byte(bytes)?;
     if peek == null_marker_byte() {
@@ -442,7 +445,11 @@ fn test_velocity_serde() {
     assert!(test == object);
 }
 
-fn serialize_policy(buff: &mut ByteBuf, field_name: Option<&str>, object: &Policy) -> Result<()> {
+pub fn serialize_policy(
+    buff: &mut ByteBuf,
+    field_name: Option<&str>,
+    object: &Policy,
+) -> Result<()> {
     serialize_field_name(buff, field_name)?;
     serialize_map_len(buff, 3u32)?;
     serialize_uint(buff, Some("msat_per_interval"), object.msat_per_interval)?;
@@ -451,7 +458,7 @@ fn serialize_policy(buff: &mut ByteBuf, field_name: Option<&str>, object: &Polic
     Ok(())
 }
 
-fn deserialize_policy(bytes: &mut Bytes, field_name: Option<&str>) -> Result<Policy> {
+pub fn deserialize_policy(bytes: &mut Bytes, field_name: Option<&str>) -> Result<Policy> {
     deserialize_field_name(bytes, field_name)?;
     deserialize_map_len(bytes, 3)?;
     let msat_per_interval = deserialize_uint(bytes, Some("msat_per_interval"))?;

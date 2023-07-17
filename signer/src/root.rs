@@ -16,10 +16,7 @@ use lightning_signer::util::clock::Clock;
 use lightning_signer::util::velocity::VelocityControlIntervalType;
 use lightning_signer::wallet::Wallet;
 use lightning_signer::Arc;
-use lss_connector::{
-    msgs::{Response as LssResponse, SignerMutations},
-    LssSigner,
-};
+use lss_connector::{LssSigner, Response as LssResponse, SignerMutations};
 use vls_protocol::model::PubKey;
 use vls_protocol::msgs::{self, read_serial_request_header, write_serial_response_header, Message};
 use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};

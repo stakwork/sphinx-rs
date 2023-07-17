@@ -8,6 +8,7 @@ use crate::routes::{ChannelReply, ChannelRequest};
 use anyhow::Result;
 use dotenv::dotenv;
 use glyph::control::{ControlPersist, Controller};
+use glyph::ser::{serialize_controlresponse, ByteBuf};
 use lss::init_lss;
 use rocket::tokio::sync::{broadcast, mpsc, oneshot};
 use sphinx_signer::lightning_signer::bitcoin::Network;
@@ -180,8 +181,11 @@ async fn listen_for_commands(
                 if let Some(_) = muts {
                     log::warn!("some mutations that need to be sent to LSS!");
                 }
-                let reply = rmp_serde::to_vec_named(&res2).unwrap();
-                let _ = msg.reply_tx.send(ChannelReply { reply });
+                let mut bb = ByteBuf::new();
+                serialize_controlresponse(&mut bb, &res2).expect("failed serialize_lssresponse");
+                let _ = msg.reply_tx.send(ChannelReply {
+                    reply: bb.into_vec(),
+                });
             }
             Err(e) => log::warn!("error parsing ctrl msg {:?}", e),
         };

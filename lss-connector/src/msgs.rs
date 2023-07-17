@@ -48,7 +48,7 @@ pub struct InitResponse {
     pub nonce: Option<[u8; 32]>,
 }
 
-fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
+pub fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
     let mut buff = encode::buffer::ByteBuf::new();
     match msg {
         Msg::Init(init) => {
@@ -82,7 +82,7 @@ fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
     }
 }
 
-fn serialize_lssres(res: &Response) -> Result<Vec<u8>> {
+pub fn serialize_lssres(res: &Response) -> Result<Vec<u8>> {
     let mut buff = encode::buffer::ByteBuf::new();
     match res {
         Response::Init(init) => {
@@ -141,7 +141,7 @@ fn serialize_muts(
     Ok(())
 }
 
-fn deserialize_lssmsg(b: &[u8]) -> Result<Msg> {
+pub fn deserialize_lssmsg(b: &[u8]) -> Result<Msg> {
     let mut bytes = decode::bytes::Bytes::new(b);
     let length =
         decode::read_map_len(&mut bytes).map_err(|_| Error::msg("could not read map length"))?;
@@ -177,7 +177,7 @@ fn deserialize_lssmsg(b: &[u8]) -> Result<Msg> {
     }
 }
 
-fn deserialize_lssres(b: &[u8]) -> Result<Response> {
+pub fn deserialize_lssres(b: &[u8]) -> Result<Response> {
     let mut bytes = decode::bytes::Bytes::new(b);
     let length =
         decode::read_map_len(&mut bytes).map_err(|_| Error::msg("could not read map length"))?;

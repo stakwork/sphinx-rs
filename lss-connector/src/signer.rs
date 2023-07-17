@@ -10,14 +10,13 @@ use vls_protocol_signer::handler::{RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
 
 #[cfg(feature = "std")]
-use lightning_signer::persist::SimpleEntropy;
+pub use lightning_signer::persist::SimpleEntropy;
 
 #[cfg(not(feature = "std"))]
 use crate::not_entropy::NotEntropy;
 
 #[derive(Clone)]
 pub struct LssSigner {
-    pub state: Arc<Mutex<BTreeMap<String, (u64, Vec<u8>)>>>,
     pub helper: ExternalPersistHelper,
     pub client_id: PublicKey,
     pub auth_token: [u8; 32],
@@ -27,8 +26,7 @@ impl LssSigner {
     pub fn new(
         builder: &RootHandlerBuilder,
         server_pubkey: &PublicKey,
-        nonce: Option<[u8; 32]>,
-        initial_state: Option<BTreeMap<String, (u64, Vec<u8>)>>,
+        _nonce: Option<[u8; 32]>,
     ) -> (Self, Vec<u8>) {
         let (keys_manager, _node_id) = builder.build_keys_manager();
         let client_id = keys_manager.get_persistence_pubkey();
@@ -46,7 +44,7 @@ impl LssSigner {
         }
         #[cfg(not(feature = "std"))]
         {
-            let n = nonce.expect("nonce must be provided in no-std mode");
+            let n = _nonce.expect("nonce must be provided in no-std mode");
             let entropy = NotEntropy::new(n);
             new_nonce = helper.new_nonce(&entropy);
         }
@@ -59,10 +57,8 @@ impl LssSigner {
         });
         let msg_bytes = msg.to_vec().unwrap();
 
-        let state = Arc::new(Mutex::new(initial_state.unwrap_or_default()));
         (
             Self {
-                state,
                 helper,
                 client_id,
                 auth_token,
@@ -92,6 +88,7 @@ impl LssSigner {
         &self,
         c: BrokerMutations,
         handler_builder: RootHandlerBuilder,
+        state: Option<BTreeMap<String, (u64, Vec<u8>)>>,
     ) -> Result<(RootHandler, Vec<u8>)> {
         // let helper = self.helper.lock().unwrap();
         let success = self
@@ -100,12 +97,8 @@ impl LssSigner {
         if !success {
             return Err(anyhow!("invalid server hmac"));
         }
-        let mut local = self.state.lock().unwrap();
-        for (key, version_value) in c.muts.into_iter() {
-            local.insert(key, version_value);
-        }
-        drop(local);
-        let handler_builder = handler_builder.lss_state(self.state.clone());
+        let s = Arc::new(Mutex::new(state.unwrap_or_default()));
+        let handler_builder = handler_builder.lss_state(s);
         let (handler, muts) = handler_builder
             .build()
             .map_err(|_| anyhow!("failed to build"))?;

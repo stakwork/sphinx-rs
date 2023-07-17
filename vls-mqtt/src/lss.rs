@@ -16,7 +16,7 @@ pub async fn init_lss(
     let init = Msg::from_slice(&first_lss_msg.message)?.into_init()?;
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
 
-    let (lss_signer, res1) = LssSigner::new(&handler_builder, &server_pubkey, None, None);
+    let (lss_signer, res1) = LssSigner::new(&handler_builder, &server_pubkey, None);
     let res_topic_1 = topics::INIT_1_RES.to_string();
     if let Err(e) = first_lss_msg.reply_tx.send(Ok((res_topic_1, res1))) {
         log::warn!("could not send on first_lss_msg.reply_tx, {:?}", e);
@@ -27,7 +27,7 @@ pub async fn init_lss(
     println!("GOT THE CREATED MSG! {:?}", created);
 
     // build the root handler
-    let (root_handler, res2) = lss_signer.build_with_lss(created, handler_builder)?;
+    let (root_handler, res2) = lss_signer.build_with_lss(created, handler_builder, None)?;
     println!("root handler built!!!!!");
     let res_topic_2 = topics::INIT_2_RES.to_string();
     if let Err(e) = second_lss_msg.reply_tx.send(Ok((res_topic_2, res2))) {
