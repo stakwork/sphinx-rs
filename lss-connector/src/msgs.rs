@@ -173,7 +173,7 @@ pub fn deserialize_lssmsg(b: &[u8]) -> Result<Msg> {
         "Stored" => Ok(Msg::Stored(
             deserialize_brokermuts(&mut bytes).map_err(Error::msg)?,
         )),
-        m => panic!("wrong: {:?}", m),
+        m => Err(anyhow!("deserialize_lssmg: not an lssmsg variant {:?}", m)),
     }
 }
 
@@ -242,7 +242,7 @@ pub fn deserialize_lssres(b: &[u8]) -> Result<Response> {
         "VlsMuts" => Ok(Response::VlsMuts(
             deserialize_signermuts(&mut bytes).map_err(Error::msg)?,
         )),
-        m => panic!("wrong: {:?}", m),
+        m => Err(anyhow!("deserialize_lssres: not an lssres variant {:?}", m)),
     }
 }
 
