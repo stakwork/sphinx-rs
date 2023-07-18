@@ -1,4 +1,4 @@
-use lss_connector::msgs::*;
+//use lss_connector::msgs::*;
 //use rmp_serde::encode::Error;
 /*
 use rand::{
@@ -9,7 +9,8 @@ use vls_protocol_signer::lightning_signer::persist::Mutations;
 */
 
 fn main() {
-    //let mut std_rng = rand::thread_rng();
+    /*
+    let mut std_rng = rand::thread_rng();
 
     let init = Msg::Init(Init {
         server_pubkey: [0u8; 33],
@@ -17,7 +18,6 @@ fn main() {
 
     let _z = init.to_vec();
 
-    /*
         let auth_token = vec![
             3, 1, 5, 6, 7, 3, 3, 2, 1, 5, 1, 2, 3, 4, 6, 1, 2, 3, 4, 5, 1, 2, 4, 5, 6, 7, 3, 4, 2, 1,
             3, 4,

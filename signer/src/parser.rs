@@ -1,6 +1,6 @@
+use crate::vls_protocol;
 use serde::ser;
 use vls_protocol::msgs::{self, DeBolt, Message};
-use crate::vls_protocol;
 
 pub fn raw_request_from_bytes(
     message: Vec<u8>,
@@ -62,7 +62,10 @@ pub fn raw_response_from_bytes(
     Ok(msgs::read_raw(&mut res)?)
 }
 
-pub fn response_from_bytes(mut res: Vec<u8>, expected_sequence: u16) -> vls_protocol::Result<Message> {
+pub fn response_from_bytes(
+    mut res: Vec<u8>,
+    expected_sequence: u16,
+) -> vls_protocol::Result<Message> {
     msgs::read_serial_response_header(&mut res, expected_sequence)?;
     Ok(msgs::read(&mut res)?)
 }

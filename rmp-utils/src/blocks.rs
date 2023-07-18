@@ -1,4 +1,4 @@
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Error, Result};
 use rmp::{
     decode::{self, bytes::Bytes, RmpRead},
     encode::{self, buffer::ByteBuf, RmpWrite},
@@ -31,11 +31,14 @@ pub fn serialize_map_len(buff: &mut ByteBuf, len: u32) -> Result<()> {
     Ok(())
 }
 
-pub fn deserialize_map_len(bytes: &mut Bytes, assert: u32) -> Result<()> {
+pub fn deserialize_map_len(bytes: &mut Bytes, expected_map_len: u32) -> Result<()> {
     let length =
         decode::read_map_len(bytes).map_err(|_| Error::msg("could not read map length"))?;
-    assert!(length == assert);
-    Ok(())
+    if length != expected_map_len {
+        Err(anyhow!("deserialize_map_len: unexpected map length"))
+    } else {
+        Ok(())
+    }
 }
 
 pub fn serialize_array_len(buff: &mut ByteBuf, len: u32) -> Result<()> {
@@ -59,7 +62,9 @@ pub fn serialize_field_name(buff: &mut ByteBuf, field_name: Option<&str>) -> Res
 pub fn deserialize_field_name(bytes: &mut Bytes, field_name: Option<&str>) -> Result<()> {
     if let Some(name) = field_name {
         let field_name_read = deserialize_raw_string(bytes)?;
-        assert!(field_name_read == name);
+        if field_name_read != name {
+            return Err(anyhow!("deserialize_field_name: unexpected field name"));
+        }
     }
     Ok(())
 }
@@ -134,6 +139,30 @@ pub fn deserialize_uint(bytes: &mut Bytes, field_name: Option<&str>) -> Result<u
     deserialize_field_name(bytes, field_name)?;
     let object = decode::read_int(bytes).map_err(|_| Error::msg("could not read uint"))?;
     Ok(object)
+}
+
+pub fn serialize_bin(buff: &mut ByteBuf, field_name: Option<&str>, object: Vec<u8>) -> Result<()> {
+    serialize_field_name(buff, field_name)?;
+    encode::write_bin(buff, &object).map_err(Error::msg)?;
+    Ok(())
+}
+
+pub fn deserialize_bin(bytes: &mut Bytes, field_name: Option<&str>, expected_bin_len: u32) -> Result<Option<Vec<u8>>> {
+    deserialize_field_name(bytes, field_name)?;
+    if null_marker_byte() == peek_byte(bytes)? {
+        Ok(None)
+    } else {
+        let length = decode::read_bin_len(bytes)
+            .map_err(|_| Error::msg("could not read bin length"))?;
+        if length != expected_bin_len {
+            return Err(anyhow!("deserialize_bin: unexpected binary length"));
+        }
+        let mut binary = vec![0u8; length as usize];
+        bytes
+            .read_exact_buf(&mut binary)
+            .map_err(Error::msg)?;
+        Ok(Some(binary))
+    }
 }
 
 pub fn serialize_none(buff: &mut ByteBuf, field_name: Option<&str>) -> Result<()> {

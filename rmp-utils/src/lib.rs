@@ -10,11 +10,16 @@ use rmp::{
 };
 
 pub mod blocks;
+pub use blocks::*;
+pub use rmp::decode::bytes::Bytes;
+pub use rmp::encode::buffer::ByteBuf;
 
 pub fn serialize_state_vec(
     buff: &mut encode::buffer::ByteBuf,
+    field_name: Option<&str>,
     v: &Vec<(String, (u64, Vec<u8>))>,
 ) -> Result<()> {
+    blocks::serialize_field_name(buff, field_name)?;
     encode::write_array_len(buff, v.len() as u32).map_err(Error::msg)?;
     for (x, (y, z)) in v {
         encode::write_array_len(buff, 2).map_err(Error::msg)?;
@@ -25,7 +30,9 @@ pub fn serialize_state_vec(
 
 pub fn deserialize_state_vec(
     bytes: &mut decode::bytes::Bytes,
+    field_name: Option<&str>,
 ) -> Result<Vec<(String, (u64, Vec<u8>))>> {
+    blocks::deserialize_field_name(bytes, field_name)?;
     let length =
         decode::read_array_len(bytes).map_err(|_| Error::msg("could not read array length"))?;
     let mut object: Vec<(String, (u64, Vec<u8>))> = Vec::with_capacity(length as usize);
@@ -98,7 +105,7 @@ fn state_vec_serde() {
     let mut buff = encode::buffer::ByteBuf::new();
     serialize_state_vec(&mut buff, &test).unwrap();
     let mut bytes = decode::bytes::Bytes::new(buff.as_slice());
-    let object = deserialize_state_vec(&mut bytes).unwrap();
+    let object = deserialize_state_vec(&mut bytes, None).unwrap();
     assert_eq!(test, object);
 }
 

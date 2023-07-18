@@ -1,12 +1,7 @@
 extern crate alloc;
 use alloc::string::String;
 use anyhow::{anyhow, Error, Result};
-use rmp::{
-    decode::{self, RmpRead},
-    encode::{self, RmpWrite},
-    Marker,
-};
-use rmp_utils::*;
+use rmp_utils as rmp;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Msg {
@@ -49,14 +44,17 @@ pub struct InitResponse {
 }
 
 pub fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
-    let mut buff = encode::buffer::ByteBuf::new();
+    let mut buff = rmp::ByteBuf::new();
     match msg {
         Msg::Init(init) => {
-            encode::write_map_len(&mut buff, 1u32).map_err(Error::msg)?;
-            encode::write_str(&mut buff, "Init").map_err(Error::msg)?;
-            encode::write_map_len(&mut buff, 1u32).map_err(Error::msg)?;
-            encode::write_str(&mut buff, "server_pubkey").map_err(Error::msg)?;
-            encode::write_bin(&mut buff, &init.server_pubkey).map_err(Error::msg)?;
+            rmp::serialize_map_len(&mut buff, 1u32)?;
+            rmp::serialize_field_name(&mut buff, Some("Init"))?;
+            rmp::serialize_map_len(&mut buff, 1u32)?;
+            rmp::serialize_bin(
+                &mut buff,
+                Some("server_pubkey"),
+                init.server_pubkey.to_vec(),
+            )?;
             Ok(buff.into_vec())
         }
         Msg::Created(bm) => {
@@ -83,21 +81,18 @@ pub fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
 }
 
 pub fn serialize_lssres(res: &Response) -> Result<Vec<u8>> {
-    let mut buff = encode::buffer::ByteBuf::new();
+    let mut buff = rmp::ByteBuf::new();
     match res {
         Response::Init(init) => {
-            encode::write_map_len(&mut buff, 1u32).map_err(Error::msg)?;
-            encode::write_str(&mut buff, "Init").map_err(Error::msg)?;
-            encode::write_map_len(&mut buff, 3u32).map_err(Error::msg)?;
-            encode::write_str(&mut buff, "client_id").map_err(Error::msg)?;
-            encode::write_bin(&mut buff, &init.client_id).map_err(Error::msg)?;
-            encode::write_str(&mut buff, "auth_token").map_err(Error::msg)?;
-            encode::write_bin(&mut buff, &init.auth_token).map_err(Error::msg)?;
-            encode::write_str(&mut buff, "nonce").map_err(Error::msg)?;
+            rmp::serialize_map_len(&mut buff, 1u32)?;
+            rmp::serialize_field_name(&mut buff, Some("Init"))?;
+            rmp::serialize_map_len(&mut buff, 3u32)?;
+            rmp::serialize_bin(&mut buff, Some("client_id"), init.client_id.to_vec())?;
+            rmp::serialize_bin(&mut buff, Some("auth_token"), init.auth_token.to_vec())?;
             if let Some(arr) = init.nonce {
-                encode::write_bin(&mut buff, &arr).map_err(Error::msg)?;
+                rmp::serialize_bin(&mut buff, Some("nonce"), arr.to_vec())?;
             } else {
-                buff.write_u8(Marker::Null.to_u8()).map_err(Error::msg)?;
+                rmp::serialize_none(&mut buff, Some("nonce"))?;
             }
             Ok(buff.into_vec())
         }
@@ -125,46 +120,31 @@ pub fn serialize_lssres(res: &Response) -> Result<Vec<u8>> {
 }
 
 fn serialize_muts(
-    buff: &mut encode::buffer::ByteBuf,
+    buff: &mut rmp::ByteBuf,
     variant: &str,
     hmac_type: &str,
     hmac: &Vec<u8>,
     muts: &Muts,
 ) -> Result<()> {
-    encode::write_map_len(buff, 1u32).map_err(Error::msg)?;
-    encode::write_str(buff, variant).map_err(Error::msg)?;
-    encode::write_map_len(buff, 2u32).map_err(Error::msg)?;
-    encode::write_str(buff, hmac_type).map_err(Error::msg)?;
-    encode::write_bin(buff, hmac).map_err(Error::msg)?;
-    encode::write_str(buff, "muts").map_err(Error::msg)?;
-    serialize_state_vec(buff, muts).map_err(Error::msg)?;
+    rmp::serialize_map_len(buff, 1u32)?;
+    rmp::serialize_field_name(buff, Some(variant))?;
+    rmp::serialize_map_len(buff, 2u32)?;
+    rmp::serialize_bin(buff, Some(hmac_type), hmac.to_vec())?;
+    rmp::serialize_state_vec(buff, Some("muts"), muts).map_err(Error::msg)?;
     Ok(())
 }
 
 pub fn deserialize_lssmsg(b: &[u8]) -> Result<Msg> {
-    let mut bytes = decode::bytes::Bytes::new(b);
-    let length =
-        decode::read_map_len(&mut bytes).map_err(|_| Error::msg("could not read map length"))?;
-    assert!(length == 1);
-    let mut buff = vec![0u8; 64];
-    let variant =
-        decode::read_str(&mut bytes, &mut buff).map_err(|_| Error::msg("could not read str"))?;
-    match variant {
+    let mut bytes = rmp::Bytes::new(b);
+    rmp::deserialize_map_len(&mut bytes, 1)?;
+    let variant = rmp::deserialize_variant(&mut bytes)?;
+    match variant.as_str() {
         "Init" => {
-            let length = decode::read_map_len(&mut bytes)
-                .map_err(|_| Error::msg("could not read map length"))?;
-            assert!(length == 1);
-            let mut buff = vec![0u8; 64];
-            let field_name = decode::read_str(&mut bytes, &mut buff)
-                .map_err(|_| Error::msg("could not read str"))?;
-            assert!(field_name == "server_pubkey");
-            let length = decode::read_bin_len(&mut bytes)
-                .map_err(|_| Error::msg("could not read bin length"))?;
-            assert!(length == 33);
+            rmp::deserialize_map_len(&mut bytes, 1)?;
             let mut server_pubkey = [0u8; 33];
-            bytes
-                .read_exact_buf(&mut server_pubkey)
-                .map_err(Error::msg)?;
+            let binary = rmp::deserialize_bin(&mut bytes, Some("server_pubkey"), 33)?
+                .ok_or(anyhow!("deserialize_bin: expected Some(Vec<u8>) got None"))?;
+            server_pubkey.copy_from_slice(&binary[..]);
             Ok(Msg::Init(Init { server_pubkey }))
         }
         "Created" => Ok(Msg::Created(
@@ -178,58 +158,30 @@ pub fn deserialize_lssmsg(b: &[u8]) -> Result<Msg> {
 }
 
 pub fn deserialize_lssres(b: &[u8]) -> Result<Response> {
-    let mut bytes = decode::bytes::Bytes::new(b);
-    let length =
-        decode::read_map_len(&mut bytes).map_err(|_| Error::msg("could not read map length"))?;
-    assert!(length == 1);
-    let mut buff = vec![0u8; 64];
-    let variant =
-        decode::read_str(&mut bytes, &mut buff).map_err(|_| Error::msg("could not read str"))?;
-    match variant {
+    let mut bytes = rmp::Bytes::new(b);
+    rmp::deserialize_map_len(&mut bytes, 1)?;
+    let variant = rmp::deserialize_variant(&mut bytes)?;
+    match variant.as_str() {
         "Init" => {
-            let length = decode::read_map_len(&mut bytes)
-                .map_err(|_| Error::msg("could not read map length"))?;
-            println!("{}", length);
-            assert!(length == 3);
-
+            rmp::deserialize_map_len(&mut bytes, 3)?;
             // client_id
-            let mut buff = vec![0u8; 64];
-            let field_name = decode::read_str(&mut bytes, &mut buff)
-                .map_err(|_| Error::msg("could not read str"))?;
-            assert!(field_name == "client_id");
-            let length = decode::read_bin_len(&mut bytes)
-                .map_err(|_| Error::msg("could not read bin length"))?;
-            assert!(length == 33);
             let mut client_id = [0u8; 33];
-            bytes.read_exact_buf(&mut client_id).map_err(Error::msg)?;
-
+            let binary = rmp::deserialize_bin(&mut bytes, Some("client_id"), 33)?
+                .ok_or(anyhow!("deserialize_bin: expected Some(Vec<u8>) got None"))?;
+            client_id.copy_from_slice(&binary[..]);
             // auth_token
-            let mut buff = vec![0u8; 64];
-            let field_name = decode::read_str(&mut bytes, &mut buff)
-                .map_err(|_| Error::msg("could not read str"))?;
-            assert!(field_name == "auth_token");
-            let length = decode::read_bin_len(&mut bytes)
-                .map_err(|_| Error::msg("could not read bin length"))?;
-            assert!(length == 32);
             let mut auth_token = [0u8; 32];
-            bytes.read_exact_buf(&mut auth_token).map_err(Error::msg)?;
+            let binary = rmp::deserialize_bin(&mut bytes, Some("auth_token"), 32)?
+                .ok_or(anyhow!("deserialize_bin: expected Some(Vec<u8>) got None"))?;
+            auth_token.copy_from_slice(&binary[..]);
             let auth_token = auth_token.to_vec();
-
             // nonce
-            let mut buff = vec![0u8; 64];
-            let field_name = decode::read_str(&mut bytes, &mut buff)
-                .map_err(|_| Error::msg("could not read str"))?;
-            assert!(field_name == "nonce");
-            let peek = blocks::peek_byte(&mut bytes)?;
-            let nonce = if peek == blocks::null_marker_byte() {
-                None
-            } else {
-                let _length = decode::read_bin_len(&mut bytes)
-                    .map_err(|_| Error::msg("could not read bin length"))?;
-                let mut arr = [0u8; 32];
-                bytes.read_exact_buf(&mut arr).map_err(Error::msg)?;
-                Some(arr)
-            };
+            let mut nonce = None;
+            if let Some(binary) = rmp::deserialize_bin(&mut bytes, Some("nonce"), 32)? {
+                let mut buff = [0u8; 32];
+                buff.copy_from_slice(&binary[..]);
+                nonce = Some(buff);
+            }
             Ok(Response::Init(InitResponse {
                 client_id,
                 auth_token,
@@ -251,40 +203,32 @@ enum MutsDeserializeVariant {
     Signer,
 }
 
-fn deserialize_brokermuts(bytes: &mut decode::bytes::Bytes) -> Result<BrokerMutations> {
+fn deserialize_brokermuts(bytes: &mut rmp::Bytes) -> Result<BrokerMutations> {
     let (server_hmac, muts) = deserialize_lssmuts(bytes, MutsDeserializeVariant::Broker)?;
     Ok(BrokerMutations { server_hmac, muts })
 }
 
-fn deserialize_signermuts(bytes: &mut decode::bytes::Bytes) -> Result<SignerMutations> {
+fn deserialize_signermuts(bytes: &mut rmp::Bytes) -> Result<SignerMutations> {
     let (client_hmac, muts) = deserialize_lssmuts(bytes, MutsDeserializeVariant::Signer)?;
     Ok(SignerMutations { client_hmac, muts })
 }
 
 fn deserialize_lssmuts(
-    bytes: &mut decode::bytes::Bytes,
+    bytes: &mut rmp::Bytes,
     variant: MutsDeserializeVariant,
 ) -> Result<(Vec<u8>, Muts)> {
-    let length =
-        decode::read_map_len(bytes).map_err(|_| Error::msg("could not read map length"))?;
-    assert!(length == 2);
-    let mut buff = vec![0u8; 64];
-    let field_name =
-        decode::read_str(bytes, &mut buff).map_err(|_| Error::msg("could not read str"))?;
-    match variant {
-        self::MutsDeserializeVariant::Broker => assert!(field_name == "server_hmac"),
-        self::MutsDeserializeVariant::Signer => assert!(field_name == "client_hmac"),
-    }
-    let length =
-        decode::read_bin_len(bytes).map_err(|_| Error::msg("could not read bin length"))?;
-    assert!(length == 32);
-    let mut hmac = [0u8; 32];
-    bytes.read_exact_buf(&mut hmac).map_err(Error::msg)?;
-    let field_name =
-        decode::read_str(bytes, &mut buff).map_err(|_| Error::msg("could not read str"))?;
-    assert!(field_name == "muts");
-    let hmac = hmac.to_vec();
-    let muts = deserialize_state_vec(bytes).map_err(Error::msg)?;
+    rmp::deserialize_map_len(bytes, 2)?;
+    let hmac = match variant {
+        self::MutsDeserializeVariant::Broker => {
+            rmp::deserialize_bin(bytes, Some("server_hmac"), 32)?
+                .ok_or(anyhow!("deserialize_bin: expected Some(Vec<u8>) got None"))?
+        }
+        self::MutsDeserializeVariant::Signer => {
+            rmp::deserialize_bin(bytes, Some("client_hmac"), 32)?
+                .ok_or(anyhow!("deserialize_bin: expected Some(Vec<u8>) got None"))?
+        }
+    };
+    let muts = rmp::deserialize_state_vec(bytes, Some("muts"))?;
     Ok((hmac, muts))
 }
 

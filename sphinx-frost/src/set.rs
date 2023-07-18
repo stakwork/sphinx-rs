@@ -112,7 +112,7 @@ impl Frost {
             FrostMsg::Register((id, set)) => {
                 // register only takes zero (init) or one pubkey
                 if set.pubkeys.len() > 1 {
-                    return None
+                    return None;
                 }
                 match self.federations.get_mut(&id) {
                     Some(fed) => {
@@ -130,20 +130,23 @@ impl Frost {
                     None => {
                         // invalid
                         if set.threshold > set.n {
-                           return None;
+                            return None;
                         }
                         // empty set for sharing threshold and n only
-                        self.federations.insert(id.clone(), Federation::new(Set {
-                            threshold: set.threshold,
-                            n: set.n,
-                            pubkeys: Vec::new(),
-                        }));
+                        self.federations.insert(
+                            id.clone(),
+                            Federation::new(Set {
+                                threshold: set.threshold,
+                                n: set.n,
+                                pubkeys: Vec::new(),
+                            }),
+                        );
                         Some(FrostResponse::Set((id, set)))
                     }
                 }
             }
-            FrostMsg::Shares((id, s)) => Some(FrostResponse::Shares((id,s))),
-            FrostMsg::Nonce((id, nonce)) => Some(FrostResponse::Nonce((id,nonce))),
+            FrostMsg::Shares((id, s)) => Some(FrostResponse::Shares((id, s))),
+            FrostMsg::Nonce((id, nonce)) => Some(FrostResponse::Nonce((id, nonce))),
             FrostMsg::Signed((id, sig)) => {
                 // collect sigs and see
                 //   - verify_signature_share
@@ -165,19 +168,20 @@ pub fn hex_secret_32() -> String {
 #[cfg(test)]
 mod tests {
     use crate::set::*;
-    use std::thread::spawn;
     pub use crossbeam::channel as chan;
+    use std::thread::spawn;
 
     struct Client {
         frost: Frost,
         msg_tx: chan::Sender<FrostMsg>,
-        res_rx: chan::Receiver<FrostResponse>
+        res_rx: chan::Receiver<FrostResponse>,
     }
     impl Client {
         pub fn new(msg_tx: chan::Sender<FrostMsg>, res_rx: chan::Receiver<FrostResponse>) -> Self {
             Self {
                 frost: Frost::new(),
-                msg_tx, res_rx
+                msg_tx,
+                res_rx,
             }
         }
         pub fn send(&mut self, msg: FrostMsg) {
@@ -189,16 +193,17 @@ mod tests {
             }
         }
     }
-    struct Server{
+    struct Server {
         frost: Frost,
         res_tx: chan::Sender<FrostResponse>,
-        msg_rx: chan::Receiver<FrostMsg>
+        msg_rx: chan::Receiver<FrostMsg>,
     }
     impl Server {
         pub fn new(res_tx: chan::Sender<FrostResponse>, msg_rx: chan::Receiver<FrostMsg>) -> Self {
             Self {
                 frost: Frost::new(),
-                msg_rx, res_tx
+                msg_rx,
+                res_tx,
             }
         }
         pub fn send(&mut self, res: FrostResponse) {

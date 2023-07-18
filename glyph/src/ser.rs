@@ -1,40 +1,40 @@
 use crate::types::*;
-use anyhow::Result;
-pub use rmp::{decode::bytes::Bytes, encode::buffer::ByteBuf};
-use rmp_utils::blocks::*;
+use anyhow::{anyhow, Result};
+use rmp_utils as rmp;
+pub use rmp_utils::{ByteBuf, Bytes};
 
 pub fn serialize_controlmessage(buff: &mut ByteBuf, object: &ControlMessage) -> Result<()> {
     match object {
-        ControlMessage::Nonce => serialize_variant(buff, "Nonce")?,
-        ControlMessage::ResetWifi => serialize_variant(buff, "ResetWifi")?,
-        ControlMessage::ResetKeys => serialize_variant(buff, "ResetKeys")?,
-        ControlMessage::ResetAll => serialize_variant(buff, "ResetAll")?,
-        ControlMessage::QueryPolicy => serialize_variant(buff, "QueryPolicy")?,
+        ControlMessage::Nonce => rmp::serialize_variant(buff, "Nonce")?,
+        ControlMessage::ResetWifi => rmp::serialize_variant(buff, "ResetWifi")?,
+        ControlMessage::ResetKeys => rmp::serialize_variant(buff, "ResetKeys")?,
+        ControlMessage::ResetAll => rmp::serialize_variant(buff, "ResetAll")?,
+        ControlMessage::QueryPolicy => rmp::serialize_variant(buff, "QueryPolicy")?,
         ControlMessage::UpdatePolicy(policy) => {
-            serialize_map_len(buff, 1)?;
+            rmp::serialize_map_len(buff, 1)?;
             serialize_policy(buff, Some("UpdatePolicy"), policy)?;
         }
-        ControlMessage::QueryAllowlist => serialize_variant(buff, "QueryAllowlist")?,
+        ControlMessage::QueryAllowlist => rmp::serialize_variant(buff, "QueryAllowlist")?,
         ControlMessage::UpdateAllowlist(list) => {
-            serialize_map_len(buff, 1)?;
-            serialize_string_vec(buff, Some("UpdateAllowlist"), list)?;
+            rmp::serialize_map_len(buff, 1)?;
+            rmp::serialize_string_vec(buff, Some("UpdateAllowlist"), list)?;
         }
-        ControlMessage::QueryVelocity => serialize_variant(buff, "QueryVelocity")?,
+        ControlMessage::QueryVelocity => rmp::serialize_variant(buff, "QueryVelocity")?,
         ControlMessage::Ota(ota_params) => {
-            serialize_map_len(buff, 1)?;
+            rmp::serialize_map_len(buff, 1)?;
             serialize_otaparams(buff, Some("Ota"), ota_params)?;
         }
-        ControlMessage::QueryAll => serialize_variant(buff, "QueryAll")?,
+        ControlMessage::QueryAll => rmp::serialize_variant(buff, "QueryAll")?,
     }
     Ok(())
 }
 
 pub fn deserialize_controlmessage(bytes: &mut Bytes) -> Result<ControlMessage> {
-    let peek = peek_byte(bytes)?;
+    let peek = rmp::peek_byte(bytes)?;
     if peek == 0x81 {
-        deserialize_map_len(bytes, 1)?;
+        rmp::deserialize_map_len(bytes, 1)?;
     }
-    let variant = deserialize_variant(bytes)?;
+    let variant = rmp::deserialize_variant(bytes)?;
     let en = match variant.as_str() {
         "Nonce" => ControlMessage::Nonce,
         "ResetWifi" => ControlMessage::ResetWifi,
@@ -47,7 +47,7 @@ pub fn deserialize_controlmessage(bytes: &mut Bytes) -> Result<ControlMessage> {
         }
         "QueryAllowlist" => ControlMessage::QueryAllowlist,
         "UpdateAllowlist" => {
-            let list = deserialize_string_vec(bytes, None)?;
+            let list = rmp::deserialize_string_vec(bytes, None)?;
             ControlMessage::UpdateAllowlist(list)
         }
         "QueryVelocity" => ControlMessage::QueryVelocity,
@@ -105,19 +105,19 @@ fn test_controlmessage_serde() {
 }
 
 fn serialize_all(buff: &mut ByteBuf, field_name: Option<&str>, object: &All) -> Result<()> {
-    serialize_field_name(buff, field_name)?;
-    serialize_map_len(buff, 3u32)?;
+    rmp::serialize_field_name(buff, field_name)?;
+    rmp::serialize_map_len(buff, 3u32)?;
     serialize_policy(buff, Some("policy"), &object.policy)?;
-    serialize_string_vec(buff, Some("allowlist"), &object.allowlist)?;
+    rmp::serialize_string_vec(buff, Some("allowlist"), &object.allowlist)?;
     serialize_velocity(buff, Some("velocity"), object.velocity.as_ref())?;
     Ok(())
 }
 
 fn deserialize_all(bytes: &mut Bytes, field_name: Option<&str>) -> Result<All> {
-    deserialize_field_name(bytes, field_name)?;
-    deserialize_map_len(bytes, 3)?;
+    rmp::deserialize_field_name(bytes, field_name)?;
+    rmp::deserialize_map_len(bytes, 3)?;
     let policy = deserialize_policy(bytes, Some("policy"))?;
-    let allowlist = deserialize_string_vec(bytes, Some("allowlist"))?;
+    let allowlist = rmp::deserialize_string_vec(bytes, Some("allowlist"))?;
     let velocity = deserialize_velocity(bytes, Some("velocity"))?;
     Ok(All {
         policy,
@@ -168,57 +168,57 @@ fn test_all_serde() {
 pub fn serialize_controlresponse(buff: &mut ByteBuf, object: &ControlResponse) -> Result<()> {
     match object {
         ControlResponse::Nonce(u) => {
-            serialize_map_len(buff, 1u32)?;
-            serialize_uint(buff, Some("Nonce"), *u)?;
+            rmp::serialize_map_len(buff, 1u32)?;
+            rmp::serialize_uint(buff, Some("Nonce"), *u)?;
         }
-        ControlResponse::ResetWifi => serialize_variant(buff, "ResetWifi")?,
-        ControlResponse::ResetKeys => serialize_variant(buff, "ResetKeys")?,
-        ControlResponse::ResetAll => serialize_variant(buff, "ResetAll")?,
+        ControlResponse::ResetWifi => rmp::serialize_variant(buff, "ResetWifi")?,
+        ControlResponse::ResetKeys => rmp::serialize_variant(buff, "ResetKeys")?,
+        ControlResponse::ResetAll => rmp::serialize_variant(buff, "ResetAll")?,
         ControlResponse::PolicyCurrent(policy) => {
-            serialize_map_len(buff, 1u32)?;
+            rmp::serialize_map_len(buff, 1u32)?;
             serialize_policy(buff, Some("PolicyCurrent"), policy)?;
         }
         ControlResponse::PolicyUpdated(policy) => {
-            serialize_map_len(buff, 1u32)?;
+            rmp::serialize_map_len(buff, 1u32)?;
             serialize_policy(buff, Some("PolicyUpdated"), policy)?;
         }
         ControlResponse::AllowlistCurrent(list) => {
-            serialize_map_len(buff, 1u32)?;
-            serialize_string_vec(buff, Some("AllowlistCurrent"), list)?;
+            rmp::serialize_map_len(buff, 1u32)?;
+            rmp::serialize_string_vec(buff, Some("AllowlistCurrent"), list)?;
         }
         ControlResponse::AllowlistUpdated(list) => {
-            serialize_map_len(buff, 1u32)?;
-            serialize_string_vec(buff, Some("AllowlistUpdated"), list)?;
+            rmp::serialize_map_len(buff, 1u32)?;
+            rmp::serialize_string_vec(buff, Some("AllowlistUpdated"), list)?;
         }
         ControlResponse::VelocityCurrent(velocity) => {
-            serialize_map_len(buff, 1u32)?;
+            rmp::serialize_map_len(buff, 1u32)?;
             serialize_velocity(buff, Some("VelocityCurrent"), velocity.as_ref())?;
         }
         ControlResponse::OtaConfirm(ota_params) => {
-            serialize_map_len(buff, 1u32)?;
+            rmp::serialize_map_len(buff, 1u32)?;
             serialize_otaparams(buff, Some("OtaConfirm"), ota_params)?;
         }
         ControlResponse::AllCurrent(all) => {
-            serialize_map_len(buff, 1u32)?;
+            rmp::serialize_map_len(buff, 1u32)?;
             serialize_all(buff, Some("AllCurrent"), all)?;
         }
         ControlResponse::Error(error) => {
-            serialize_map_len(buff, 1u32)?;
-            serialize_string(buff, Some("Error"), error)?;
+            rmp::serialize_map_len(buff, 1u32)?;
+            rmp::serialize_string(buff, Some("Error"), error)?;
         }
     }
     Ok(())
 }
 
 pub fn deserialize_controlresponse(bytes: &mut Bytes) -> Result<ControlResponse> {
-    let peek = peek_byte(bytes)?;
+    let peek = rmp::peek_byte(bytes)?;
     if peek == 0x81 {
-        deserialize_map_len(bytes, 1)?;
+        rmp::deserialize_map_len(bytes, 1)?;
     }
-    let variant = deserialize_variant(bytes)?;
+    let variant = rmp::deserialize_variant(bytes)?;
     let en = match variant.as_str() {
         "Nonce" => {
-            let u = deserialize_uint(bytes, None)?;
+            let u = rmp::deserialize_uint(bytes, None)?;
             ControlResponse::Nonce(u)
         }
         "ResetWifi" => ControlResponse::ResetWifi,
@@ -233,11 +233,11 @@ pub fn deserialize_controlresponse(bytes: &mut Bytes) -> Result<ControlResponse>
             ControlResponse::PolicyUpdated(policy)
         }
         "AllowlistCurrent" => {
-            let list = deserialize_string_vec(bytes, None)?;
+            let list = rmp::deserialize_string_vec(bytes, None)?;
             ControlResponse::AllowlistCurrent(list)
         }
         "AllowlistUpdated" => {
-            let list = deserialize_string_vec(bytes, None)?;
+            let list = rmp::deserialize_string_vec(bytes, None)?;
             ControlResponse::AllowlistUpdated(list)
         }
         "VelocityCurrent" => {
@@ -253,7 +253,7 @@ pub fn deserialize_controlresponse(bytes: &mut Bytes) -> Result<ControlResponse>
             ControlResponse::AllCurrent(all)
         }
         "Error" => {
-            let error = deserialize_string(bytes, None)?;
+            let error = rmp::deserialize_string(bytes, None)?;
             ControlResponse::Error(error)
         }
         _ => panic!("could not deserialize controlresponse"),
@@ -335,20 +335,20 @@ fn test_controlresponse_serde() {
 }
 
 pub fn serialize_config(buff: &mut ByteBuf, object: &Config) -> Result<()> {
-    serialize_map_len(buff, 4u32)?;
-    serialize_string(buff, Some("broker"), &object.broker)?;
-    serialize_string(buff, Some("ssid"), &object.ssid)?;
-    serialize_string(buff, Some("pass"), &object.pass)?;
-    serialize_string(buff, Some("network"), &object.network)?;
+    rmp::serialize_map_len(buff, 4u32)?;
+    rmp::serialize_string(buff, Some("broker"), &object.broker)?;
+    rmp::serialize_string(buff, Some("ssid"), &object.ssid)?;
+    rmp::serialize_string(buff, Some("pass"), &object.pass)?;
+    rmp::serialize_string(buff, Some("network"), &object.network)?;
     Ok(())
 }
 
 pub fn deserialize_config(bytes: &mut Bytes) -> Result<Config> {
-    deserialize_map_len(bytes, 4)?;
-    let broker = deserialize_string(bytes, Some("broker"))?;
-    let ssid = deserialize_string(bytes, Some("ssid"))?;
-    let pass = deserialize_string(bytes, Some("pass"))?;
-    let network = deserialize_string(bytes, Some("network"))?;
+    rmp::deserialize_map_len(bytes, 4)?;
+    let broker = rmp::deserialize_string(bytes, Some("broker"))?;
+    let ssid = rmp::deserialize_string(bytes, Some("ssid"))?;
+    let pass = rmp::deserialize_string(bytes, Some("pass"))?;
+    let network = rmp::deserialize_string(bytes, Some("network"))?;
     Ok(Config {
         broker,
         ssid,
@@ -389,15 +389,15 @@ pub fn serialize_velocity(
 ) -> Result<()> {
     match object {
         None => {
-            serialize_none(buff, field_name)?;
+            rmp::serialize_none(buff, field_name)?;
         }
         Some(object) => {
-            serialize_field_name(buff, field_name)?;
-            serialize_array_len(buff, 2u32)?;
-            serialize_uint(buff, None, object.0)?;
-            serialize_array_len(buff, object.1.len() as u32)?;
+            rmp::serialize_field_name(buff, field_name)?;
+            rmp::serialize_array_len(buff, 2u32)?;
+            rmp::serialize_uint(buff, None, object.0)?;
+            rmp::serialize_array_len(buff, object.1.len() as u32)?;
             for e in &object.1 {
-                serialize_uint(buff, None, *e)?;
+                rmp::serialize_uint(buff, None, *e)?;
             }
         }
     }
@@ -408,18 +408,20 @@ pub fn deserialize_velocity(
     bytes: &mut Bytes,
     field_name: Option<&str>,
 ) -> Result<Option<Velocity>> {
-    deserialize_field_name(bytes, field_name)?;
-    let peek = peek_byte(bytes)?;
-    if peek == null_marker_byte() {
+    rmp::deserialize_field_name(bytes, field_name)?;
+    let peek = rmp::peek_byte(bytes)?;
+    if peek == rmp::null_marker_byte() {
         return Ok(None);
     }
-    let length = deserialize_array_len(bytes)?;
-    assert!(length == 2);
-    let x = deserialize_uint(bytes, None)?;
-    let length = deserialize_array_len(bytes)?;
+    let length = rmp::deserialize_array_len(bytes)?;
+    if length != 2 {
+        return Err(anyhow!("deserialize_velocity: unexpected array length"));
+    }
+    let x = rmp::deserialize_uint(bytes, None)?;
+    let length = rmp::deserialize_array_len(bytes)?;
     let mut y: Vec<u64> = Vec::with_capacity(length as usize);
     for _ in 0..length {
-        let e = deserialize_uint(bytes, None)?;
+        let e = rmp::deserialize_uint(bytes, None)?;
         y.push(e);
     }
     Ok(Some((x, y)))
@@ -450,20 +452,20 @@ pub fn serialize_policy(
     field_name: Option<&str>,
     object: &Policy,
 ) -> Result<()> {
-    serialize_field_name(buff, field_name)?;
-    serialize_map_len(buff, 3u32)?;
-    serialize_uint(buff, Some("msat_per_interval"), object.msat_per_interval)?;
+    rmp::serialize_field_name(buff, field_name)?;
+    rmp::serialize_map_len(buff, 3u32)?;
+    rmp::serialize_uint(buff, Some("msat_per_interval"), object.msat_per_interval)?;
     serialize_interval(buff, Some("interval"), &object.interval)?;
-    serialize_uint(buff, Some("htlc_limit_msat"), object.htlc_limit_msat)?;
+    rmp::serialize_uint(buff, Some("htlc_limit_msat"), object.htlc_limit_msat)?;
     Ok(())
 }
 
 pub fn deserialize_policy(bytes: &mut Bytes, field_name: Option<&str>) -> Result<Policy> {
-    deserialize_field_name(bytes, field_name)?;
-    deserialize_map_len(bytes, 3)?;
-    let msat_per_interval = deserialize_uint(bytes, Some("msat_per_interval"))?;
+    rmp::deserialize_field_name(bytes, field_name)?;
+    rmp::deserialize_map_len(bytes, 3)?;
+    let msat_per_interval = rmp::deserialize_uint(bytes, Some("msat_per_interval"))?;
     let interval = deserialize_interval(bytes, Some("interval"))?;
-    let htlc_limit_msat = deserialize_uint(bytes, Some("htlc_limit_msat"))?;
+    let htlc_limit_msat = rmp::deserialize_uint(bytes, Some("htlc_limit_msat"))?;
     Ok(Policy {
         msat_per_interval,
         interval,
@@ -521,17 +523,17 @@ fn serialize_interval(
     field_name: Option<&str>,
     object: &Interval,
 ) -> Result<()> {
-    serialize_field_name(buff, field_name)?;
+    rmp::serialize_field_name(buff, field_name)?;
     match object {
-        Interval::Hourly => serialize_variant(buff, "hourly")?,
-        Interval::Daily => serialize_variant(buff, "daily")?,
+        Interval::Hourly => rmp::serialize_variant(buff, "hourly")?,
+        Interval::Daily => rmp::serialize_variant(buff, "daily")?,
     };
     Ok(())
 }
 
 fn deserialize_interval(bytes: &mut Bytes, field_name: Option<&str>) -> Result<Interval> {
-    deserialize_field_name(bytes, field_name)?;
-    let variant = deserialize_variant(bytes)?;
+    rmp::deserialize_field_name(bytes, field_name)?;
+    let variant = rmp::deserialize_variant(bytes)?;
     let en = match variant.as_str() {
         "hourly" => Interval::Hourly,
         "daily" => Interval::Daily,
@@ -565,17 +567,17 @@ fn serialize_otaparams(
     field_name: Option<&str>,
     object: &OtaParams,
 ) -> Result<()> {
-    serialize_field_name(buff, field_name)?;
-    serialize_map_len(buff, 2u32)?;
-    serialize_uint(buff, Some("version"), object.version)?;
-    serialize_string(buff, Some("url"), &object.url)?;
+    rmp::serialize_field_name(buff, field_name)?;
+    rmp::serialize_map_len(buff, 2u32)?;
+    rmp::serialize_uint(buff, Some("version"), object.version)?;
+    rmp::serialize_string(buff, Some("url"), &object.url)?;
     Ok(())
 }
 
 fn deserialize_otaparams(bytes: &mut Bytes) -> Result<OtaParams> {
-    deserialize_map_len(bytes, 2)?;
-    let version = deserialize_uint(bytes, Some("version"))?;
-    let url = deserialize_string(bytes, Some("url"))?;
+    rmp::deserialize_map_len(bytes, 2)?;
+    let version = rmp::deserialize_uint(bytes, Some("version"))?;
+    let url = rmp::deserialize_string(bytes, Some("url"))?;
     Ok(OtaParams { version, url })
 }
 
@@ -603,16 +605,16 @@ fn test_otaparams_serde() {
 }
 
 pub fn serialize_wifiparams(buff: &mut ByteBuf, object: &WifiParams) -> Result<()> {
-    serialize_map_len(buff, 2u32)?;
-    serialize_string(buff, Some("ssid"), &object.ssid)?;
-    serialize_string(buff, Some("password"), &object.password)?;
+    rmp::serialize_map_len(buff, 2u32)?;
+    rmp::serialize_string(buff, Some("ssid"), &object.ssid)?;
+    rmp::serialize_string(buff, Some("password"), &object.password)?;
     Ok(())
 }
 
 pub fn deserialize_wifiparams(bytes: &mut Bytes) -> Result<WifiParams> {
-    deserialize_map_len(bytes, 2)?;
-    let ssid = deserialize_string(bytes, Some("ssid"))?;
-    let password = deserialize_string(bytes, Some("password"))?;
+    rmp::deserialize_map_len(bytes, 2)?;
+    let ssid = rmp::deserialize_string(bytes, Some("ssid"))?;
+    let password = rmp::deserialize_string(bytes, Some("password"))?;
     Ok(WifiParams { ssid, password })
 }
 
