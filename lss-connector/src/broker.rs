@@ -1,9 +1,10 @@
 use crate::msgs::*;
 
-use anyhow::Result;
+use anyhow::{Error, Result};
 use lightning_signer::persist::Mutations;
 use lightning_storage_server::client::Auth;
 use secp256k1::PublicKey;
+use std::convert::TryInto;
 use std::sync::Arc;
 use tokio::sync::Mutex as AsyncMutex;
 use vls_frontend::external_persist::lss::Client as LssClient;
@@ -39,7 +40,7 @@ impl LssBroker {
         let client_id = secp256k1::PublicKey::from_slice(&ir.client_id)?;
         let auth = Auth {
             client_id: client_id,
-            token: ir.auth_token,
+            token: ir.auth_token.to_vec(),
         };
         let client = LssClient::new(uri, &spk, auth).await?;
         log::info!("connected to LSS provider {}", uri);
@@ -75,7 +76,9 @@ impl LssBroker {
         let (muts, server_hmac) = client.get("".to_string(), nonce).await?;
         Ok(BrokerMutations {
             muts: muts.into_inner(),
-            server_hmac,
+            server_hmac: server_hmac
+                .try_into()
+                .map_err(|_| Error::msg("hmac not 32 bytes"))?,
         })
     }
     pub async fn put_muts(&self, cm: SignerMutations) -> Result<Vec<u8>> {
@@ -98,21 +101,25 @@ impl LssBroker {
     pub async fn handle(&self, res: Response) -> Result<Msg> {
         match res {
             Response::Init(_) => Ok(Msg::Created(BrokerMutations {
-                muts: Vec::new(),        // empty
-                server_hmac: Vec::new(), // empty
+                muts: Vec::new(),       // empty
+                server_hmac: [0u8; 32], // empty
             })),
             Response::Created(cm) => {
                 let server_hmac = self.put_muts(cm).await?;
                 Ok(Msg::Created(BrokerMutations {
                     muts: Vec::new(),
-                    server_hmac,
+                    server_hmac: server_hmac
+                        .try_into()
+                        .map_err(|_| Error::msg("hmac not 32 bytes"))?,
                 }))
             }
             Response::VlsMuts(vlsm) => {
                 let server_hmac = self.put_muts(vlsm).await?;
                 Ok(Msg::Stored(BrokerMutations {
                     muts: Vec::new(),
-                    server_hmac,
+                    server_hmac: server_hmac
+                        .try_into()
+                        .map_err(|_| Error::msg("hmac not 32 bytes"))?,
                 }))
             }
         }
@@ -132,7 +139,9 @@ pub async fn lss_handle(lss: &LssPersister, msg: &[u8]) -> Result<Vec<u8>> {
             .await?;
         BrokerMutations {
             muts: Vec::new(),
-            server_hmac,
+            server_hmac: server_hmac
+                .try_into()
+                .map_err(|_| Error::msg("hmac not 32 bytes"))?,
         }
     };
     Ok(Msg::Stored(bm).to_vec()?)

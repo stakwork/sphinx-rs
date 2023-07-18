@@ -52,7 +52,7 @@ impl LssSigner {
         // send client_id and auth_token back to broker
         let msg = Response::Init(InitResponse {
             client_id: client_id.serialize(),
-            auth_token: auth_token.to_vec(),
+            auth_token,
             nonce: Some(new_nonce),
         });
         let msg_bytes = msg.to_vec().unwrap();
@@ -70,7 +70,7 @@ impl LssSigner {
     pub fn reconnect_init_response(&self) -> Vec<u8> {
         let msg = Response::Init(InitResponse {
             client_id: self.client_id.serialize(),
-            auth_token: self.auth_token.to_vec(),
+            auth_token: self.auth_token,
             nonce: None,
         });
         println!("===> reconnect_init_response {:?}", msg);
@@ -80,7 +80,7 @@ impl LssSigner {
     pub fn empty_created(&self) -> Vec<u8> {
         let res = Response::Created(SignerMutations {
             muts: Vec::new(),
-            client_hmac: [0; 32].to_vec(),
+            client_hmac: [0; 32],
         });
         res.to_vec().unwrap()
     }
@@ -93,7 +93,7 @@ impl LssSigner {
         // let helper = self.helper.lock().unwrap();
         let success = self
             .helper
-            .check_hmac(&Mutations::from_vec(c.muts.clone()), c.server_hmac);
+            .check_hmac(&Mutations::from_vec(c.muts.clone()), c.server_hmac.to_vec());
         if !success {
             return Err(anyhow!("invalid server hmac"));
         }
@@ -102,7 +102,7 @@ impl LssSigner {
         let (handler, muts) = handler_builder
             .build()
             .map_err(|_| anyhow!("failed to build"))?;
-        let client_hmac = self.helper.client_hmac(&muts).to_vec();
+        let client_hmac = self.helper.client_hmac(&muts);
 
         let res = Response::Created(SignerMutations {
             muts: muts.into_inner(),
@@ -120,7 +120,7 @@ impl LssSigner {
     }
     pub fn check_hmac(&self, bm: BrokerMutations) -> bool {
         self.helper
-            .check_hmac(&Mutations::from_vec(bm.muts), bm.server_hmac)
+            .check_hmac(&Mutations::from_vec(bm.muts), bm.server_hmac.to_vec())
     }
 }
 

@@ -26,20 +26,20 @@ pub struct Init {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BrokerMutations {
-    pub server_hmac: Vec<u8>,
+    pub server_hmac: [u8; 32],
     pub muts: Muts,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SignerMutations {
-    pub client_hmac: Vec<u8>,
+    pub client_hmac: [u8; 32],
     pub muts: Muts,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct InitResponse {
     pub client_id: [u8; 33],
-    pub auth_token: Vec<u8>,
+    pub auth_token: [u8; 32],
     pub nonce: Option<[u8; 32]>,
 }
 
@@ -62,19 +62,13 @@ pub fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
                 &mut buff,
                 "Created",
                 "server_hmac",
-                &bm.server_hmac,
+                bm.server_hmac,
                 &bm.muts,
             )?;
             Ok(buff.into_vec())
         }
         Msg::Stored(bm) => {
-            serialize_muts(
-                &mut buff,
-                "Stored",
-                "server_hmac",
-                &bm.server_hmac,
-                &bm.muts,
-            )?;
+            serialize_muts(&mut buff, "Stored", "server_hmac", bm.server_hmac, &bm.muts)?;
             Ok(buff.into_vec())
         }
     }
@@ -101,7 +95,7 @@ pub fn serialize_lssres(res: &Response) -> Result<Vec<u8>> {
                 &mut buff,
                 "Created",
                 "client_hmac",
-                &sm.client_hmac,
+                sm.client_hmac,
                 &sm.muts,
             )?;
             Ok(buff.into_vec())
@@ -111,7 +105,7 @@ pub fn serialize_lssres(res: &Response) -> Result<Vec<u8>> {
                 &mut buff,
                 "VlsMuts",
                 "client_hmac",
-                &sm.client_hmac,
+                sm.client_hmac,
                 &sm.muts,
             )?;
             Ok(buff.into_vec())
@@ -123,7 +117,7 @@ fn serialize_muts(
     buff: &mut rmp::ByteBuf,
     variant: &str,
     hmac_type: &str,
-    hmac: &Vec<u8>,
+    hmac: [u8; 32],
     muts: &Muts,
 ) -> Result<()> {
     rmp::serialize_map_len(buff, 1u32)?;
@@ -174,7 +168,6 @@ pub fn deserialize_lssres(b: &[u8]) -> Result<Response> {
             let binary = rmp::deserialize_bin(&mut bytes, Some("auth_token"), 32)?
                 .ok_or(anyhow!("deserialize_bin: expected Some(Vec<u8>) got None"))?;
             auth_token.copy_from_slice(&binary[..]);
-            let auth_token = auth_token.to_vec();
             // nonce
             let mut nonce = None;
             if let Some(binary) = rmp::deserialize_bin(&mut bytes, Some("nonce"), 32)? {
@@ -216,9 +209,9 @@ fn deserialize_signermuts(bytes: &mut rmp::Bytes) -> Result<SignerMutations> {
 fn deserialize_lssmuts(
     bytes: &mut rmp::Bytes,
     variant: MutsDeserializeVariant,
-) -> Result<(Vec<u8>, Muts)> {
+) -> Result<([u8; 32], Muts)> {
     rmp::deserialize_map_len(bytes, 2)?;
-    let hmac = match variant {
+    let binary = match variant {
         self::MutsDeserializeVariant::Broker => {
             rmp::deserialize_bin(bytes, Some("server_hmac"), 32)?
                 .ok_or(anyhow!("deserialize_bin: expected Some(Vec<u8>) got None"))?
@@ -228,6 +221,8 @@ fn deserialize_lssmuts(
                 .ok_or(anyhow!("deserialize_bin: expected Some(Vec<u8>) got None"))?
         }
     };
+    let mut hmac = [0u8; 32];
+    hmac.copy_from_slice(&binary[..]);
     let muts = rmp::deserialize_state_vec(bytes, Some("muts"))?;
     Ok((hmac, muts))
 }
@@ -293,7 +288,7 @@ mod tests {
     fn test_lss_msg() -> anyhow::Result<()> {
         let m1 = Msg::Created(BrokerMutations {
             muts: Vec::new(),
-            server_hmac: Vec::new(),
+            server_hmac: [0u8; 32],
         });
         println!("M1 {:?}", m1.to_vec()?);
         // let s = vec![];
@@ -321,7 +316,7 @@ mod tests {
             ("cccc".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
         ];
         let test = Msg::Created(BrokerMutations {
-            server_hmac: [u8::MAX; 32].to_vec(),
+            server_hmac: [u8::MAX; 32],
             muts,
         });
         let bytes = serialize_lssmsg(&test).unwrap();
@@ -337,7 +332,7 @@ mod tests {
             ("cccc".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
         ];
         let test = Msg::Stored(BrokerMutations {
-            server_hmac: [u8::MAX; 32].to_vec(),
+            server_hmac: [u8::MAX; 32],
             muts,
         });
         let bytes = serialize_lssmsg(&test).unwrap();
@@ -349,7 +344,7 @@ mod tests {
     fn test_resinit_serde() {
         let test = Response::Init(InitResponse {
             client_id: [u8::MAX; 33],
-            auth_token: [u8::MAX; 32].to_vec(),
+            auth_token: [u8::MAX; 32],
             nonce: Some([u8::MAX; 32]),
         });
         let bytes = serialize_lssres(&test).unwrap();
@@ -358,7 +353,7 @@ mod tests {
 
         let test = Response::Init(InitResponse {
             client_id: [u8::MAX; 33],
-            auth_token: [u8::MAX; 32].to_vec(),
+            auth_token: [u8::MAX; 32],
             nonce: None,
         });
         let bytes = serialize_lssres(&test).unwrap();
@@ -374,7 +369,7 @@ mod tests {
             ("cccc".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
         ];
         let test = Response::Created(SignerMutations {
-            client_hmac: [u8::MAX; 32].to_vec(),
+            client_hmac: [u8::MAX; 32],
             muts,
         });
         let bytes = serialize_lssres(&test).unwrap();
@@ -390,7 +385,7 @@ mod tests {
             ("cccc".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
         ];
         let test = Response::VlsMuts(SignerMutations {
-            client_hmac: [u8::MAX; 32].to_vec(),
+            client_hmac: [u8::MAX; 32],
             muts,
         });
         let bytes = serialize_lssres(&test).unwrap();
