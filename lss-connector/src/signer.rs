@@ -91,9 +91,12 @@ impl LssSigner {
         state: Option<BTreeMap<String, (u64, Vec<u8>)>>,
     ) -> Result<(RootHandler, Vec<u8>)> {
         // let helper = self.helper.lock().unwrap();
-        let success = self
-            .helper
-            .check_hmac(&Mutations::from_vec(c.muts.clone()), c.server_hmac.to_vec());
+        let success = self.helper.check_hmac(
+            &Mutations::from_vec(c.muts.clone()),
+            c.server_hmac
+                .ok_or(anyhow!("build_with_lss: server_hmac is none"))?
+                .to_vec(),
+        );
         if !success {
             return Err(anyhow!("invalid server hmac"));
         }
@@ -119,8 +122,12 @@ impl LssSigner {
         self.helper.server_hmac(mutations)
     }
     pub fn check_hmac(&self, bm: BrokerMutations) -> bool {
-        self.helper
-            .check_hmac(&Mutations::from_vec(bm.muts), bm.server_hmac.to_vec())
+        match bm.server_hmac {
+            Some(hmac) => self
+                .helper
+                .check_hmac(&Mutations::from_vec(bm.muts), hmac.to_vec()),
+            None => false,
+        }
     }
 }
 
@@ -133,7 +140,6 @@ pub fn handle_lss_msg(
     lss_signer: &LssSigner,
 ) -> Result<(String, Vec<u8>)> {
     use sphinx_glyph::topics;
-    use std::convert::TryInto;
 
     // println!("LssMsg::from_slice {:?}", &msg.message);
     let lssmsg = Msg::from_slice(&msg)?;
@@ -168,8 +174,7 @@ pub fn handle_lss_msg(
             } else {
                 let shmac: [u8; 32] = bm
                     .server_hmac
-                    .try_into()
-                    .map_err(|_| anyhow!("Invalid server hmac (not 32 bytes)"))?;
+                    .ok_or(anyhow!("muts are not empty, but server_hmac is none"))?;
                 // check the original muts
                 let server_hmac = lss_signer.server_hmac(&Mutations::from_vec(sm.muts));
                 // send back the original VLS response finally

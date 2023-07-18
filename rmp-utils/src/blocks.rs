@@ -9,8 +9,9 @@ pub fn hello_world() {
     println!("Hello world!");
 }
 
-pub fn peek_byte(bytes: &mut Bytes) -> Result<u8> {
+pub fn peek_byte(bytes: &mut Bytes, field_name: Option<&str>) -> Result<u8> {
     let mut temp = Bytes::new(bytes.remaining_slice());
+    deserialize_field_name(&mut temp, field_name)?;
     let peek = temp.read_u8().map_err(Error::msg)?;
     Ok(peek)
 }
@@ -22,7 +23,7 @@ pub fn peek_str_len(bytes: &mut Bytes) -> Result<usize> {
     Ok(len)
 }
 
-pub fn null_marker_byte() -> u8 {
+fn null_marker_byte() -> u8 {
     Marker::Null.to_u8()
 }
 
@@ -147,26 +148,40 @@ pub fn serialize_bin(buff: &mut ByteBuf, field_name: Option<&str>, object: Vec<u
     Ok(())
 }
 
-pub fn deserialize_bin(bytes: &mut Bytes, field_name: Option<&str>, expected_bin_len: u32) -> Result<Option<Vec<u8>>> {
+pub fn deserialize_bin(
+    bytes: &mut Bytes,
+    field_name: Option<&str>,
+    expected_bin_len: u32,
+) -> Result<Vec<u8>> {
     deserialize_field_name(bytes, field_name)?;
-    if null_marker_byte() == peek_byte(bytes)? {
-        Ok(None)
-    } else {
-        let length = decode::read_bin_len(bytes)
-            .map_err(|_| Error::msg("could not read bin length"))?;
-        if length != expected_bin_len {
-            return Err(anyhow!("deserialize_bin: unexpected binary length"));
-        }
-        let mut binary = vec![0u8; length as usize];
-        bytes
-            .read_exact_buf(&mut binary)
-            .map_err(Error::msg)?;
-        Ok(Some(binary))
+    let length =
+        decode::read_bin_len(bytes).map_err(|_| Error::msg("could not read bin length"))?;
+    if length != expected_bin_len {
+        return Err(anyhow!("deserialize_bin: unexpected binary length"));
     }
+    let mut binary = vec![0u8; length as usize];
+    bytes.read_exact_buf(&mut binary).map_err(Error::msg)?;
+    Ok(binary)
+}
+
+pub fn peek_is_none(bytes: &mut Bytes, field_name: Option<&str>) -> Result<bool> {
+    Ok(peek_byte(bytes, field_name)? == null_marker_byte())
 }
 
 pub fn serialize_none(buff: &mut ByteBuf, field_name: Option<&str>) -> Result<()> {
     serialize_field_name(buff, field_name)?;
     buff.write_u8(Marker::Null.to_u8()).map_err(Error::msg)?;
     Ok(())
+}
+
+pub fn deserialize_none(bytes: &mut Bytes, field_name: Option<&str>) -> Result<()> {
+    deserialize_field_name(bytes, field_name)?;
+    let byte = bytes.read_u8().map_err(Error::msg)?;
+    if byte == null_marker_byte() {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "deserialize_none: byte is not the null marker byte"
+        ))
+    }
 }
