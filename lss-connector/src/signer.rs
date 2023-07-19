@@ -100,7 +100,12 @@ impl LssSigner {
         if !success {
             return Err(anyhow!("invalid server hmac"));
         }
-        let s = Arc::new(Mutex::new(state.unwrap_or_default()));
+
+        let mut state = state.unwrap_or_default();
+        for (key, version_value) in c.muts.into_iter() {
+            state.insert(key, version_value);
+        }
+        let s = Arc::new(Mutex::new(state));
         let handler_builder = handler_builder.lss_state(s);
         let (handler, muts) = handler_builder
             .build()

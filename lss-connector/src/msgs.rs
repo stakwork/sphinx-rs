@@ -50,11 +50,7 @@ pub fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
             rmp::serialize_map_len(&mut buff, 1u32)?;
             rmp::serialize_field_name(&mut buff, Some("Init"))?;
             rmp::serialize_map_len(&mut buff, 1u32)?;
-            rmp::serialize_bin(
-                &mut buff,
-                Some("server_pubkey"),
-                &init.server_pubkey,
-            )?;
+            rmp::serialize_bin(&mut buff, Some("server_pubkey"), &init.server_pubkey)?;
             Ok(buff.into_vec())
         }
         Msg::Created(bm) => {

@@ -83,7 +83,7 @@ impl LssBroker {
             ),
         })
     }
-    pub async fn put_muts(&self, cm: SignerMutations) -> Result<Option<[u8;32]>> {
+    pub async fn put_muts(&self, cm: SignerMutations) -> Result<Option<[u8; 32]>> {
         Ok(if cm.muts.is_empty() {
             None
         } else {
@@ -91,7 +91,7 @@ impl LssBroker {
             let binary = client
                 .put(Mutations::from_vec(cm.muts), &cm.client_hmac)
                 .await?;
-            let mut hmac = [0u8;32];
+            let mut hmac = [0u8; 32];
             hmac.copy_from_slice(&binary[..]);
             Some(hmac)
         })
@@ -112,15 +112,15 @@ impl LssBroker {
             Response::Created(cm) => {
                 let server_hmac = self.put_muts(cm).await?;
                 Ok(Msg::Created(BrokerMutations {
-                    muts: Vec::new(),  // empty
+                    muts: Vec::new(), // empty
                     server_hmac,
                 }))
             }
             Response::VlsMuts(vlsm) => {
                 let server_hmac = self.put_muts(vlsm).await?;
                 Ok(Msg::Stored(BrokerMutations {
-                    muts: Vec::new(),  // empty
-                    server_hmac
+                    muts: Vec::new(), // empty
+                    server_hmac,
                 }))
             }
         }
@@ -135,7 +135,7 @@ pub async fn lss_handle(lss: &LssPersister, msg: &[u8]) -> Result<Vec<u8>> {
     let bm: BrokerMutations = if res.muts.is_empty() {
         Default::default()
     } else {
-        let mut server_hmac = [0u8;32];
+        let mut server_hmac = [0u8; 32];
         let binary = client
             .put(Mutations::from_vec(res.muts), &res.client_hmac)
             .await?;
