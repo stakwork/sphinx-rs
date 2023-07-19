@@ -52,7 +52,7 @@ impl LssSigner {
         // send client_id and auth_token back to broker
         let msg = Response::Init(InitResponse {
             client_id: client_id.serialize(),
-            auth_token: auth_token.to_vec(),
+            auth_token,
             nonce: Some(new_nonce),
         });
         let msg_bytes = msg.to_vec().unwrap();
@@ -70,7 +70,7 @@ impl LssSigner {
     pub fn reconnect_init_response(&self) -> Vec<u8> {
         let msg = Response::Init(InitResponse {
             client_id: self.client_id.serialize(),
-            auth_token: self.auth_token.to_vec(),
+            auth_token: self.auth_token,
             nonce: None,
         });
         println!("===> reconnect_init_response {:?}", msg);
@@ -80,7 +80,7 @@ impl LssSigner {
     pub fn empty_created(&self) -> Vec<u8> {
         let res = Response::Created(SignerMutations {
             muts: Vec::new(),
-            client_hmac: [0; 32].to_vec(),
+            client_hmac: [0; 32],
         });
         res.to_vec().unwrap()
     }
@@ -91,18 +91,31 @@ impl LssSigner {
         state: Option<BTreeMap<String, (u64, Vec<u8>)>>,
     ) -> Result<(RootHandler, Vec<u8>)> {
         // let helper = self.helper.lock().unwrap();
-        let success = self
-            .helper
-            .check_hmac(&Mutations::from_vec(c.muts.clone()), c.server_hmac);
+        let success = self.helper.check_hmac(
+            &Mutations::from_vec(c.muts.clone()),
+            c.server_hmac
+                .ok_or(anyhow!("build_with_lss: server_hmac is none"))?
+                .to_vec(),
+        );
         if !success {
             return Err(anyhow!("invalid server hmac"));
         }
-        let s = Arc::new(Mutex::new(state.unwrap_or_default()));
-        let handler_builder = handler_builder.lss_state(s);
+
+        let mut sta = BTreeMap::new(); // state.unwrap_or_default();
+        for (key, version_value) in c.muts.into_iter() {
+            sta.insert(key, version_value);
+        }
+        if let Some(stat) = state {
+            for (key, version_value) in stat {
+                sta.insert(key, version_value);
+            }
+        }
+        let st = Arc::new(Mutex::new(sta));
+        let handler_builder = handler_builder.lss_state(st);
         let (handler, muts) = handler_builder
             .build()
             .map_err(|_| anyhow!("failed to build"))?;
-        let client_hmac = self.helper.client_hmac(&muts).to_vec();
+        let client_hmac = self.helper.client_hmac(&muts);
 
         let res = Response::Created(SignerMutations {
             muts: muts.into_inner(),
@@ -119,8 +132,12 @@ impl LssSigner {
         self.helper.server_hmac(mutations)
     }
     pub fn check_hmac(&self, bm: BrokerMutations) -> bool {
-        self.helper
-            .check_hmac(&Mutations::from_vec(bm.muts), bm.server_hmac)
+        match bm.server_hmac {
+            Some(hmac) => self
+                .helper
+                .check_hmac(&Mutations::from_vec(bm.muts), hmac.to_vec()),
+            None => false,
+        }
     }
 }
 
@@ -133,7 +150,6 @@ pub fn handle_lss_msg(
     lss_signer: &LssSigner,
 ) -> Result<(String, Vec<u8>)> {
     use sphinx_glyph::topics;
-    use std::convert::TryInto;
 
     // println!("LssMsg::from_slice {:?}", &msg.message);
     let lssmsg = Msg::from_slice(&msg)?;
@@ -168,8 +184,7 @@ pub fn handle_lss_msg(
             } else {
                 let shmac: [u8; 32] = bm
                     .server_hmac
-                    .try_into()
-                    .map_err(|_| anyhow!("Invalid server hmac (not 32 bytes)"))?;
+                    .ok_or(anyhow!("muts are not empty, but server_hmac is none"))?;
                 // check the original muts
                 let server_hmac = lss_signer.server_hmac(&Mutations::from_vec(sm.muts));
                 // send back the original VLS response finally

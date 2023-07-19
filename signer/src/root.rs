@@ -177,7 +177,7 @@ pub fn handle_with_lss(
     let lss_bytes = if mutations.is_empty() {
         Vec::new()
     } else {
-        let client_hmac = lss_signer.client_hmac(&mutations).to_vec();
+        let client_hmac = lss_signer.client_hmac(&mutations);
         let lss_msg = LssResponse::VlsMuts(SignerMutations {
             client_hmac,
             muts: mutations.into_inner(),

@@ -30,7 +30,7 @@ pub fn serialize_controlmessage(buff: &mut ByteBuf, object: &ControlMessage) -> 
 }
 
 pub fn deserialize_controlmessage(bytes: &mut Bytes) -> Result<ControlMessage> {
-    let peek = rmp::peek_byte(bytes)?;
+    let peek = rmp::peek_byte(bytes, None)?;
     if peek == 0x81 {
         rmp::deserialize_map_len(bytes, 1)?;
     }
@@ -211,7 +211,7 @@ pub fn serialize_controlresponse(buff: &mut ByteBuf, object: &ControlResponse) -
 }
 
 pub fn deserialize_controlresponse(bytes: &mut Bytes) -> Result<ControlResponse> {
-    let peek = rmp::peek_byte(bytes)?;
+    let peek = rmp::peek_byte(bytes, None)?;
     if peek == 0x81 {
         rmp::deserialize_map_len(bytes, 1)?;
     }
@@ -409,22 +409,23 @@ pub fn deserialize_velocity(
     field_name: Option<&str>,
 ) -> Result<Option<Velocity>> {
     rmp::deserialize_field_name(bytes, field_name)?;
-    let peek = rmp::peek_byte(bytes)?;
-    if peek == rmp::null_marker_byte() {
-        return Ok(None);
+    if rmp::peek_is_none(bytes, None)? {
+        rmp::deserialize_none(bytes, None)?;
+        Ok(None)
+    } else {
+        let length = rmp::deserialize_array_len(bytes)?;
+        if length != 2 {
+            return Err(anyhow!("deserialize_velocity: unexpected array length"));
+        }
+        let x = rmp::deserialize_uint(bytes, None)?;
+        let length = rmp::deserialize_array_len(bytes)?;
+        let mut y: Vec<u64> = Vec::with_capacity(length as usize);
+        for _ in 0..length {
+            let e = rmp::deserialize_uint(bytes, None)?;
+            y.push(e);
+        }
+        Ok(Some((x, y)))
     }
-    let length = rmp::deserialize_array_len(bytes)?;
-    if length != 2 {
-        return Err(anyhow!("deserialize_velocity: unexpected array length"));
-    }
-    let x = rmp::deserialize_uint(bytes, None)?;
-    let length = rmp::deserialize_array_len(bytes)?;
-    let mut y: Vec<u64> = Vec::with_capacity(length as usize);
-    for _ in 0..length {
-        let e = rmp::deserialize_uint(bytes, None)?;
-        y.push(e);
-    }
-    Ok(Some((x, y)))
 }
 
 #[test]

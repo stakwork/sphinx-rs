@@ -103,7 +103,14 @@ fn state_vec_serde() {
         ("cccc".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
     ];
     let mut buff = encode::buffer::ByteBuf::new();
-    serialize_state_vec(&mut buff, &test).unwrap();
+    serialize_state_vec(&mut buff, None, &test).unwrap();
+    let mut bytes = decode::bytes::Bytes::new(buff.as_slice());
+    let object = deserialize_state_vec(&mut bytes, None).unwrap();
+    assert_eq!(test, object);
+
+    let test = Vec::new();
+    let mut buff = encode::buffer::ByteBuf::new();
+    serialize_state_vec(&mut buff, None, &test).unwrap();
     let mut bytes = decode::bytes::Bytes::new(buff.as_slice());
     let object = deserialize_state_vec(&mut bytes, None).unwrap();
     assert_eq!(test, object);
