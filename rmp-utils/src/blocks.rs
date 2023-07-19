@@ -142,9 +142,9 @@ pub fn deserialize_uint(bytes: &mut Bytes, field_name: Option<&str>) -> Result<u
     Ok(object)
 }
 
-pub fn serialize_bin(buff: &mut ByteBuf, field_name: Option<&str>, object: Vec<u8>) -> Result<()> {
+pub fn serialize_bin(buff: &mut ByteBuf, field_name: Option<&str>, object: &[u8]) -> Result<()> {
     serialize_field_name(buff, field_name)?;
-    encode::write_bin(buff, &object).map_err(Error::msg)?;
+    encode::write_bin(buff, object).map_err(Error::msg)?;
     Ok(())
 }
 

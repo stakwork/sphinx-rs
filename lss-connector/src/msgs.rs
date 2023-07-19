@@ -53,7 +53,7 @@ pub fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
             rmp::serialize_bin(
                 &mut buff,
                 Some("server_pubkey"),
-                init.server_pubkey.to_vec(),
+                &init.server_pubkey,
             )?;
             Ok(buff.into_vec())
         }
@@ -81,10 +81,10 @@ pub fn serialize_lssres(res: &Response) -> Result<Vec<u8>> {
             rmp::serialize_map_len(&mut buff, 1u32)?;
             rmp::serialize_field_name(&mut buff, Some("Init"))?;
             rmp::serialize_map_len(&mut buff, 3u32)?;
-            rmp::serialize_bin(&mut buff, Some("client_id"), init.client_id.to_vec())?;
-            rmp::serialize_bin(&mut buff, Some("auth_token"), init.auth_token.to_vec())?;
+            rmp::serialize_bin(&mut buff, Some("client_id"), &init.client_id)?;
+            rmp::serialize_bin(&mut buff, Some("auth_token"), &init.auth_token)?;
             if let Some(arr) = init.nonce {
-                rmp::serialize_bin(&mut buff, Some("nonce"), arr.to_vec())?;
+                rmp::serialize_bin(&mut buff, Some("nonce"), &arr)?;
             } else {
                 rmp::serialize_none(&mut buff, Some("nonce"))?;
             }
@@ -124,7 +124,7 @@ fn serialize_muts(
     rmp::serialize_field_name(buff, Some(variant))?;
     rmp::serialize_map_len(buff, 2u32)?;
     match hmac {
-        Some(hmac) => rmp::serialize_bin(buff, Some(hmac_type), hmac.to_vec())?,
+        Some(hmac) => rmp::serialize_bin(buff, Some(hmac_type), &hmac)?,
         None => rmp::serialize_none(buff, Some(hmac_type))?,
     }
     rmp::serialize_state_vec(buff, Some("muts"), muts).map_err(Error::msg)?;
@@ -174,7 +174,7 @@ pub fn deserialize_lssres(b: &[u8]) -> Result<Response> {
                 None
             } else {
                 let mut nonce = [0u8; 32];
-                rmp::deserialize_bin(&mut bytes, Some("nonce"), 32)?;
+                let binary = rmp::deserialize_bin(&mut bytes, Some("nonce"), 32)?;
                 nonce.copy_from_slice(&binary[..]);
                 Some(nonce)
             };
@@ -373,7 +373,7 @@ mod tests {
         let test = Response::Init(InitResponse {
             client_id: [u8::MAX; 33],
             auth_token: [u8::MAX; 32],
-            nonce: Some([u8::MAX; 32]),
+            nonce: Some([2u8; 32]),
         });
         let bytes = serialize_lssres(&test).unwrap();
         let object = deserialize_lssres(&bytes).unwrap();
