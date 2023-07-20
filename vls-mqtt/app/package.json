@@ -17,6 +17,7 @@
     "buffer": "^6.0.3",
     "carbon-components-svelte": "^0.70.12",
     "carbon-icons-svelte": "^11.4.0",
+    "events": "^3.3.0",
     "localforage": "^1.10.0",
     "mqtt": "^4.3.7",
     "rollup": "^2.3.4",

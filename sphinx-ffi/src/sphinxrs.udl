@@ -56,4 +56,6 @@ namespace sphinxrs {
   VlsResponse run_vls(string args, bytes state, bytes msg1, bytes msg2, bytes vls_msg);
   [Throws=SphinxError]
   VlsResponse run_lss(string args, bytes state, bytes msg1, bytes msg2, bytes lss_msg, bytes prev_vls, bytes prev_lss);
+  [Throws=SphinxError]
+  string make_auth_token(u32 ts, string secret);
 };

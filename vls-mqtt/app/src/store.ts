@@ -1,5 +1,6 @@
-import { writable } from "svelte/store";
+import { writable, derived } from "svelte/store";
 import { localStorageStore } from "./storage";
+import { sphinx } from "./wasm";
 
 interface PageItem {
   page: Page;
@@ -49,6 +50,14 @@ export const genKey = (): string => {
 };
 
 export const seed = localStorageStore<string>("seed", genKey());
+
+export const keys = derived([seed], ([$seed]) => {
+  try {
+    return sphinx.node_keys("regtest", $seed);
+  } catch (e) {
+    console.error(e);
+  }
+});
 
 export const isSigner = writable<boolean>(initialIsSigner);
 

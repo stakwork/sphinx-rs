@@ -1,7 +1,7 @@
 import { sphinx } from "./wasm";
 import { localStorageStore } from "./storage";
-import { seed, policy, allowlist, Policy, isSigner } from "./store";
-import { derived, get } from "svelte/store";
+import { policy, allowlist, Policy, isSigner, keys } from "./store";
+import { get } from "svelte/store";
 
 const nonce = localStorageStore("nonce", 0);
 
@@ -13,14 +13,6 @@ function newNonce(update: boolean): bigint {
   log("newNonce", n + 1);
   return BigInt(n + 1);
 }
-
-export const keys = derived([seed], ([$seed]) => {
-  try {
-    return sphinx.node_keys("regtest", $seed);
-  } catch (e) {
-    console.error(e);
-  }
-});
 
 interface Control {
   type: Cmd;

@@ -39,6 +39,9 @@ impl Token {
     pub fn new() -> Self {
         Self(now(), None)
     }
+    pub fn new_with_time(d: u32) -> Self {
+        Self(d, None)
+    }
     pub fn set_sig(&mut self, sig: [u8; 65]) {
         self.1 = Some(sig)
     }
