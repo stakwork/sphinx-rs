@@ -5,16 +5,21 @@ interface PageItem {
   page: Page;
   label: string;
 }
+const initialIsSigner = signerParam();
+
 export const pages: PageItem[] = [
   { label: "Account", page: "account" },
   { label: "Policy", page: "policy" },
   { label: "Allow List", page: "allowlist" },
   { label: "Force Close", page: "forceclose" },
 ];
+if (initialIsSigner) {
+  pages.unshift({ label: "Signer", page: "signer" });
+}
 
-export type Page = "account" | "allowlist" | "policy" | "forceclose";
+export type Page = "signer" | "account" | "allowlist" | "policy" | "forceclose";
 
-export const menu = writable<Page>("account");
+export const menu = writable<Page>(initialIsSigner ? "signer" : "account");
 
 export type Interval = "hourly" | "daily";
 
@@ -44,3 +49,17 @@ export const genKey = (): string => {
 };
 
 export const seed = localStorageStore<string>("seed", genKey());
+
+export const isSigner = writable<boolean>(initialIsSigner);
+
+function signerParam(): boolean {
+  const queryString = window.location.search;
+  const urlParams = new URLSearchParams(queryString);
+  const signer = urlParams.get("signer");
+  if (signer) {
+    console.log("=> signer mode");
+    return true;
+  } else {
+    return false;
+  }
+}

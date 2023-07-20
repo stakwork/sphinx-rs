@@ -5,11 +5,13 @@
   import Policy from "carbon-icons-svelte/lib/Policy.svelte";
   import ListChecked from "carbon-icons-svelte/lib/ListChecked.svelte";
   import Exit from "carbon-icons-svelte/lib/Exit.svelte";
+  import Password from "carbon-icons-svelte/lib/Password.svelte";
 
   function navigate(page: string) {
     menu.set(page as Page);
   }
   const icons = {
+    signer: Password,
     account: VirtualColumnKey,
     policy: Policy,
     allowlist: ListChecked,

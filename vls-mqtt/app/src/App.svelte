@@ -2,11 +2,12 @@
   import * as sphinx from "../../../sphinx-wasm/pkg";
   import { onMount } from "svelte";
   import Sidebar from "./Sidebar.svelte";
-  import { pages, menu } from "./store";
+  import { pages, menu, isSigner } from "./store";
   import Account from "./Account.svelte";
   import Allowlist from "./Allowlist.svelte";
   import Policy from "./Policy.svelte";
   import ForceClose from "./ForceClose.svelte";
+  import Signer from "./Signer.svelte";
 
   let loaded = false;
 
@@ -23,11 +24,13 @@
 
   $: page = pages.find((p) => p.page === $menu);
   const components = {
+    signer: Signer,
     account: Account,
     policy: Policy,
     allowlist: Allowlist,
     forceclose: ForceClose,
   };
+
   $: component = components[page.page];
 </script>
 

@@ -43,7 +43,7 @@ pub struct Args {
     policy: Policy,
     velocity: Option<Velocity>,
     allowlist: Vec<String>,
-    timestamp: Duration,
+    timestamp: u64, // number of seconds
     lss_nonce: [u8; 32],
 }
 
@@ -131,13 +131,18 @@ pub fn run_lss(
 }
 
 fn root_handler_builder(args: Args, state: State) -> Result<RootHandlerBuilder> {
+    use std::time::UNIX_EPOCH;
+
     let tmp = ThreadMemoPersister {};
 
     let persist_ctx = tmp.enter(Arc::new(Mutex::new(state)));
 
+    let st = UNIX_EPOCH + Duration::from_secs(args.timestamp);
+    let d = st.duration_since(UNIX_EPOCH).unwrap();
+
     let persister = Arc::new(tmp);
-    let clock = Arc::new(NowClock::new(args.timestamp));
-    let stf = Arc::new(NowStartingTimeFactory::new(args.timestamp));
+    let clock = Arc::new(NowClock::new(d));
+    let stf = Arc::new(NowStartingTimeFactory::new(d));
     let (rhb, _approver) = builder_inner(
         args.seed,
         args.network,
@@ -222,7 +227,7 @@ mod tests {
 
     fn empty_args() -> Args {
         use std::time::SystemTime;
-        let timestamp = SystemTime::now()
+        let ts = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap();
         Args {
@@ -231,9 +236,18 @@ mod tests {
             policy: Default::default(),
             velocity: None,
             allowlist: vec![],
-            timestamp,
+            timestamp: ts.as_secs(),
             lss_nonce: [32; 32],
         }
+    }
+
+    // cargo test test_args_der --no-default-features --features no-std,persist,broker-test -- --nocapture
+    #[test]
+    fn test_args_der() {
+        let ts = "1111111111";
+        let j = format!("{{\"seed\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"network\":\"regtest\",\"policy\":{{\"msat_per_interval\":21000000000,\"interval\":\"daily\",\"htlc_limit_msat\":1000000000}},\"allowlist\":[],\"timestamp\":{},\"lss_nonce\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]}}", ts);
+        let a: Args = sphinx_glyph::serde_json::from_str(&j).unwrap();
+        println!("ARGS {:?}", a);
     }
 
     // cargo test test_map --no-default-features --features no-std,persist,broker-test -- --nocapture
@@ -324,7 +338,7 @@ mod tests {
 
                 let lss_msg = lss_broker.handle(lss_res).await?;
                 let lss_msg_bytes = lss_msg.to_vec()?;
-                let lss_rr = run_lss(
+                let _lss_rr = run_lss(
                     args.clone(),
                     state.clone(),
                     bi1.clone(),

@@ -4,7 +4,7 @@
     SkeletonText,
     InlineNotification,
   } from "carbon-components-svelte";
-  import { seed } from "./store";
+  import { seed, isSigner } from "./store";
   import { sphinx } from "./wasm";
   import { getNonce } from "./api";
   import { onMount } from "svelte";
@@ -12,6 +12,7 @@
   let connected = false;
 
   async function start() {
+    if ($isSigner) return;
     const n = await getNonce();
     if (n) connected = true;
   }

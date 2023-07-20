@@ -1,6 +1,6 @@
 import { sphinx } from "./wasm";
 import { localStorageStore } from "./storage";
-import { seed, policy, allowlist, Policy } from "./store";
+import { seed, policy, allowlist, Policy, isSigner } from "./store";
 import { derived, get } from "svelte/store";
 
 const nonce = localStorageStore("nonce", 0);
@@ -59,6 +59,9 @@ export function root() {
 }
 
 async function sendCmd(type: Cmd, content?: any) {
+  if (get(isSigner)) {
+    return console.log("=> skip sendCmd");
+  }
   log("=> sendCmd", type, content);
   const j = JSON.stringify({ [type]: content || null });
   const ks: sphinx.Keys = get(keys);
@@ -85,6 +88,7 @@ export async function getNonce() {
   log("=> getNonce");
   try {
     const res = await sendCmd("Nonce");
+    if (!res) return;
     const msg = sphinx.parse_control_response(res);
     console.log("nonce response:", msg, typeof msg);
     const j = JSON.parse(msg);
@@ -103,6 +107,7 @@ export async function getPolicy(): Promise<Policy> {
   log("=> getPolicy");
   try {
     const res = await sendCmd("QueryPolicy");
+    if (!res) return;
     const msg = sphinx.parse_control_response(res);
     const j = JSON.parse(msg);
     if (j.PolicyCurrent) {
@@ -118,6 +123,7 @@ export async function setPolicy(p: Policy): Promise<Policy> {
   log("=> setPolicy");
   try {
     const res = await sendCmd("UpdatePolicy", p);
+    if (!res) return;
     const msg = sphinx.parse_control_response(res);
     const j = JSON.parse(msg);
     if (j.PolicyUpdated) {
@@ -134,6 +140,7 @@ export async function getAllowlist(): Promise<string[]> {
   log("=> getAllowlist");
   try {
     const res = await sendCmd("QueryAllowlist");
+    if (!res) return;
     const msg = sphinx.parse_control_response(res);
     const j = JSON.parse(msg);
     console.log(j);
@@ -151,6 +158,7 @@ export async function setAllowlist(al: string[]): Promise<string[]> {
   log("=> setAllowlist");
   try {
     const res = await sendCmd("UpdateAllowlist", al);
+    if (!res) return;
     const msg = sphinx.parse_control_response(res);
     const j = JSON.parse(msg);
     console.log(j);
