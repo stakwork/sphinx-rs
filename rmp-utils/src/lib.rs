@@ -14,16 +14,24 @@ pub use blocks::*;
 pub use rmp::decode::bytes::Bytes;
 pub use rmp::encode::buffer::ByteBuf;
 
+const TRACE: bool = false;
+
 pub fn serialize_state_vec(
     buff: &mut encode::buffer::ByteBuf,
     field_name: Option<&str>,
     v: &Vec<(String, (u64, Vec<u8>))>,
 ) -> Result<()> {
+    if TRACE {
+        log::info!("serialize_state_vec: start");
+    }
     blocks::serialize_field_name(buff, field_name)?;
     encode::write_array_len(buff, v.len() as u32).map_err(Error::msg)?;
     for (x, (y, z)) in v {
         encode::write_array_len(buff, 2).map_err(Error::msg)?;
         serialize_state_element(buff, x, y, z)?;
+    }
+    if TRACE {
+        log::info!("serialize_state_vec: end");
     }
     Ok(())
 }
@@ -32,6 +40,9 @@ pub fn deserialize_state_vec(
     bytes: &mut decode::bytes::Bytes,
     field_name: Option<&str>,
 ) -> Result<Vec<(String, (u64, Vec<u8>))>> {
+    if TRACE {
+        log::info!("deserialize_state_vec: start");
+    }
     blocks::deserialize_field_name(bytes, field_name)?;
     let length =
         decode::read_array_len(bytes).map_err(|_| Error::msg("could not read array length"))?;
@@ -42,19 +53,31 @@ pub fn deserialize_state_vec(
         let (x, (y, z)) = deserialize_state_element(bytes)?;
         object.push((x, (y, z)));
     }
+    if TRACE {
+        log::info!("deserialize_state_vec: end");
+    }
     Ok(object)
 }
 
 pub fn serialize_state_map(map: &BTreeMap<String, (u64, Vec<u8>)>) -> Result<Vec<u8>> {
+    if TRACE {
+        log::info!("serialize_state_map: start");
+    }
     let mut buff = encode::buffer::ByteBuf::new();
     encode::write_map_len(&mut buff, map.len() as u32).map_err(Error::msg)?;
     for (x, (y, z)) in map {
         serialize_state_element(&mut buff, x, y, z)?;
     }
+    if TRACE {
+        log::info!("serialize_state_map: end");
+    }
     Ok(buff.into_vec())
 }
 
 pub fn deserialize_state_map(b: &[u8]) -> Result<BTreeMap<String, (u64, Vec<u8>)>> {
+    if TRACE {
+        log::info!("deserialize_state_map: start");
+    }
     let mut bytes = decode::bytes::Bytes::new(b);
     let length =
         decode::read_map_len(&mut bytes).map_err(|_| Error::msg("could not read map length"))?;
@@ -62,6 +85,9 @@ pub fn deserialize_state_map(b: &[u8]) -> Result<BTreeMap<String, (u64, Vec<u8>)
     for _ in 0..length {
         let (x, (y, z)) = deserialize_state_element(&mut bytes)?;
         object.insert(x, (y, z));
+    }
+    if TRACE {
+        log::info!("deserialize_state_map: end");
     }
     Ok(object)
 }
@@ -72,14 +98,23 @@ fn serialize_state_element(
     y: &u64,
     z: &Vec<u8>,
 ) -> Result<()> {
+    if TRACE {
+        log::info!("serialize_state_element: start");
+    }
     encode::write_str(buff, x).map_err(Error::msg)?;
     encode::write_array_len(buff, 2).map_err(Error::msg)?;
     encode::write_uint(buff, *y).map_err(Error::msg)?;
     encode::write_bin(buff, &z).map_err(Error::msg)?;
+    if TRACE {
+        log::info!("serialize_state_element: end");
+    }
     Ok(())
 }
 
 fn deserialize_state_element(bytes: &mut decode::bytes::Bytes) -> Result<(String, (u64, Vec<u8>))> {
+    if TRACE {
+        log::info!("deserialize_state_element: start");
+    }
     let mut temp = decode::bytes::Bytes::new(bytes.remaining_slice());
     let length =
         decode::read_str_len(&mut temp).map_err(|_| Error::msg("could not read str length"))?;
@@ -90,8 +125,14 @@ fn deserialize_state_element(bytes: &mut decode::bytes::Bytes) -> Result<(String
     let y: u64 = decode::read_int(bytes).map_err(Error::msg)?;
     let length =
         decode::read_bin_len(bytes).map_err(|_| Error::msg("could not read bin length"))?;
+    if TRACE {
+        log::info!("deserialize_state_element: allocating Vec<u8> of size {}", length);
+    }
     let mut z: Vec<u8> = vec![0u8; length as usize];
     bytes.read_exact_buf(&mut z).map_err(Error::msg)?;
+    if TRACE {
+        log::info!("deserialize_state_element: end");
+    }
     Ok((x, (y, z)))
 }
 
