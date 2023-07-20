@@ -32,5 +32,8 @@ hex = { version = "0.4.3", default-features = false }
 anyhow = { version = "1", default-features = false }
 fsdb = { version = "0.1.11", optional = true }
 
+[target.riscv32imc-esp-espidf.dependencies]
+esp-idf-sys  = { version = "0.33.1", features = ["binstart"] }
+
 [dev-dependencies]
 simple_logger = "4.2.0"

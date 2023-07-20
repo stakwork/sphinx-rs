@@ -3,6 +3,7 @@ use sphinx_glyph::types;
 use types::{Interval, Policy, Velocity};
 
 use anyhow::anyhow;
+use core::sync::atomic::{AtomicU16, Ordering};
 use lightning_signer::bitcoin::blockdata::constants::ChainHash;
 use lightning_signer::bitcoin::Network;
 use lightning_signer::node::NodeServices;
@@ -21,6 +22,8 @@ use vls_protocol::model::PubKey;
 use vls_protocol::msgs::{self, read_serial_request_header, write_serial_response_header, Message};
 use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
+
+pub static COUNTER: AtomicU16 = AtomicU16::new(u16::MAX);
 
 pub fn builder(
     seed: [u8; 32],
@@ -120,6 +123,21 @@ fn handle_inner(
         dbid,
     } = read_serial_request_header(&mut bytes)
         .map_err(|e| anyhow!("failed read_serial_request_header {:?}", e))?;
+    log::info!("sequence: {}", sequence);
+    let counter = COUNTER.load(Ordering::Relaxed);
+    if counter == u16::MAX {
+        COUNTER.store(sequence, Ordering::Relaxed);
+    } else {
+        if counter + 1 != sequence || sequence == 0 {
+            #[cfg(target_arch = "riscv32")]
+            unsafe {
+                esp_idf_sys::esp_restart()
+            };
+        } else {
+            COUNTER.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
     let message = msgs::read(&mut bytes).map_err(|e| anyhow!("failed msgs::read: {:?}", e))?;
 
     if let Message::HsmdInit(ref m) = message {
