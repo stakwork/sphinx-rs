@@ -58,6 +58,7 @@ pub fn run_vls(
     msg1: &[u8],
     msg2: &[u8],
     vls_msg: &[u8],
+    expected_sequence: Option<u16>,
 ) -> Result<VlsResponse> {
     Ok(cy::run_vls(
         args.to_string(),
@@ -65,6 +66,7 @@ pub fn run_vls(
         msg1.to_vec(),
         msg2.to_vec(),
         vls_msg.to_vec(),
+        expected_sequence,
     )?
     .into())
 }
