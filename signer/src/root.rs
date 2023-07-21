@@ -2,7 +2,6 @@ use crate::approver::{create_approver, SphinxApprover};
 use sphinx_glyph::types;
 use types::{Interval, Policy, Velocity};
 
-use core::sync::atomic::{AtomicU16, Ordering};
 use lightning_signer::bitcoin::blockdata::constants::ChainHash;
 use lightning_signer::bitcoin::Network;
 use lightning_signer::node::NodeServices;
@@ -22,8 +21,6 @@ use vls_protocol::model::PubKey;
 use vls_protocol::msgs::{self, read_serial_request_header, write_serial_response_header, Message};
 use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
-
-pub static COUNTER: AtomicU16 = AtomicU16::new(u16::MAX);
 
 #[derive(Error, Debug)]
 pub enum VlsHandlerError {
@@ -134,8 +131,9 @@ pub fn policy_interval(int: Interval) -> VelocityControlIntervalType {
 fn handle_inner(
     root_handler: &RootHandler,
     mut bytes: Vec<u8>,
+    expected_sequence: Option<u16>,
     do_log: bool,
-) -> Result<(Vec<u8>, Mutations), VlsHandlerError> {
+) -> Result<(Vec<u8>, Mutations, u16), VlsHandlerError> {
     // println!("Signer is handling these bytes: {:?}", bytes);
     let msgs::SerialRequestHeader {
         sequence,
@@ -144,14 +142,9 @@ fn handle_inner(
     } = read_serial_request_header(&mut bytes)
         .map_err(|e| VlsHandlerError::HeaderRead(format!("{:?}", e)))?;
     log::info!("sequence: {}", sequence);
-    let counter = COUNTER.load(Ordering::Relaxed);
-    if counter == u16::MAX {
-        COUNTER.store(sequence, Ordering::Relaxed);
-    } else {
-        if counter + 1 != sequence || sequence == 0 {
-            return Err(VlsHandlerError::BadSequence(sequence, counter + 1));
-        } else {
-            COUNTER.fetch_add(1, Ordering::Relaxed);
+    if let Some(expected) = expected_sequence {
+        if expected != sequence {
+            return Err(VlsHandlerError::BadSequence(sequence, expected));
         }
     }
 
@@ -195,25 +188,29 @@ fn handle_inner(
     msgs::write_vec(&mut &mut buf, vls_msg.as_vec())
         .map_err(|e| VlsHandlerError::MsgWrite(format!("{:?}", e)))?;
     //println!("handled message, replying with: {:?}", out_md);
-    Ok((buf, mutations))
+    Ok((buf, mutations, sequence))
 }
 
 pub fn handle(
     root_handler: &RootHandler,
     bytes: Vec<u8>,
+    expected_sequence: Option<u16>,
     do_log: bool,
-) -> Result<Vec<u8>, VlsHandlerError> {
-    let (out_bytes, _muts) = handle_inner(root_handler, bytes, do_log)?;
-    Ok(out_bytes)
+) -> Result<(Vec<u8>, u16), VlsHandlerError> {
+    let (out_bytes, _muts, sequence) =
+        handle_inner(root_handler, bytes, expected_sequence, do_log)?;
+    Ok((out_bytes, sequence))
 }
 
 pub fn handle_with_lss(
     root_handler: &RootHandler,
     lss_signer: &LssSigner,
     bytes: Vec<u8>,
+    expected_sequence: Option<u16>,
     do_log: bool,
-) -> Result<(Vec<u8>, Vec<u8>), VlsHandlerError> {
-    let (out_bytes, mutations) = handle_inner(root_handler, bytes, do_log)?;
+) -> Result<(Vec<u8>, Vec<u8>, u16), VlsHandlerError> {
+    let (out_bytes, mutations, sequence) =
+        handle_inner(root_handler, bytes, expected_sequence, do_log)?;
     let lss_bytes = if mutations.is_empty() {
         Vec::new()
     } else {
@@ -226,7 +223,7 @@ pub fn handle_with_lss(
             .to_vec()
             .map_err(|e| VlsHandlerError::LssWrite(format!("{:?}", e)))?
     };
-    Ok((out_bytes, lss_bytes))
+    Ok((out_bytes, lss_bytes, sequence))
 }
 
 pub fn parse_ping_and_form_response(mut msg_bytes: Vec<u8>) -> Vec<u8> {

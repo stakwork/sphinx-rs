@@ -30,10 +30,10 @@ pub const ROOT_STORE: &str = "teststore";
 #[derive(Debug)]
 pub struct VlsChanMsg {
     pub message: Vec<u8>,
-    pub reply_tx: oneshot::Sender<Result<(Vec<u8>, Vec<u8>)>>,
+    pub reply_tx: oneshot::Sender<Result<(Vec<u8>, Vec<u8>, u16)>>,
 }
 impl VlsChanMsg {
-    pub fn new(message: Vec<u8>) -> (Self, oneshot::Receiver<Result<(Vec<u8>, Vec<u8>)>>) {
+    pub fn new(message: Vec<u8>) -> (Self, oneshot::Receiver<Result<(Vec<u8>, Vec<u8>, u16)>>) {
         let (reply_tx, reply_rx) = oneshot::channel();
         (Self { message, reply_tx }, reply_rx)
     }
@@ -139,7 +139,7 @@ async fn rocket() -> _ {
     rocket::tokio::spawn(async move {
         while let Some(msg) = vls_rx.recv().await {
             let s1 = approver.control().get_state();
-            let res_res = root::handle_with_lss(&rh_, &lss_signer, msg.message, true).map_err(Error::msg);
+            let res_res = root::handle_with_lss(&rh_, &lss_signer, msg.message, None, true).map_err(Error::msg);
             let s2 = approver.control().get_state();
             if s1 != s2 {
                 log::info!("===> VelocityApprover state updated");
