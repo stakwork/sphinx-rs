@@ -150,7 +150,7 @@ async fn got_msg(
         let (vls_msg, reply_rx) = VlsChanMsg::new(msg_bytes.to_vec());
         let _ = vls_tx.send(vls_msg).await;
         match reply_rx.await.unwrap() {
-            Ok((vls_bytes, lss_bytes)) => {
+            Ok((vls_bytes, lss_bytes, _sequence)) => {
                 if lss_bytes.len() == 0 {
                     // no muts, respond directly back!
                     (topics::VLS_RES.to_string(), vls_bytes)
