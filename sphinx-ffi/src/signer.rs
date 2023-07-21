@@ -33,12 +33,15 @@ pub fn run_vls(
     msg1: Vec<u8>,
     msg2: Vec<u8>,
     vls_msg: Vec<u8>,
+    expected_sequence: Option<u16>,
 ) -> Result<VlsResponse> {
     let args = args_from_json(&args_string)?;
     let state = state_from_mp(&state_mp)?;
     let ret =
-        mobile::run_vls(args, state, msg1, msg2, vls_msg).map_err(|e| SphinxError::InitFailed {
-            r: format!("{:?}", e),
+        mobile::run_vls(args, state, msg1, msg2, vls_msg, expected_sequence).map_err(|e| {
+            SphinxError::InitFailed {
+                r: format!("{:?}", e),
+            }
         })?;
     Ok(ret)
 }

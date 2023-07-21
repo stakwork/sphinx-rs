@@ -341,7 +341,7 @@ private fun findLibraryName(componentName: String): String {
     if (libOverride != null) {
         return libOverride
     }
-    return "sphinxrs"
+    return "uniffi_sphinxrs"
 }
 
 private inline fun <reified Lib : Library> loadIndirect(
@@ -386,7 +386,7 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_run_init_2(`args`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`msg1`: RustBuffer.ByValue,`msg2`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_run_vls(`args`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`msg1`: RustBuffer.ByValue,`msg2`: RustBuffer.ByValue,`vlsMsg`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
+    fun uniffi_sphinxrs_fn_func_run_vls(`args`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`msg1`: RustBuffer.ByValue,`msg2`: RustBuffer.ByValue,`vlsMsg`: RustBuffer.ByValue,`expectedSequence`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_run_lss(`args`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`msg1`: RustBuffer.ByValue,`msg2`: RustBuffer.ByValue,`lssMsg`: RustBuffer.ByValue,`prevVls`: RustBuffer.ByValue,`prevLss`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
@@ -478,7 +478,7 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
     if (lib.uniffi_sphinxrs_checksum_func_run_init_2() != 13191.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_sphinxrs_checksum_func_run_vls() != 59450.toShort()) {
+    if (lib.uniffi_sphinxrs_checksum_func_run_vls() != 35014.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_run_lss() != 63303.toShort()) {
@@ -491,6 +491,26 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
 
 // Public interface members begin here.
 
+
+public object FfiConverterUShort: FfiConverter<UShort, Short> {
+    override fun lift(value: Short): UShort {
+        return value.toUShort()
+    }
+
+    override fun read(buf: ByteBuffer): UShort {
+        return lift(buf.getShort())
+    }
+
+    override fun lower(value: UShort): Short {
+        return value.toShort()
+    }
+
+    override fun allocationSize(value: UShort) = 2
+
+    override fun write(value: UShort, buf: ByteBuffer) {
+        buf.putShort(value.toShort())
+    }
+}
 
 public object FfiConverterUInt: FfiConverter<UInt, Int> {
     override fun lift(value: Int): UInt {
@@ -1015,6 +1035,35 @@ public object FfiConverterTypeSphinxError : FfiConverterRustBuffer<SphinxExcepti
 
 
 
+public object FfiConverterOptionalUShort: FfiConverterRustBuffer<UShort?> {
+    override fun read(buf: ByteBuffer): UShort? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterUShort.read(buf)
+    }
+
+    override fun allocationSize(value: UShort?): Int {
+        if (value == null) {
+            return 1
+        } else {
+            return 1 + FfiConverterUShort.allocationSize(value)
+        }
+    }
+
+    override fun write(value: UShort?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterUShort.write(value, buf)
+        }
+    }
+}
+
+
+
+
 public object FfiConverterOptionalByteArray: FfiConverterRustBuffer<ByteArray?> {
     override fun read(buf: ByteBuffer): ByteArray? {
         if (buf.get().toInt() == 0) {
@@ -1141,10 +1190,10 @@ fun `runInit2`(`args`: String, `state`: ByteArray, `msg1`: ByteArray, `msg2`: By
 
 @Throws(SphinxException::class)
 
-fun `runVls`(`args`: String, `state`: ByteArray, `msg1`: ByteArray, `msg2`: ByteArray, `vlsMsg`: ByteArray): VlsResponse {
+fun `runVls`(`args`: String, `state`: ByteArray, `msg1`: ByteArray, `msg2`: ByteArray, `vlsMsg`: ByteArray, `expectedSequence`: UShort?): VlsResponse {
     return FfiConverterTypeVlsResponse.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_run_vls(FfiConverterString.lower(`args`),FfiConverterByteArray.lower(`state`),FfiConverterByteArray.lower(`msg1`),FfiConverterByteArray.lower(`msg2`),FfiConverterByteArray.lower(`vlsMsg`),_status)
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_run_vls(FfiConverterString.lower(`args`),FfiConverterByteArray.lower(`state`),FfiConverterByteArray.lower(`msg1`),FfiConverterByteArray.lower(`msg2`),FfiConverterByteArray.lower(`vlsMsg`),FfiConverterOptionalUShort.lower(`expectedSequence`),_status)
 })
 }
 

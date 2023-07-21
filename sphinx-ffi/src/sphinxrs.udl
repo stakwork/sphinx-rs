@@ -53,7 +53,7 @@ namespace sphinxrs {
   [Throws=SphinxError]
   VlsResponse run_init_2(string args, bytes state, bytes msg1, bytes msg2);
   [Throws=SphinxError]
-  VlsResponse run_vls(string args, bytes state, bytes msg1, bytes msg2, bytes vls_msg);
+  VlsResponse run_vls(string args, bytes state, bytes msg1, bytes msg2, bytes vls_msg, u16? expected_sequence);
   [Throws=SphinxError]
   VlsResponse run_lss(string args, bytes state, bytes msg1, bytes msg2, bytes lss_msg, bytes prev_vls, bytes prev_lss);
   [Throws=SphinxError]
