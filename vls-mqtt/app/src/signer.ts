@@ -57,6 +57,8 @@ declare global {
 export function initialize() {
   const ks = get(keys);
 
+  sphinx.init_logs();
+
   const auth_token = sphinx.make_auth_token(now(), ks.secret);
   console.log("auth_token", auth_token);
   // start and sub mqtt
@@ -155,6 +157,7 @@ export function run_init_1(p: Uint8Array) {
   try {
     const a = argsAndState();
     const ret = sphinx.run_init_1(a.args, a.state, p);
+    console.log("RET LSS BYTES", ret.lss_bytes);
     lss_msg1 = ret.lss_bytes;
     processVlsResult(ret);
   } catch (e) {

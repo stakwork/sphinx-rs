@@ -36,6 +36,11 @@ impl VlsResponse {
 }
 
 #[wasm_bindgen]
+pub fn init_logs() {
+    crate::init_logs();
+}
+
+#[wasm_bindgen]
 pub fn run_init_1(args: &str, state: &[u8], msg1: &[u8]) -> Result<VlsResponse> {
     Ok(cy::run_init_1(args.to_string(), state.to_vec(), msg1.to_vec())?.into())
 }
@@ -81,6 +86,7 @@ pub fn run_lss(
     prev_vls: &[u8],
     prev_lss: &[u8],
 ) -> Result<VlsResponse> {
+    init_logs();
     Ok(cy::run_lss(
         args.to_string(),
         state.to_vec(),

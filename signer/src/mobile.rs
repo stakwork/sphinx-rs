@@ -64,7 +64,6 @@ pub fn run_init_1(
 ) -> Result<(RunReturn, RootHandlerBuilder, LssSigner)> {
     let init = Msg::from_slice(&lss_msg1)?.into_init()?;
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
-
     let nonce = args.lss_nonce.clone();
     let rhb = root_handler_builder(args, state)?;
     let (lss_signer, res1) = LssSigner::new(&rhb, &server_pubkey, Some(nonce));
@@ -83,7 +82,6 @@ pub fn run_init_2(
 ) -> Result<(RunReturn, RootHandler, LssSigner)> {
     let (_res1, rhb, lss_signer) = run_init_1(args, state.clone(), lss_msg1)?;
     let created = Msg::from_slice(&lss_msg2)?.into_created()?;
-
     let (root_handler, res2) = lss_signer.build_with_lss(created, rhb, Some(state))?;
     Ok((
         RunReturn::new_lss(topics::INIT_2_RES, res2),

@@ -5,6 +5,10 @@ use wasm_bindgen::prelude::*;
 
 type Result<T> = std::result::Result<T, JsError>;
 
+pub fn init_logs() {
+    wasm_logger::init(wasm_logger::Config::default());
+}
+
 #[wasm_bindgen]
 pub fn pubkey_from_secret_key(sec: &str) -> Result<String> {
     Ok(cy::pubkey_from_secret_key(sec.to_string())?)
