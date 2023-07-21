@@ -19,43 +19,45 @@ pub type Result<T> = std::result::Result<T, SphinxError>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SphinxError {
-    #[error("Failed to derive public key")]
-    DerivePublicKey,
-    #[error("Failed to derive shared secret")]
-    DeriveSharedSecret,
-    #[error("Failed to encrypt")]
-    Encrypt,
-    #[error("Failed to decrypt")]
-    Decrypt,
-    #[error("Bad pubkey")]
-    BadPubkey,
-    #[error("Bad secret")]
-    BadSecret,
-    #[error("Bad nonce")]
-    BadNonce,
-    #[error("Bad cipher")]
-    BadCiper,
-    #[error("Invalid network")]
-    InvalidNetwork,
-    #[error("Bad Request")]
-    BadRequest,
-    #[error("Bad Response")]
-    BadResponse,
-    #[error("Bad Args")]
-    BadArgs,
-    #[error("Bad State")]
-    BadState,
-    #[error("Init Failed")]
-    InitFailed,
-    #[error("LSS Failed")]
-    LssFailed,
-    #[error("VLS Failed")]
-    VlsFailed,
+    #[error("Failed to derive public key: {r}")]
+    DerivePublicKey { r: String },
+    #[error("Failed to derive shared secret: {r}")]
+    DeriveSharedSecret { r: String },
+    #[error("Failed to encrypt: {r}")]
+    Encrypt { r: String },
+    #[error("Failed to decrypt: {r}")]
+    Decrypt { r: String },
+    #[error("Bad pubkey: {r}")]
+    BadPubkey { r: String },
+    #[error("Bad secret: {r}")]
+    BadSecret { r: String },
+    #[error("Bad nonce: {r}")]
+    BadNonce { r: String },
+    #[error("Bad cipher: {r}")]
+    BadCiper { r: String },
+    #[error("Invalid network: {r}")]
+    InvalidNetwork { r: String },
+    #[error("Bad Request: {r}")]
+    BadRequest { r: String },
+    #[error("Bad Response: {r}")]
+    BadResponse { r: String },
+    #[error("Bad Args: {r}")]
+    BadArgs { r: String },
+    #[error("Bad State: {r}")]
+    BadState { r: String },
+    #[error("Init Failed: {r}")]
+    InitFailed { r: String },
+    #[error("LSS Failed: {r}")]
+    LssFailed { r: String },
+    #[error("VLS Failed: {r}")]
+    VlsFailed { r: String },
 }
 
 pub fn pubkey_from_secret_key(my_secret_key: String) -> Result<String> {
     let secret_key = parse::parse_secret_string(my_secret_key)?;
-    let sk = SecretKey::from_slice(&secret_key[..]).map_err(|_| SphinxError::BadSecret)?;
+    let sk = SecretKey::from_slice(&secret_key[..]).map_err(|e| SphinxError::BadSecret {
+        r: format!("{:?}", e),
+    })?;
     let ctx = Secp256k1::new();
     let pk = PublicKey::from_secret_key(&ctx, &sk).serialize();
     Ok(hex::encode(pk))
@@ -67,8 +69,11 @@ pub fn pubkey_from_secret_key(my_secret_key: String) -> Result<String> {
 pub fn derive_shared_secret(their_pubkey: String, my_secret_key: String) -> Result<String> {
     let pubkey = parse::parse_public_key_string(their_pubkey)?;
     let secret_key = parse::parse_secret_string(my_secret_key)?;
-    let secret = derive_shared_secret_from_slice(pubkey, secret_key)
-        .map_err(|_| SphinxError::DeriveSharedSecret)?;
+    let secret = derive_shared_secret_from_slice(pubkey, secret_key).map_err(|e| {
+        SphinxError::DeriveSharedSecret {
+            r: format!("{:?}", e),
+        }
+    })?;
     Ok(hex::encode(secret))
 }
 
@@ -80,7 +85,9 @@ pub fn encrypt(plaintext: String, secret: String, nonce: String) -> Result<Strin
     let plain = parse::parse_secret_string(plaintext)?;
     let sec = parse::parse_secret_string(secret)?;
     let non = parse::parse_nonce_string(nonce)?;
-    let cipher = chacha_encrypt(plain, sec, non).map_err(|_| SphinxError::Encrypt)?;
+    let cipher = chacha_encrypt(plain, sec, non).map_err(|e| SphinxError::Encrypt {
+        r: format!("{:?}", e),
+    })?;
     Ok(hex::encode(cipher))
 }
 
@@ -90,7 +97,9 @@ pub fn encrypt(plaintext: String, secret: String, nonce: String) -> Result<Strin
 pub fn decrypt(ciphertext: String, secret: String) -> Result<String> {
     let cipher = parse::parse_cipher_string(ciphertext)?;
     let sec = parse::parse_secret_string(secret)?;
-    let plain = chacha_decrypt(cipher, sec).map_err(|_| SphinxError::Decrypt)?;
+    let plain = chacha_decrypt(cipher, sec).map_err(|e| SphinxError::Decrypt {
+        r: format!("{:?}", e),
+    })?;
     Ok(hex::encode(plain))
 }
 
@@ -101,7 +110,9 @@ pub struct Keys {
 
 pub fn node_keys(net: String, seed: String) -> Result<Keys> {
     let seed = parse::parse_secret_string(seed)?;
-    let network: Network = Network::from_str(&net).map_err(|_| SphinxError::InvalidNetwork)?;
+    let network: Network = Network::from_str(&net).map_err(|e| SphinxError::InvalidNetwork {
+        r: format!("{:?}", e),
+    })?;
     let ks = derive::node_keys(&network, &seed[..]);
     Ok(Keys {
         secret: hex::encode(ks.1.secret_bytes()),
@@ -111,11 +122,16 @@ pub fn node_keys(net: String, seed: String) -> Result<Keys> {
 
 pub fn mnemonic_from_entropy(seed: String) -> Result<String> {
     let seed = parse::parse_secret_string(seed)?;
-    Ok(derive::mnemonic_from_entropy(&seed[..]).map_err(|_| SphinxError::BadSecret)?)
+    let ret = derive::mnemonic_from_entropy(&seed[..]).map_err(|e| SphinxError::BadSecret {
+        r: format!("{:?}", e),
+    })?;
+    Ok(ret)
 }
 
 pub fn entropy_from_mnemonic(mnemonic: String) -> Result<String> {
-    let m = derive::entropy_from_mnemonic(&mnemonic).map_err(|_| SphinxError::BadSecret)?;
+    let m = derive::entropy_from_mnemonic(&mnemonic).map_err(|e| SphinxError::BadSecret {
+        r: format!("{:?}", e),
+    })?;
     Ok(hex::encode(m))
 }
 

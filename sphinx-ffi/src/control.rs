@@ -7,20 +7,28 @@ use sphinx_glyph::sphinx_auther;
 use sphinx_glyph::types::ControlMessage;
 
 pub fn build_request(msg: String, secret: String, nonce: u64) -> Result<String> {
-    let cm = control_msg_from_json(msg.as_bytes()).map_err(|_| SphinxError::BadRequest)?;
+    let cm = control_msg_from_json(msg.as_bytes()).map_err(|e| SphinxError::BadRequest {
+        r: format!("{:?}", e),
+    })?;
     Ok(build_msg(cm, nonce, secret)?)
 }
 
 pub fn parse_response(inp: String) -> Result<String> {
-    let v = hex::decode(inp).map_err(|_| SphinxError::BadResponse)?;
-    let r = parse_control_response_to_json(&v).map_err(|_| SphinxError::BadResponse)?;
+    let v = hex::decode(inp).map_err(|e| SphinxError::BadResponse {
+        r: format!("{:?}", e),
+    })?;
+    let r = parse_control_response_to_json(&v).map_err(|e| SphinxError::BadResponse {
+        r: format!("{:?}", e),
+    })?;
     Ok(r)
 }
 
 pub fn make_auth_token(ts: u32, secret: String) -> Result<String> {
     let sk = parse_secret_key(secret)?;
     let t = sphinx_auther::token::Token::new_with_time(ts);
-    Ok(t.sign_to_base64(&sk).map_err(|_| SphinxError::BadSecret)?)
+    Ok(t.sign_to_base64(&sk).map_err(|e| SphinxError::BadSecret {
+        r: format!("{:?}", e),
+    })?)
 }
 
 ///////////
@@ -29,12 +37,16 @@ pub fn make_auth_token(ts: u32, secret: String) -> Result<String> {
 
 fn build_msg(msg: ControlMessage, nonce: u64, secret: String) -> Result<String> {
     let sk = parse_secret_key(secret)?;
-    let r = build_control_msg(msg, nonce, &sk).map_err(|_| SphinxError::BadRequest)?;
+    let r = build_control_msg(msg, nonce, &sk).map_err(|e| SphinxError::BadRequest {
+        r: format!("{:?}", e),
+    })?;
     Ok(hex::encode(r))
 }
 
 fn parse_secret_key(secret: String) -> Result<SecretKey> {
     let secret_key = parse::parse_secret_string(secret)?;
-    let sk = SecretKey::from_slice(&secret_key[..]).map_err(|_| SphinxError::BadSecret)?;
+    let sk = SecretKey::from_slice(&secret_key[..]).map_err(|e| SphinxError::BadSecret {
+        r: format!("{:?}", e),
+    })?;
     Ok(sk)
 }

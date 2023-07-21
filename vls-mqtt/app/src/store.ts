@@ -42,7 +42,7 @@ export const policy = writable<Policy>(defaultPolicy);
 
 export const allowlist = writable<string[]>([]);
 
-export const genKey = (): string => {
+export const genSeed = (): string => {
   return Array.from(
     window.crypto.getRandomValues(new Uint8Array(32)),
     (byte) => {
@@ -51,7 +51,9 @@ export const genKey = (): string => {
   ).join("");
 };
 
-export const seed = localStorageStore<string>("seed", genKey());
+export const seed = localStorageStore<string>("seed", genSeed());
+
+export const lss_nonce = writable<string>(genSeed());
 
 export const keys = derived([loaded, seed], ([$loaded, $seed]) => {
   if (!$loaded) return null;

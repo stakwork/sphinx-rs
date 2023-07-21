@@ -6,15 +6,15 @@ echo "=> renaming uniffi_sphinxrs to sphinxrs"
 sed -i '' 's/return "uniffi_sphinxrs"/return "sphinxrs"/' src/uniffi/sphinxrs/sphinxrs.kt
 
 echo "=> building i686-linux-android"
-cross build --target i686-linux-android --release
+cross build --features=uniffi/cli --target i686-linux-android --release
 echo "=> building aarch64-linux-android"
-cross build --target aarch64-linux-android --release
+cross build --features=uniffi/cli --target aarch64-linux-android --release
 echo "=> building arm-linux-androideabi"
-cross build --target arm-linux-androideabi --release
+cross build --features=uniffi/cli --target arm-linux-androideabi --release
 echo "=> building armv7-linux-androideabi"
-cross build --target armv7-linux-androideabi --release
+cross build --features=uniffi/cli --target armv7-linux-androideabi --release
 echo "=> building x86_64-linux-android"
-cross build --target x86_64-linux-android --release
+cross build --features=uniffi/cli --target x86_64-linux-android --release
 
 echo "=> renaming files"
 

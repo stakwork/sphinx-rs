@@ -1,21 +1,21 @@
 [Error]
-enum SphinxError {
-  "DerivePublicKey",
-  "DeriveSharedSecret",
-  "Encrypt",
-  "Decrypt",
-  "BadPubkey",
-  "BadSecret",
-  "BadNonce",
-  "BadCiper",
-  "InvalidNetwork",
-  "BadRequest",
-  "BadResponse",
-  "BadArgs",
-  "BadState",
-  "InitFailed",
-  "LssFailed",
-  "VlsFailed",
+interface SphinxError {
+  DerivePublicKey(string r);
+  DeriveSharedSecret(string r);
+  Encrypt(string r);
+  Decrypt(string r);
+  BadPubkey(string r);
+  BadSecret(string r);
+  BadNonce(string r);
+  BadCiper(string r);
+  InvalidNetwork(string r);
+  BadRequest(string r);
+  BadResponse(string r);
+  BadArgs(string r);
+  BadState(string r);
+  InitFailed(string r);
+  LssFailed(string r);
+  VlsFailed(string r);
 };
 
 dictionary Keys {

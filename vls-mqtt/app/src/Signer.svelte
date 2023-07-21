@@ -1,9 +1,13 @@
 <script>
   import * as signer from "./signer";
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
 
   onMount(() => {
     signer.initialize();
+  });
+
+  onDestroy(() => {
+    signer.say_bye();
   });
 </script>
 
