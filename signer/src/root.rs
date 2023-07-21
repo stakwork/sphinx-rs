@@ -2,7 +2,6 @@ use crate::approver::{create_approver, SphinxApprover};
 use sphinx_glyph::types;
 use types::{Interval, Policy, Velocity};
 
-use anyhow::anyhow;
 use core::sync::atomic::{AtomicU16, Ordering};
 use lightning_signer::bitcoin::blockdata::constants::ChainHash;
 use lightning_signer::bitcoin::Network;
@@ -18,12 +17,33 @@ use lightning_signer::util::velocity::VelocityControlIntervalType;
 use lightning_signer::wallet::Wallet;
 use lightning_signer::Arc;
 use lss_connector::{LssSigner, Response as LssResponse, SignerMutations};
+use thiserror::Error;
 use vls_protocol::model::PubKey;
 use vls_protocol::msgs::{self, read_serial_request_header, write_serial_response_header, Message};
 use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
 
 pub static COUNTER: AtomicU16 = AtomicU16::new(u16::MAX);
+
+#[derive(Error, Debug)]
+pub enum VlsHandlerError {
+    #[error("failed read_serial_request_header: {0}")]
+    HeaderRead(String),
+    #[error("failed msgs::read: {0}")]
+    MsgRead(String),
+    #[error("failed write_serial_response_header: {0}")]
+    HeaderWrite(String),
+    #[error("failed msgs::write_vec: {0}")]
+    MsgWrite(String),
+    #[error("failed lss_msg.to_vec: {0}")]
+    LssWrite(String),
+    #[error("invalid sequence: {0}, expected {1}")]
+    BadSequence(u16, u16),
+    #[error("client {0} handler error: {1}")]
+    ClientHandle(u64, String),
+    #[error("root handler error: {0}")]
+    RootHandle(String),
+}
 
 pub fn builder(
     seed: [u8; 32],
@@ -115,30 +135,28 @@ fn handle_inner(
     root_handler: &RootHandler,
     mut bytes: Vec<u8>,
     do_log: bool,
-) -> anyhow::Result<(Vec<u8>, Mutations)> {
+) -> Result<(Vec<u8>, Mutations), VlsHandlerError> {
     // println!("Signer is handling these bytes: {:?}", bytes);
     let msgs::SerialRequestHeader {
         sequence,
         peer_id,
         dbid,
     } = read_serial_request_header(&mut bytes)
-        .map_err(|e| anyhow!("failed read_serial_request_header {:?}", e))?;
+        .map_err(|e| VlsHandlerError::HeaderRead(format!("{:?}", e)))?;
     log::info!("sequence: {}", sequence);
     let counter = COUNTER.load(Ordering::Relaxed);
     if counter == u16::MAX {
         COUNTER.store(sequence, Ordering::Relaxed);
     } else {
         if counter + 1 != sequence || sequence == 0 {
-            #[cfg(target_arch = "riscv32")]
-            unsafe {
-                esp_idf_sys::esp_restart()
-            };
+            return Err(VlsHandlerError::BadSequence(sequence, counter + 1));
         } else {
             COUNTER.fetch_add(1, Ordering::Relaxed);
         }
     }
 
-    let message = msgs::read(&mut bytes).map_err(|e| anyhow!("failed msgs::read: {:?}", e))?;
+    let message =
+        msgs::read(&mut bytes).map_err(|e| VlsHandlerError::MsgRead(format!("{:?}", e)))?;
 
     if let Message::HsmdInit(ref m) = message {
         if ChainHash::using_genesis_block(root_handler.node().network()).as_bytes()
@@ -160,27 +178,31 @@ fn handle_inner(
         match handler.handle(message) {
             Ok(r) => r,
             Err(e) => {
-                return Err(anyhow!("client {} handler error: {:?}", dbid, e));
+                return Err(VlsHandlerError::ClientHandle(dbid, format!("{:?}", e)));
             }
         }
     } else {
         match root_handler.handle(message) {
             Ok(r) => r,
-            Err(e) => return Err(anyhow!("root handler error: {:?}", e)),
+            Err(e) => return Err(VlsHandlerError::RootHandle(format!("{:?}", e))),
         }
     };
     let (vls_msg, mutations) = reply;
     // make the VLS message bytes
     let mut buf = Vec::new();
     write_serial_response_header(&mut &mut buf, sequence)
-        .map_err(|e| anyhow!("failed write_serial_response_header: {:?}", e))?;
+        .map_err(|e| VlsHandlerError::HeaderWrite(format!("{:?}", e)))?;
     msgs::write_vec(&mut &mut buf, vls_msg.as_vec())
-        .map_err(|e| anyhow!("failed msgs::write_vec: {:?}", e))?;
+        .map_err(|e| VlsHandlerError::MsgWrite(format!("{:?}", e)))?;
     //println!("handled message, replying with: {:?}", out_md);
     Ok((buf, mutations))
 }
 
-pub fn handle(root_handler: &RootHandler, bytes: Vec<u8>, do_log: bool) -> anyhow::Result<Vec<u8>> {
+pub fn handle(
+    root_handler: &RootHandler,
+    bytes: Vec<u8>,
+    do_log: bool,
+) -> Result<Vec<u8>, VlsHandlerError> {
     let (out_bytes, _muts) = handle_inner(root_handler, bytes, do_log)?;
     Ok(out_bytes)
 }
@@ -190,7 +212,7 @@ pub fn handle_with_lss(
     lss_signer: &LssSigner,
     bytes: Vec<u8>,
     do_log: bool,
-) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
+) -> Result<(Vec<u8>, Vec<u8>), VlsHandlerError> {
     let (out_bytes, mutations) = handle_inner(root_handler, bytes, do_log)?;
     let lss_bytes = if mutations.is_empty() {
         Vec::new()
@@ -200,7 +222,9 @@ pub fn handle_with_lss(
             client_hmac,
             muts: mutations.into_inner(),
         });
-        lss_msg.to_vec()?
+        lss_msg
+            .to_vec()
+            .map_err(|e| VlsHandlerError::LssWrite(format!("{:?}", e)))?
     };
     Ok((out_bytes, lss_bytes))
 }

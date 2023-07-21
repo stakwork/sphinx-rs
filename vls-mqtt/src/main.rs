@@ -5,7 +5,7 @@ mod persist;
 mod routes;
 
 use crate::routes::{ChannelReply, ChannelRequest};
-use anyhow::Result;
+use anyhow::{Error, Result};
 use dotenv::dotenv;
 use glyph::control::{ControlPersist, Controller};
 use glyph::ser::{serialize_controlresponse, ByteBuf};
@@ -139,7 +139,7 @@ async fn rocket() -> _ {
     rocket::tokio::spawn(async move {
         while let Some(msg) = vls_rx.recv().await {
             let s1 = approver.control().get_state();
-            let res_res = root::handle_with_lss(&rh_, &lss_signer, msg.message, true);
+            let res_res = root::handle_with_lss(&rh_, &lss_signer, msg.message, true).map_err(Error::msg);
             let s2 = approver.control().get_state();
             if s1 != s2 {
                 log::info!("===> VelocityApprover state updated");
