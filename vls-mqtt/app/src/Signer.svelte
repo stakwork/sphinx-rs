@@ -2,8 +2,6 @@
   import * as signer from "./signer";
   import { onMount } from "svelte";
 
-  console.log(signer);
-
   onMount(() => {
     signer.initialize();
   });

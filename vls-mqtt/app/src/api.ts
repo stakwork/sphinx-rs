@@ -1,6 +1,6 @@
 import { sphinx } from "./wasm";
 import { localStorageStore } from "./storage";
-import { policy, allowlist, Policy, isSigner, keys } from "./store";
+import { policy, allowlist, type Policy, isSigner, keys } from "./store";
 import { get } from "svelte/store";
 
 const nonce = localStorageStore("nonce", 0);

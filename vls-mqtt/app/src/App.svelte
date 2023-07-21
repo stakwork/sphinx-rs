@@ -2,19 +2,17 @@
   import * as sphinx from "../../../sphinx-wasm/pkg";
   import { onMount } from "svelte";
   import Sidebar from "./Sidebar.svelte";
-  import { pages, menu, isSigner } from "./store";
+  import { pages, menu, keys, formatPubkey, loaded } from "./store";
   import Account from "./Account.svelte";
   import Allowlist from "./Allowlist.svelte";
   import Policy from "./Policy.svelte";
   import ForceClose from "./ForceClose.svelte";
   import Signer from "./Signer.svelte";
 
-  let loaded = false;
-
   async function loadWasm() {
     try {
       await sphinx.default("/sphinx_wasm_bg.wasm");
-      loaded = true;
+      loaded.set(true);
     } catch (e) {
       console.log(e);
     }
@@ -32,6 +30,15 @@
   };
 
   $: component = components[page.page];
+
+  let scale = 1;
+  function copyPubkey() {
+    scale = 1.2;
+    navigator.clipboard.writeText($keys?.pubkey);
+    setTimeout(() => {
+      scale = 1;
+    }, 140);
+  }
 </script>
 
 <main>
@@ -39,13 +46,25 @@
     <div class="lefty logo-wrap">
       <img src="/logo.svg" alt="logo" />
     </div>
-    <div class="page-title">
-      {page.label}
+    <div class="page-right">
+      <div class="page-title">
+        {page.label}
+      </div>
+      {#if $keys}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <div
+          class="pubkey"
+          on:click={copyPubkey}
+          style={`transform:scale(${scale},${scale})`}
+        >
+          {formatPubkey($keys.pubkey)}
+        </div>
+      {/if}
     </div>
   </header>
   <div class="body">
     <div class="lefty"><Sidebar /></div>
-    {#if loaded}
+    {#if $loaded}
       <svelte:component this={component} />
     {/if}
   </div>
@@ -83,8 +102,25 @@
     height: 100%;
     border-right: 1px dashed #bfbfbf;
   }
+  .page-right {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+  }
   .page-title {
     font-size: 1.2rem;
     padding-left: 2rem;
+  }
+  .pubkey {
+    margin-right: 2rem;
+    display: flex;
+    align-items: center;
+    font-weight: bold;
+    font-size: 0.7rem;
+    color: #aaa;
+    cursor: pointer;
+  }
+  .pubkey:hover {
+    color: white;
   }
 </style>

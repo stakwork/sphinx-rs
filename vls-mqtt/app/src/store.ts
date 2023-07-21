@@ -22,6 +22,8 @@ export type Page = "signer" | "account" | "allowlist" | "policy" | "forceclose";
 
 export const menu = writable<Page>(initialIsSigner ? "signer" : "account");
 
+export const loaded = writable<boolean>(false);
+
 export type Interval = "hourly" | "daily";
 
 export interface Policy {
@@ -51,7 +53,8 @@ export const genKey = (): string => {
 
 export const seed = localStorageStore<string>("seed", genKey());
 
-export const keys = derived([seed], ([$seed]) => {
+export const keys = derived([loaded, seed], ([$loaded, $seed]) => {
+  if (!$loaded) return null;
   try {
     return sphinx.node_keys("regtest", $seed);
   } catch (e) {
@@ -71,4 +74,8 @@ function signerParam(): boolean {
   } else {
     return false;
   }
+}
+
+export function formatPubkey(pk: string) {
+  return `${pk.slice(0, 6)}...${pk.slice(60)}`;
 }

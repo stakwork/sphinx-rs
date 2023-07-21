@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Button } from "carbon-components-svelte";
-  import { menu, pages, Page } from "./store";
+  import { menu, pages, type Page } from "./store";
   import VirtualColumnKey from "carbon-icons-svelte/lib/VirtualColumnKey.svelte";
   import Policy from "carbon-icons-svelte/lib/Policy.svelte";
   import ListChecked from "carbon-icons-svelte/lib/ListChecked.svelte";
@@ -48,6 +48,7 @@
     display: flex;
     align-items: center;
     margin: 1rem;
+    color: #ccc;
   }
   .btn-wrap span {
     margin-left: 1rem;
