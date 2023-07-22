@@ -182,9 +182,9 @@ export async function run_lss(p: Uint8Array) {
       a.state,
       lss_msg1,
       lss_msg2,
+      p,
       prev_vls,
-      prev_lss,
-      p
+      prev_lss
     );
     processVlsResult(ret);
   } catch (e) {
