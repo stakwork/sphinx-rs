@@ -32,7 +32,7 @@ use vls_protocol_signer::lightning_signer;
 //     - run_vls(args, msg1, msg2, vls_msg)
 //     - if topic==LSS_RES store result on phone (both bytes), and return lss_bytes
 //     - else return vls_bytes
-//     - persist on phone!
+//     - persist mutations on phone!
 // 4. get LSS msg:
 //     - run_lss(args, msg1, msg2, lss_msg, prev_vls, prev_lss)
 

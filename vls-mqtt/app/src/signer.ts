@@ -1,7 +1,9 @@
-import { type Policy, keys, seed, lss_nonce, policy, allowlist } from "./store";
+import { keys } from "./store";
 import { get } from "svelte/store";
 import { sphinx } from "./wasm";
-import * as msgpack from "@msgpack/msgpack";
+import { now, argsAndState, storeMutations } from "./signerUtils";
+
+// broker: sequence 0 != expected 1
 
 let MQTT;
 
@@ -55,32 +57,36 @@ declare global {
 }
 
 export function initialize() {
-  const ks = get(keys);
+  try {
+    const ks = get(keys);
 
-  sphinx.init_logs();
+    sphinx.init_logs();
 
-  const auth_token = sphinx.make_auth_token(now(), ks.secret);
-  console.log("auth_token", auth_token);
-  // start and sub mqtt
-  // send HELLO
-  const url = "ws://localhost:8083";
-  const cl = window.mqtt.connect(url, {
-    username: ks.pubkey,
-    password: auth_token,
-  });
-  MQTT = cl;
-  cl.on("error", function (e) {
-    console.log("MQTT ERROR", e);
-  });
-  cl.on("close", function (e) {
-    console.log("MQTT CLOSED", e);
-  });
-  cl.on("connect", async function () {
-    console.log("MQTT connected!");
-    cl.on("message", processMessage);
-    suball();
-    publish(Topics.HELLO, "");
-  });
+    const auth_token = sphinx.make_auth_token(now(), ks.secret);
+    console.log("auth_token", auth_token);
+    // start and sub mqtt
+    // send HELLO
+    const url = "ws://localhost:8083";
+    const cl = window.mqtt.connect(url, {
+      username: ks.pubkey,
+      password: auth_token,
+    });
+    MQTT = cl;
+    cl.on("error", function (e) {
+      console.log("MQTT ERROR", e);
+    });
+    cl.on("close", function (e) {
+      console.log("MQTT CLOSED", e);
+    });
+    cl.on("connect", async function () {
+      console.log("MQTT connected!");
+      cl.on("message", processMessage);
+      suball();
+      publish(Topics.HELLO, "");
+    });
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 function processMessage(topic: string, payload: Uint8Array) {
@@ -129,61 +135,38 @@ function processVlsResult(ret: sphinx.VlsResponse) {
   }
 }
 
-function makeArgs(): Args {
-  return {
-    seed: fromHexString(get(seed)),
-    network: "regtest",
-    policy: get(policy),
-    allowlist: get(allowlist),
-    timestamp: now(),
-    lss_nonce: fromHexString(get(lss_nonce)),
-  };
-}
-
-export type State = { [k: string]: VersionBytes };
-
-interface ArgsAndState {
-  args: string;
-  state: Uint8Array;
-}
-function argsAndState(): ArgsAndState {
-  const args = stringifyArgs(makeArgs());
-  const sta: State = {};
-  const state = msgpack.encode(sta);
-  return { args, state };
-}
-
-export function run_init_1(p: Uint8Array) {
+export async function run_init_1(p: Uint8Array) {
   try {
-    const a = argsAndState();
+    // save Init Msg
+    lss_msg1 = p;
+    const a = await argsAndState();
     const ret = sphinx.run_init_1(a.args, a.state, p);
-    console.log("RET LSS BYTES", ret.lss_bytes);
-    lss_msg1 = ret.lss_bytes;
     processVlsResult(ret);
   } catch (e) {
     console.log("run_init_1 failed:", e);
   }
 }
 
-export function run_init_2(p: Uint8Array) {
+export async function run_init_2(p: Uint8Array) {
   try {
-    const a = argsAndState();
-    console.log("run_init_2", a, lss_msg1, p);
+    // save Created Msg
+    lss_msg2 = p;
+    const a = await argsAndState();
     const ret = sphinx.run_init_2(a.args, a.state, lss_msg1, p);
-    lss_msg2 = ret.lss_bytes;
     processVlsResult(ret);
   } catch (e) {
     console.log("run_init_2 failed:", e);
   }
 }
 
-export function run_vls(p: Uint8Array) {
+export async function run_vls(p: Uint8Array) {
   try {
-    const a = argsAndState();
+    const a = await argsAndState();
     const ret = sphinx.run_vls(a.args, a.state, lss_msg1, lss_msg2, p);
     if (ret.topic === Topics.LSS_RES) {
       prev_vls = ret.vls_bytes;
       prev_lss = ret.lss_bytes;
+      storeMutations(ret.lss_bytes);
     }
     processVlsResult(ret);
   } catch (e) {
@@ -191,9 +174,9 @@ export function run_vls(p: Uint8Array) {
   }
 }
 
-export function run_lss(p: Uint8Array) {
+export async function run_lss(p: Uint8Array) {
   try {
-    const a = argsAndState();
+    const a = await argsAndState();
     const ret = sphinx.run_lss(
       a.args,
       a.state,
@@ -207,75 +190,4 @@ export function run_lss(p: Uint8Array) {
   } catch (e) {
     console.log("run_lss failed:", e);
   }
-}
-
-export interface LssResponse {
-  VlsMuts: VlsMuts;
-}
-
-export interface VlsMuts {
-  client_hmac: Bytes;
-  muts: Mutations;
-}
-
-export type Mutations = VlsBytes[];
-
-export type VlsBytes = (string | VersionBytes)[];
-
-export type VersionBytes = (number | Bytes)[];
-
-export type Bytes = Uint8Array;
-
-export type Velocity = (number | Bytes)[];
-
-// ["name", [1, [bytes]]]
-export interface Args {
-  seed: Uint8Array;
-  network: string;
-  policy: Policy;
-  velocity?: Velocity;
-  allowlist: string[];
-  timestamp: number; // unix ts in seconds
-  lss_nonce: Uint8Array;
-}
-
-function stringifyArgs(a: Args): string {
-  return JSON.stringify(a, (k, v) => {
-    if (v instanceof Uint8Array) {
-      return Array.from(v);
-    } else {
-      return v;
-    }
-  });
-}
-
-function _test() {
-  const ones = [
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1,
-  ];
-  const a: Args = {
-    seed: Uint8Array.from(ones),
-    network: "regtest",
-    policy: {
-      msat_per_interval: 21000000000,
-      interval: "daily",
-      htlc_limit_msat: 1000000000,
-    },
-    allowlist: [],
-    timestamp: 1111111111,
-    lss_nonce: Uint8Array.from(ones),
-  };
-  const s = stringifyArgs(a);
-  console.log(s);
-}
-
-function now() {
-  return Math.round(new Date().getTime() / 1000);
-}
-
-function fromHexString(hexString: string): Uint8Array {
-  return Uint8Array.from(
-    hexString.match(/.{1,2}/g).map((byte) => parseInt(byte, 16))
-  );
 }
