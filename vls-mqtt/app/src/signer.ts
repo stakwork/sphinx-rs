@@ -2,10 +2,13 @@ import { keys } from "./store";
 import { get } from "svelte/store";
 import { sphinx } from "./wasm";
 import { now, argsAndState, storeMutations } from "./signerUtils";
+import * as Paho from "paho-mqtt";
 
 // broker: sequence 0 != expected 1
 
 let MQTT;
+
+let CLIENT_ID;
 
 export enum Topics {
   VLS = "vls",
@@ -27,14 +30,14 @@ export enum Topics {
 
 function publish(topic: Topics, payload: any) {
   if (!MQTT) return console.log("NO MQTT CLIENT");
-  const t = `${MQTT.options.clientId}/${topic}`;
+  const t = `${CLIENT_ID}/${topic}`;
   MQTT.publish(t, payload);
 }
 
 function sub(topic: Topics) {
   if (!MQTT) return console.log("NO MQTT CLIENT");
-  const t = `${MQTT.options.clientId}/${topic}`;
-  console.log("subsribe, ", t);
+  const t = `${CLIENT_ID}/${topic}`;
+  console.log("subscribe, ", t);
   MQTT.subscribe(t);
 }
 
@@ -50,47 +53,44 @@ function suball() {
   }
 }
 
-declare global {
-  interface Window {
-    mqtt: any;
-  }
-}
-
 export function initialize() {
   try {
     const ks = get(keys);
 
     sphinx.init_logs();
 
-    const auth_token = sphinx.make_auth_token(now(), ks.secret);
-    console.log("auth_token", auth_token);
-    // start and sub mqtt
-    // send HELLO
-    const url = "ws://localhost:8083";
-    const cl = window.mqtt.connect(url, {
-      username: ks.pubkey,
-      password: auth_token,
-    });
-    MQTT = cl;
-    cl.on("error", function (e) {
-      console.log("MQTT ERROR", e);
-    });
-    cl.on("close", function (e) {
-      console.log("MQTT CLOSED", e);
-    });
-    cl.on("connect", async function () {
+    const userName = ks.pubkey;
+    const password = sphinx.make_auth_token(now(), ks.secret);
+    console.log("auth_token", password);
+
+    const host = "localhost";
+    const port = 8083;
+    const useSSL = false;
+
+    CLIENT_ID = `paho-${genId()}`;
+    MQTT = new Paho.Client(host, port, "", CLIENT_ID) as any;
+
+    function onConnectionLost() {
+      console.log("onConnectionLost");
+    }
+    MQTT.onConnectionLost = onConnectionLost;
+
+    function onSuccess() {
       console.log("MQTT connected!");
-      cl.on("message", processMessage);
+      MQTT.onMessageArrived = function (m) {
+        processMessage(m.topic, new Uint8Array(m.payloadBytes));
+      };
       suball();
       publish(Topics.HELLO, "");
-    });
+    }
+    MQTT.connect({ onSuccess, useSSL, userName, password });
   } catch (e) {
     console.error(e);
   }
 }
 
 function processMessage(topic: string, payload: Uint8Array) {
-  console.log("=====>>>>> GOT A MSG", topic, payload);
+  // console.log("=====>>>>> GOT A MSG", topic, payload);
   const ts = topic.split("/");
   const last = ts[ts.length - 1];
   switch (last) {
@@ -191,3 +191,12 @@ export async function run_lss(p: Uint8Array) {
     console.log("run_lss failed:", e);
   }
 }
+
+export const genId = (): string => {
+  return Array.from(
+    window.crypto.getRandomValues(new Uint8Array(16)),
+    (byte) => {
+      return ("0" + (byte & 0xff).toString(16)).slice(-2);
+    }
+  ).join("");
+};
