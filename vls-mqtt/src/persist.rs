@@ -6,6 +6,7 @@ pub struct ControlPersister {
     nonce: Bucket<[u8; 8]>,
     config: Bucket<Config>,
     seed: Bucket<[u8; 32]>,
+    id: Bucket<String>,
     policy: Bucket<Policy>,
     velocity: Bucket<Velocity>,
 }
@@ -17,6 +18,7 @@ impl ControlPersister {
             nonce: db.bucket("nonce", None).expect("fail nonce db"),
             config: db.bucket("config", None).expect("fail config db"),
             seed: db.bucket("seed", None).expect("fail seed db"),
+            id: db.bucket("id", None).expect("fail id db"),
             policy: db.bucket("policy", None).expect("fail policy db"),
             velocity: db.bucket("velocity", None).expect("fail velocity db"),
         }
@@ -48,6 +50,12 @@ impl ControlPersist for ControlPersister {
     }
     fn remove_seed(&mut self) -> Result<()> {
         Ok(self.seed.remove("seed")?)
+    }
+    fn read_id(&self) -> Result<String> {
+        Ok(self.id.get("id")?)
+    }
+    fn write_id(&mut self, id: String) -> Result<()> {
+        Ok(self.id.put("id", id)?)
     }
     fn read_policy(&self) -> Result<Policy> {
         Ok(self.policy.get("policy")?)
