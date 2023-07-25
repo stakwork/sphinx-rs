@@ -1,8 +1,12 @@
 import * as localforage from "localforage";
 import { Buffer } from "buffer/";
 import * as msgpack from "@msgpack/msgpack";
-import { type Policy, keys, seed, lss_nonce, policy, allowlist } from "./store";
+import { type Policy, seed, lss_nonce, policy, allowlist } from "./store";
 import { get } from "svelte/store";
+
+const forage = localforage.createInstance({
+  name: "vls",
+});
 
 interface ArgsAndState {
   args: string;
@@ -90,6 +94,10 @@ function fromHexString(hexString: string): Uint8Array {
   );
 }
 
+export async function clearAll() {
+  await forage.clear();
+}
+
 async function persist_muts(muts: Mutations) {
   interface Ret {
     key: string;
@@ -106,15 +114,15 @@ async function persist_muts(muts: Mutations) {
     ret.push({ key: name as string, value: bytes.toString("base64") });
   }
   for (let r of ret) {
-    await localforage.setItem(r.key, r.value);
+    await forage.setItem(r.key, r.value);
   }
 }
 
 async function load_muts(): Promise<State> {
-  const keys = await localforage.keys();
+  const keys = await forage.keys();
   const ret: State = {};
   for (let k of keys) {
-    const item = await localforage.getItem(k);
+    const item = await forage.getItem(k);
     const b = Buffer.from(item as string, "base64");
     const ver_bytes = b.slice(0, 8);
     const ver = intFromBytes(ver_bytes);

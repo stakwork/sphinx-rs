@@ -1,7 +1,7 @@
 import { keys } from "./store";
 import { get } from "svelte/store";
 import { sphinx } from "./wasm";
-import { now, argsAndState, storeMutations } from "./signerUtils";
+import { now, argsAndState, storeMutations, clearAll } from "./signerUtils";
 import * as Paho from "paho-mqtt";
 
 // broker: sequence 0 != expected 1
@@ -53,8 +53,11 @@ function suball() {
   }
 }
 
-export function initialize() {
+export async function initialize() {
   try {
+    // FIXME?
+    await clearAll();
+
     const ks = get(keys);
 
     sphinx.init_logs();
@@ -70,23 +73,29 @@ export function initialize() {
     CLIENT_ID = `paho-${genId()}`;
     MQTT = new Paho.Client(host, port, "", CLIENT_ID) as any;
 
-    function onConnectionLost() {
+    async function onConnectionLost() {
       console.log("onConnectionLost");
+      await sleep(1000);
+      mqttConnect(userName, password, useSSL);
     }
     MQTT.onConnectionLost = onConnectionLost;
 
-    function onSuccess() {
-      console.log("MQTT connected!");
-      MQTT.onMessageArrived = function (m) {
-        processMessage(m.topic, new Uint8Array(m.payloadBytes));
-      };
-      suball();
-      publish(Topics.HELLO, "");
-    }
-    MQTT.connect({ onSuccess, useSSL, userName, password });
+    mqttConnect(userName, password, useSSL);
   } catch (e) {
     console.error(e);
   }
+}
+
+function mqttConnect(userName: string, password: string, useSSL: boolean) {
+  function onSuccess() {
+    console.log("MQTT connected!");
+    MQTT.onMessageArrived = function (m) {
+      processMessage(m.topic, new Uint8Array(m.payloadBytes));
+    };
+    suball();
+    publish(Topics.HELLO, "");
+  }
+  MQTT.connect({ onSuccess, useSSL, userName, password });
 }
 
 function processMessage(topic: string, payload: Uint8Array) {
@@ -166,7 +175,7 @@ export async function run_vls(p: Uint8Array) {
     if (ret.topic === Topics.LSS_RES) {
       prev_vls = ret.vls_bytes;
       prev_lss = ret.lss_bytes;
-      storeMutations(ret.lss_bytes);
+      await storeMutations(ret.lss_bytes);
     }
     processVlsResult(ret);
   } catch (e) {
@@ -200,3 +209,7 @@ export const genId = (): string => {
     }
   ).join("");
 };
+
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

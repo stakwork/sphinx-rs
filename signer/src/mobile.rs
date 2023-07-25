@@ -154,7 +154,10 @@ fn root_handler_builder(args: Args, state: State) -> Result<RootHandlerBuilder> 
         clock,
         stf,
     )?;
-    let _muts = persist_ctx.exit();
+    let muts = persist_ctx.exit();
+    if !muts.is_empty() {
+        log::info!("root_handler_builder MUTS: {:?}", muts);
+    }
     Ok(rhb)
 }
 

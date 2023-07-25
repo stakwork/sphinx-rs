@@ -5,8 +5,10 @@ use wasm_bindgen::prelude::*;
 
 type Result<T> = std::result::Result<T, JsError>;
 
+#[wasm_bindgen]
 pub fn init_logs() {
     wasm_logger::init(wasm_logger::Config::default());
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 }
 
 #[wasm_bindgen]

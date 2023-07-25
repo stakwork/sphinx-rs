@@ -1,17 +1,23 @@
 <script>
   import * as signer from "./signer";
-  import { onMount, onDestroy } from "svelte";
+  import { onDestroy } from "svelte";
+  import { Button } from "carbon-components-svelte";
+  import PlayFilled from "carbon-icons-svelte/lib/PlayFilled.svelte";
 
-  onMount(() => {
+  let started = false;
+  function start() {
+    started = true;
     signer.initialize();
-  });
+  }
 
   onDestroy(() => {
     signer.say_bye();
   });
 </script>
 
-<main>Ready to sign...</main>
+<main>
+  <Button icon={PlayFilled} disabled={started} on:click={start}>Start</Button>
+</main>
 
 <style>
   main {
