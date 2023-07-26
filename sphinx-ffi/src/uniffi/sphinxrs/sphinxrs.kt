@@ -341,7 +341,7 @@ private fun findLibraryName(componentName: String): String {
     if (libOverride != null) {
         return libOverride
     }
-    return "uniffi_sphinxrs"
+    return "sphinxrs"
 }
 
 private inline fun <reified Lib : Library> loadIndirect(
@@ -649,7 +649,9 @@ public object FfiConverterTypeKeys: FfiConverterRustBuffer<Keys> {
 data class VlsResponse (
     var `topic`: String, 
     var `vlsBytes`: ByteArray?, 
-    var `lssBytes`: ByteArray?
+    var `lssBytes`: ByteArray?, 
+    var `sequence`: UShort, 
+    var `state`: ByteArray?
 ) {
     
 }
@@ -660,19 +662,25 @@ public object FfiConverterTypeVlsResponse: FfiConverterRustBuffer<VlsResponse> {
             FfiConverterString.read(buf),
             FfiConverterOptionalByteArray.read(buf),
             FfiConverterOptionalByteArray.read(buf),
+            FfiConverterUShort.read(buf),
+            FfiConverterOptionalByteArray.read(buf),
         )
     }
 
     override fun allocationSize(value: VlsResponse) = (
             FfiConverterString.allocationSize(value.`topic`) +
             FfiConverterOptionalByteArray.allocationSize(value.`vlsBytes`) +
-            FfiConverterOptionalByteArray.allocationSize(value.`lssBytes`)
+            FfiConverterOptionalByteArray.allocationSize(value.`lssBytes`) +
+            FfiConverterUShort.allocationSize(value.`sequence`) +
+            FfiConverterOptionalByteArray.allocationSize(value.`state`)
     )
 
     override fun write(value: VlsResponse, buf: ByteBuffer) {
             FfiConverterString.write(value.`topic`, buf)
             FfiConverterOptionalByteArray.write(value.`vlsBytes`, buf)
             FfiConverterOptionalByteArray.write(value.`lssBytes`, buf)
+            FfiConverterUShort.write(value.`sequence`, buf)
+            FfiConverterOptionalByteArray.write(value.`state`, buf)
     }
 }
 
