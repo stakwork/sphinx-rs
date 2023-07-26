@@ -293,6 +293,32 @@ private func uniffiCheckCallStatus(
 // Public interface members begin here.
 
 
+fileprivate struct FfiConverterUInt16: FfiConverterPrimitive {
+    typealias FfiType = UInt16
+    typealias SwiftType = UInt16
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt16 {
+        return try lift(readInt(&buf))
+    }
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+fileprivate struct FfiConverterUInt32: FfiConverterPrimitive {
+    typealias FfiType = UInt32
+    typealias SwiftType = UInt32
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt32 {
+        return try lift(readInt(&buf))
+    }
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
 fileprivate struct FfiConverterUInt64: FfiConverterPrimitive {
     typealias FfiType = UInt64
     typealias SwiftType = UInt64
@@ -419,13 +445,17 @@ public struct VlsResponse {
     public var `topic`: String
     public var `vlsBytes`: Data?
     public var `lssBytes`: Data?
+    public var `sequence`: UInt16
+    public var `state`: Data?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(`topic`: String, `vlsBytes`: Data?, `lssBytes`: Data?) {
+    public init(`topic`: String, `vlsBytes`: Data?, `lssBytes`: Data?, `sequence`: UInt16, `state`: Data?) {
         self.`topic` = `topic`
         self.`vlsBytes` = `vlsBytes`
         self.`lssBytes` = `lssBytes`
+        self.`sequence` = `sequence`
+        self.`state` = `state`
     }
 }
 
@@ -441,6 +471,12 @@ extension VlsResponse: Equatable, Hashable {
         if lhs.`lssBytes` != rhs.`lssBytes` {
             return false
         }
+        if lhs.`sequence` != rhs.`sequence` {
+            return false
+        }
+        if lhs.`state` != rhs.`state` {
+            return false
+        }
         return true
     }
 
@@ -448,6 +484,8 @@ extension VlsResponse: Equatable, Hashable {
         hasher.combine(`topic`)
         hasher.combine(`vlsBytes`)
         hasher.combine(`lssBytes`)
+        hasher.combine(`sequence`)
+        hasher.combine(`state`)
     }
 }
 
@@ -457,7 +495,9 @@ public struct FfiConverterTypeVlsResponse: FfiConverterRustBuffer {
         return try VlsResponse(
             `topic`: FfiConverterString.read(from: &buf), 
             `vlsBytes`: FfiConverterOptionData.read(from: &buf), 
-            `lssBytes`: FfiConverterOptionData.read(from: &buf)
+            `lssBytes`: FfiConverterOptionData.read(from: &buf), 
+            `sequence`: FfiConverterUInt16.read(from: &buf), 
+            `state`: FfiConverterOptionData.read(from: &buf)
         )
     }
 
@@ -465,6 +505,8 @@ public struct FfiConverterTypeVlsResponse: FfiConverterRustBuffer {
         FfiConverterString.write(value.`topic`, into: &buf)
         FfiConverterOptionData.write(value.`vlsBytes`, into: &buf)
         FfiConverterOptionData.write(value.`lssBytes`, into: &buf)
+        FfiConverterUInt16.write(value.`sequence`, into: &buf)
+        FfiConverterOptionData.write(value.`state`, into: &buf)
     }
 }
 
@@ -481,54 +523,22 @@ public enum SphinxError {
 
     
     
-    // Simple error enums only carry a message
-    case DerivePublicKey(message: String)
-    
-    // Simple error enums only carry a message
-    case DeriveSharedSecret(message: String)
-    
-    // Simple error enums only carry a message
-    case Encrypt(message: String)
-    
-    // Simple error enums only carry a message
-    case Decrypt(message: String)
-    
-    // Simple error enums only carry a message
-    case BadPubkey(message: String)
-    
-    // Simple error enums only carry a message
-    case BadSecret(message: String)
-    
-    // Simple error enums only carry a message
-    case BadNonce(message: String)
-    
-    // Simple error enums only carry a message
-    case BadCiper(message: String)
-    
-    // Simple error enums only carry a message
-    case InvalidNetwork(message: String)
-    
-    // Simple error enums only carry a message
-    case BadRequest(message: String)
-    
-    // Simple error enums only carry a message
-    case BadResponse(message: String)
-    
-    // Simple error enums only carry a message
-    case BadArgs(message: String)
-    
-    // Simple error enums only carry a message
-    case BadState(message: String)
-    
-    // Simple error enums only carry a message
-    case InitFailed(message: String)
-    
-    // Simple error enums only carry a message
-    case LssFailed(message: String)
-    
-    // Simple error enums only carry a message
-    case VlsFailed(message: String)
-    
+    case DerivePublicKey(`r`: String)
+    case DeriveSharedSecret(`r`: String)
+    case Encrypt(`r`: String)
+    case Decrypt(`r`: String)
+    case BadPubkey(`r`: String)
+    case BadSecret(`r`: String)
+    case BadNonce(`r`: String)
+    case BadCiper(`r`: String)
+    case InvalidNetwork(`r`: String)
+    case BadRequest(`r`: String)
+    case BadResponse(`r`: String)
+    case BadArgs(`r`: String)
+    case BadState(`r`: String)
+    case InitFailed(`r`: String)
+    case LssFailed(`r`: String)
+    case VlsFailed(`r`: String)
 
     fileprivate static func uniffiErrorHandler(_ error: RustBuffer) throws -> Error {
         return try FfiConverterTypeSphinxError.lift(error)
@@ -547,71 +557,55 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
 
         
         case 1: return .DerivePublicKey(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 2: return .DeriveSharedSecret(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 3: return .Encrypt(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 4: return .Decrypt(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 5: return .BadPubkey(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 6: return .BadSecret(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 7: return .BadNonce(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 8: return .BadCiper(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 9: return .InvalidNetwork(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 10: return .BadRequest(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 11: return .BadResponse(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 12: return .BadArgs(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 13: return .BadState(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 14: return .InitFailed(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 15: return .LssFailed(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
         case 16: return .VlsFailed(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+            `r`: try FfiConverterString.read(from: &buf)
+            )
 
-        default: throw UniffiInternalError.unexpectedEnumCase
+         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
@@ -621,40 +615,86 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
         
 
         
-        case let .DerivePublicKey(message):
-            writeInt(&buf, Int32(1))
-        case let .DeriveSharedSecret(message):
-            writeInt(&buf, Int32(2))
-        case let .Encrypt(message):
-            writeInt(&buf, Int32(3))
-        case let .Decrypt(message):
-            writeInt(&buf, Int32(4))
-        case let .BadPubkey(message):
-            writeInt(&buf, Int32(5))
-        case let .BadSecret(message):
-            writeInt(&buf, Int32(6))
-        case let .BadNonce(message):
-            writeInt(&buf, Int32(7))
-        case let .BadCiper(message):
-            writeInt(&buf, Int32(8))
-        case let .InvalidNetwork(message):
-            writeInt(&buf, Int32(9))
-        case let .BadRequest(message):
-            writeInt(&buf, Int32(10))
-        case let .BadResponse(message):
-            writeInt(&buf, Int32(11))
-        case let .BadArgs(message):
-            writeInt(&buf, Int32(12))
-        case let .BadState(message):
-            writeInt(&buf, Int32(13))
-        case let .InitFailed(message):
-            writeInt(&buf, Int32(14))
-        case let .LssFailed(message):
-            writeInt(&buf, Int32(15))
-        case let .VlsFailed(message):
-            writeInt(&buf, Int32(16))
-
         
+        case let .DerivePublicKey(`r`):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .DeriveSharedSecret(`r`):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .Encrypt(`r`):
+            writeInt(&buf, Int32(3))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .Decrypt(`r`):
+            writeInt(&buf, Int32(4))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .BadPubkey(`r`):
+            writeInt(&buf, Int32(5))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .BadSecret(`r`):
+            writeInt(&buf, Int32(6))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .BadNonce(`r`):
+            writeInt(&buf, Int32(7))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .BadCiper(`r`):
+            writeInt(&buf, Int32(8))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .InvalidNetwork(`r`):
+            writeInt(&buf, Int32(9))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .BadRequest(`r`):
+            writeInt(&buf, Int32(10))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .BadResponse(`r`):
+            writeInt(&buf, Int32(11))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .BadArgs(`r`):
+            writeInt(&buf, Int32(12))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .BadState(`r`):
+            writeInt(&buf, Int32(13))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .InitFailed(`r`):
+            writeInt(&buf, Int32(14))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .LssFailed(`r`):
+            writeInt(&buf, Int32(15))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .VlsFailed(`r`):
+            writeInt(&buf, Int32(16))
+            FfiConverterString.write(`r`, into: &buf)
+            
         }
     }
 }
@@ -663,6 +703,27 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
 extension SphinxError: Equatable, Hashable {}
 
 extension SphinxError: Error { }
+
+fileprivate struct FfiConverterOptionUInt16: FfiConverterRustBuffer {
+    typealias SwiftType = UInt16?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterUInt16.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterUInt16.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
 
 fileprivate struct FfiConverterOptionData: FfiConverterRustBuffer {
     typealias SwiftType = Data?
@@ -796,7 +857,7 @@ public func `runInit2`(`args`: String, `state`: Data, `msg1`: Data, `msg2`: Data
     )
 }
 
-public func `runVls`(`args`: String, `state`: Data, `msg1`: Data, `msg2`: Data, `vlsMsg`: Data) throws -> VlsResponse {
+public func `runVls`(`args`: String, `state`: Data, `msg1`: Data, `msg2`: Data, `vlsMsg`: Data, `expectedSequence`: UInt16?) throws -> VlsResponse {
     return try  FfiConverterTypeVlsResponse.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_run_vls(
@@ -804,7 +865,8 @@ public func `runVls`(`args`: String, `state`: Data, `msg1`: Data, `msg2`: Data, 
         FfiConverterData.lower(`state`),
         FfiConverterData.lower(`msg1`),
         FfiConverterData.lower(`msg2`),
-        FfiConverterData.lower(`vlsMsg`),$0)
+        FfiConverterData.lower(`vlsMsg`),
+        FfiConverterOptionUInt16.lower(`expectedSequence`),$0)
 }
     )
 }
@@ -820,6 +882,16 @@ public func `runLss`(`args`: String, `state`: Data, `msg1`: Data, `msg2`: Data, 
         FfiConverterData.lower(`lssMsg`),
         FfiConverterData.lower(`prevVls`),
         FfiConverterData.lower(`prevLss`),$0)
+}
+    )
+}
+
+public func `makeAuthToken`(`ts`: UInt32, `secret`: String) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_make_auth_token(
+        FfiConverterUInt32.lower(`ts`),
+        FfiConverterString.lower(`secret`),$0)
 }
     )
 }
@@ -872,10 +944,13 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_run_init_2() != 13191) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_run_vls() != 59450) {
+    if (uniffi_sphinxrs_checksum_func_run_vls() != 35014) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_run_lss() != 63303) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_make_auth_token() != 13236) {
         return InitializationResult.apiChecksumMismatch
     }
 
