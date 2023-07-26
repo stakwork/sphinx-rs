@@ -182,7 +182,7 @@ fn handle_inner(
     };
     let (vls_msg, mutations) = reply;
     // make the VLS message bytes
-    let mut buf = Vec::new();
+    let mut buf = Vec::with_capacity(8usize + vls_msg.as_vec().len());
     write_serial_response_header(&mut &mut buf, sequence)
         .map_err(|e| VlsHandlerError::HeaderWrite(format!("{:?}", e)))?;
     msgs::write_vec(&mut &mut buf, vls_msg.as_vec())
