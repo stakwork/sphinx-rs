@@ -27,6 +27,8 @@ dictionary VlsResponse {
     string topic;
     bytes? vls_bytes;
     bytes? lss_bytes;
+    u16 sequence;
+    bytes? state;
 };
 
 namespace sphinxrs {

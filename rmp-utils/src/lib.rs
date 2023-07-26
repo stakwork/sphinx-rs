@@ -74,6 +74,15 @@ pub fn serialize_state_map(map: &BTreeMap<String, (u64, Vec<u8>)>) -> Result<Vec
     Ok(buff.into_vec())
 }
 
+pub fn serialize_simple_state_map(map: &BTreeMap<String, Vec<u8>>) -> Result<Vec<u8>> {
+    let mut buff = encode::buffer::ByteBuf::new();
+    encode::write_map_len(&mut buff, map.len() as u32).map_err(Error::msg)?;
+    for (x, z) in map {
+        serialize_simple_state_element(&mut buff, x, z)?;
+    }
+    Ok(buff.into_vec())
+}
+
 pub fn deserialize_state_map(b: &[u8]) -> Result<BTreeMap<String, (u64, Vec<u8>)>> {
     if TRACE {
         log::info!("deserialize_state_map: start");
@@ -88,6 +97,18 @@ pub fn deserialize_state_map(b: &[u8]) -> Result<BTreeMap<String, (u64, Vec<u8>)
     }
     if TRACE {
         log::info!("deserialize_state_map: end");
+    }
+    Ok(object)
+}
+
+pub fn deserialize_simple_state_map(b: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
+    let mut bytes = decode::bytes::Bytes::new(b);
+    let length =
+        decode::read_map_len(&mut bytes).map_err(|_| Error::msg("could not read map length"))?;
+    let mut object: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+    for _ in 0..length {
+        let (x, z) = deserialize_simple_state_element(&mut bytes)?;
+        object.insert(x, z);
     }
     Ok(object)
 }
@@ -111,6 +132,16 @@ fn serialize_state_element(
     Ok(())
 }
 
+fn serialize_simple_state_element(
+    buff: &mut encode::buffer::ByteBuf,
+    x: &String,
+    z: &Vec<u8>,
+) -> Result<()> {
+    encode::write_str(buff, x).map_err(Error::msg)?;
+    encode::write_bin(buff, &z).map_err(Error::msg)?;
+    Ok(())
+}
+
 fn deserialize_state_element(bytes: &mut decode::bytes::Bytes) -> Result<(String, (u64, Vec<u8>))> {
     if TRACE {
         log::info!("deserialize_state_element: start");
@@ -126,7 +157,7 @@ fn deserialize_state_element(bytes: &mut decode::bytes::Bytes) -> Result<(String
     let length =
         decode::read_bin_len(bytes).map_err(|_| Error::msg("could not read bin length"))?;
     if TRACE {
-        log::info!("deserialize_state_element: allocating Vec<u8> of size {}", length);
+        log::info!("deserialize_state_element: Vec<u8> of size {}", length);
     }
     let mut z: Vec<u8> = vec![0u8; length as usize];
     bytes.read_exact_buf(&mut z).map_err(Error::msg)?;
@@ -134,6 +165,20 @@ fn deserialize_state_element(bytes: &mut decode::bytes::Bytes) -> Result<(String
         log::info!("deserialize_state_element: end");
     }
     Ok((x, (y, z)))
+}
+
+fn deserialize_simple_state_element(bytes: &mut decode::bytes::Bytes) -> Result<(String, Vec<u8>)> {
+    let mut temp = decode::bytes::Bytes::new(bytes.remaining_slice());
+    let length =
+        decode::read_str_len(&mut temp).map_err(|_| Error::msg("could not read str length"))?;
+    let mut buff = vec![0u8; length as usize];
+    decode::read_str(bytes, &mut buff).map_err(|_| Error::msg("could not read str"))?;
+    let x = String::from_utf8(buff).map_err(Error::msg)?;
+    let length =
+        decode::read_bin_len(bytes).map_err(|_| Error::msg("could not read bin length"))?;
+    let mut z: Vec<u8> = vec![0u8; length as usize];
+    bytes.read_exact_buf(&mut z).map_err(Error::msg)?;
+    Ok((x, z))
 }
 
 #[test]

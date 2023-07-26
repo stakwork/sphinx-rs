@@ -1,5 +1,4 @@
 import * as localforage from "localforage";
-import { Buffer } from "buffer/";
 import * as msgpack from "@msgpack/msgpack";
 import { type Policy, seed, lss_nonce, policy, allowlist } from "./store";
 import { get } from "svelte/store";
@@ -21,10 +20,7 @@ export async function argsAndState(): Promise<ArgsAndState> {
 
 export async function storeMutations(inc: Uint8Array) {
   try {
-    const ms: LssResponse = msgpack.decode(inc) as LssResponse;
-    if (!ms.VlsMuts) return;
-    if (!ms.VlsMuts.muts) return;
-    const muts = ms.VlsMuts.muts;
+    const muts: State = msgpack.decode(inc) as State;
     await persist_muts(muts);
   } catch (e) {
     console.error(e);
@@ -42,28 +38,12 @@ function makeArgs(): Args {
   };
 }
 
-export type State = { [k: string]: VersionBytes };
-
-export interface LssResponse {
-  VlsMuts: VlsMuts;
-}
-
-export interface VlsMuts {
-  client_hmac: Bytes;
-  muts: Mutations;
-}
-
-export type Mutations = VlsBytes[];
-
-export type VlsBytes = (string | VersionBytes)[];
-
-export type VersionBytes = (number | Bytes)[];
+export type State = { [k: string]: Bytes };
 
 export type Bytes = Uint8Array;
 
 export type Velocity = (number | Bytes)[];
 
-// ["name", [1, [bytes]]]
 export interface Args {
   seed: Uint8Array;
   network: string;
@@ -98,23 +78,10 @@ export async function clearAll() {
   await forage.clear();
 }
 
-async function persist_muts(muts: Mutations) {
-  interface Ret {
-    key: string;
-    value: string;
-  }
-  let ret: Ret[] = [];
-  for (let m of muts) {
-    let name = m[0];
-    let val = m[1];
-    let ver = val[0];
-    const ver_bytes = getInt64Bytes(BigInt(ver as number));
-    let mut = Buffer.from(val[1] as Uint8Array);
-    const bytes = Buffer.concat([ver_bytes, mut]);
-    ret.push({ key: name as string, value: bytes.toString("base64") });
-  }
-  for (let r of ret) {
-    await forage.setItem(r.key, r.value);
+async function persist_muts(muts: State) {
+  for (let k in muts) {
+    const val = muts[k];
+    await forage.setItem<Uint8Array>(k, val);
   }
 }
 
@@ -122,22 +89,8 @@ async function load_muts(): Promise<State> {
   const keys = await forage.keys();
   const ret: State = {};
   for (let k of keys) {
-    const item = await forage.getItem(k);
-    const b = Buffer.from(item as string, "base64");
-    const ver_bytes = b.slice(0, 8);
-    const ver = intFromBytes(ver_bytes);
-    const bytes = b.slice(8);
-    ret[k] = [Number(ver), bytes];
+    const item = await forage.getItem<Uint8Array>(k);
+    ret[k] = item;
   }
   return ret;
-}
-
-function getInt64Bytes(x) {
-  const bytes = Buffer.alloc(8);
-  bytes.writeBigInt64LE(x, 0);
-  return bytes;
-}
-
-function intFromBytes(x) {
-  return x.readBigInt64LE();
 }

@@ -1,5 +1,3 @@
-import { keys } from "./store";
-import { get } from "svelte/store";
 import { sphinx } from "./wasm";
 import { now, argsAndState, storeMutations, clearAll } from "./signerUtils";
 import * as Paho from "paho-mqtt";
@@ -28,24 +26,6 @@ export enum Topics {
   BYE = "bye",
 }
 
-function publish(topic: Topics, payload: any) {
-  if (!MQTT) return console.log("NO MQTT CLIENT");
-  const t = `${CLIENT_ID}/${topic}`;
-  MQTT.publish(t, payload);
-}
-
-function sub(topic: Topics) {
-  if (!MQTT) return console.log("NO MQTT CLIENT");
-  const t = `${CLIENT_ID}/${topic}`;
-  console.log("subscribe, ", t);
-  MQTT.subscribe(t);
-}
-
-export function say_bye() {
-  console.log("say bye!");
-  publish(Topics.BYE, "");
-}
-
 function suball() {
   const ts = [Topics.VLS, Topics.INIT_1_MSG, Topics.INIT_2_MSG, Topics.LSS_MSG];
   for (let t of ts) {
@@ -53,13 +33,12 @@ function suball() {
   }
 }
 
-export async function initialize() {
+export async function clear() {
+  await clearAll();
+}
+
+export async function initialize(ks: sphinx.Keys) {
   try {
-    // FIXME?
-    await clearAll();
-
-    const ks = get(keys);
-
     sphinx.init_logs();
 
     const userName = ks.pubkey;
@@ -98,25 +77,45 @@ function mqttConnect(userName: string, password: string, useSSL: boolean) {
   MQTT.connect({ onSuccess, useSSL, userName, password });
 }
 
+function publish(topic: Topics, payload: any) {
+  try {
+    if (!MQTT) return console.log("NO MQTT CLIENT");
+    const t = `${CLIENT_ID}/${topic}`;
+    MQTT.publish(t, payload);
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+function sub(topic: Topics) {
+  try {
+    if (!MQTT) return console.log("NO MQTT CLIENT");
+    const t = `${CLIENT_ID}/${topic}`;
+    console.log("subscribe, ", t);
+    MQTT.subscribe(t);
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+export function say_bye() {
+  console.log("say bye!");
+  publish(Topics.BYE, "");
+}
+
 function processMessage(topic: string, payload: Uint8Array) {
+  const funcs: { [k: string]: (Uint8Array) => void } = {};
+  funcs[Topics.INIT_1_MSG] = run_init_1;
+  funcs[Topics.INIT_2_MSG] = run_init_2;
+  funcs[Topics.VLS] = run_vls;
+  funcs[Topics.LSS_MSG] = run_lss;
   // console.log("=====>>>>> GOT A MSG", topic, payload);
   const ts = topic.split("/");
   const last = ts[ts.length - 1];
-  switch (last) {
-    case Topics.INIT_1_MSG:
-      run_init_1(payload);
-      break;
-    case Topics.INIT_2_MSG:
-      run_init_2(payload);
-      break;
-    case Topics.VLS:
-      run_vls(payload);
-      break;
-    case Topics.LSS_MSG:
-      run_lss(payload);
-      break;
-    default:
-      console.log("bad topic", last);
+  if (funcs[last]) {
+    funcs[last](payload);
+  } else {
+    console.log("bad topic", last);
   }
 }
 
@@ -126,22 +125,8 @@ let prev_vls: Uint8Array = Uint8Array.from([]);
 let prev_lss: Uint8Array = Uint8Array.from([]);
 
 function processVlsResult(ret: sphinx.VlsResponse) {
-  switch (ret.topic) {
-    case Topics.INIT_1_RES:
-      publish(Topics.INIT_1_RES, ret.lss_bytes);
-      break;
-    case Topics.INIT_2_RES:
-      publish(Topics.INIT_2_RES, ret.lss_bytes);
-      break;
-    case Topics.VLS_RES:
-      publish(Topics.VLS_RES, ret.vls_bytes);
-      break;
-    case Topics.LSS_RES:
-      publish(Topics.LSS_RES, ret.lss_bytes);
-      break;
-    default:
-      console.log("unexpected return topic", ret.topic);
-  }
+  let payload = ret.topic === Topics.VLS_RES ? ret.vls_bytes : ret.lss_bytes;
+  publish(ret.topic as Topics, payload);
 }
 
 export async function run_init_1(p: Uint8Array) {
@@ -175,7 +160,7 @@ export async function run_vls(p: Uint8Array) {
     if (ret.topic === Topics.LSS_RES) {
       prev_vls = ret.vls_bytes;
       prev_lss = ret.lss_bytes;
-      await storeMutations(ret.lss_bytes);
+      await storeMutations(ret.state);
     }
     processVlsResult(ret);
   } catch (e) {

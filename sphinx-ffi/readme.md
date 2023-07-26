@@ -40,6 +40,12 @@
 - mnemonic: 24 words separated by spaces
 - return a 32-byte hex seed
 
+**`make_auth_token(now: number, secret: String)`**
+
+- now: 10-digit UNIX timestamp
+- secret: 32-byte hex
+- return auth_token string
+
 ### control messages
 
 **`build_request(json: String, secret: String, nonce: Number)`**
@@ -56,19 +62,33 @@
 
 ### signer
 
-The signer API requires the phone to persist the results of each call, in order to add them to the next call.
+The `args` are a JSON string of arguments that are needed for every call.
 
-The `args` are a JSON string of arguments that are needed for every call:
+The `state` is a Map of strings to bytes, that should be persisted after each `run_vls` call.
 
-```rs
-pub struct Args {
-    seed: [u8; 32], // entropy
-    network: Network, // "bitcoin" or "regtest"
-    policy: Policy,
-    velocity: Option<Velocity>,
-    allowlist: Vec<String>,
-    timestamp: Duration,
-    lss_nonce: [u8; 32], // random nonce
+Each mobile signer call returns a `VlsResponse` object.
+
+```ts
+type Bytes = Uint8Array;
+
+interface Args {
+  seed: Bytes; // 32 bytes
+  network: string; // "bitcoin" or "regtest"
+  policy: Policy;
+  velocity?: Velocity;
+  allowlist: string[];
+  timestamp: number; // unix ts in seconds
+  lss_nonce: Bytes; // random 32 bytes
+}
+
+type State = { [k: string]: Bytes };
+
+interface VlsResponse {
+  topic: string;
+  vls_bytes?: Bytes;
+  lss_bytes?: Bytes;
+  sequence: number;
+  state?: Bytes; // Map of strings to bytes, serialized with msgpack
 }
 ```
 
@@ -76,9 +96,42 @@ pub struct Args {
 
 **`run_init_2(args: String, state: Bytes, msg1: Bytes, msg2: Bytes)`**
 
-**`run_vls(args: String, state: Bytes, msg1: Bytes, msg2: Bytes, vls_msg: Bytes)`**
+**`run_vls(args: String, state: Bytes, msg1: Bytes, msg2: Bytes, vls_msg: Bytes, sequence: u16)`**
 
 **`run_lss(args: String, state: Bytes, msg1: Bytes, msg2: Bytes, lss_msg: Bytes, previous_vls_msg: Bytes, previous_lss_msg: Bytes)`**
+
+### mobile signer instructions
+
+1. generate your seed: random 32 bytes
+2. run `node_keys(network, seed)` to get your keys.
+3. connect to the MQTT broker
+   - clientID: random string
+   - username: keys.pubkey
+   - password: `make_auth_token(timestamp, keys.secret)`
+4. subscribe to topics:
+   - `{CLIENT_ID}/vls`, `{CLIENT_ID}/init-1-msg`, `{CLIENT_ID}/init-2-msg`, `{CLIENT_ID}/lss-msg`
+5. publish to `{CLIENT_ID}/hello` to let the broker know you are ready
+6. when a MQTT message is received:
+
+- `init-1-msg`:
+  - store the received bytes (msg1)
+  - `run_init_1`
+- `init-2-msg`:
+  - store the received bytes (msg2)
+  - `run_init_2`
+- `vls-msg`:
+  - load up all locally stored mutations
+  - `run_vls`
+  - if the response topic is `lss-res`, then:
+    - store the `vls_bytes` (previous_vls_msg)
+    - store the `lss_bytes` (previous_lss_msg)
+    - store ALL the returned mutations:
+      - msgpack.decode(response.state)
+      - store each key/value pair
+- `lss-msg`:
+  - `run_lss`
+
+After each run, publish the bytes on the returned topic. If the topic == `vls-res`, then use the `vls_bytes`. Otherwise, use the `lss_bytes`
 
 ### kotlin
 
