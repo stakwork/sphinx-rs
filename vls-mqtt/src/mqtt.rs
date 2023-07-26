@@ -25,7 +25,7 @@ pub async fn start(
         let t = Token::new();
         let token = t.sign_to_base64(&secret)?;
 
-        let client_id = format!("sphinx-{}", random_word(8));
+        let client_id = format!("{}_{}", random_word(8), random_word(8));
         let broker: String = env::var("BROKER").unwrap_or("localhost:1883".to_string());
 
         println!(".......... start eventloop ..........");
