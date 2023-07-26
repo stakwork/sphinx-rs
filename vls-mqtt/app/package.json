@@ -13,7 +13,6 @@
     "@msgpack/msgpack": "^3.0.0-beta2",
     "@sveltejs/vite-plugin-svelte": "^2.4.2",
     "@tsconfig/svelte": "^5.0.0",
-    "buffer": "^6.0.3",
     "carbon-components-svelte": "^0.78.0",
     "carbon-icons-svelte": "^12.1.0",
     "localforage": "^1.10.0",

@@ -2,7 +2,7 @@
   import * as sphinx from "../../../sphinx-wasm/pkg";
   import { onMount } from "svelte";
   import Sidebar from "./Sidebar.svelte";
-  import { pages, menu, keys, formatPubkey, loaded } from "./store";
+  import { pages, menu, pubkey, formatPubkey, loaded } from "./store";
   import Account from "./Account.svelte";
   import Allowlist from "./Allowlist.svelte";
   import Policy from "./Policy.svelte";
@@ -34,7 +34,7 @@
   let scale = 1;
   function copyPubkey() {
     scale = 1.2;
-    navigator.clipboard.writeText($keys?.pubkey);
+    navigator.clipboard.writeText($pubkey);
     setTimeout(() => {
       scale = 1;
     }, 140);
@@ -50,14 +50,15 @@
       <div class="page-title">
         {page.label}
       </div>
-      {#if $keys}
+      {#if $pubkey}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <!-- svelte-ignore a11y-no-static-element-interactions -->
         <div
           class="pubkey"
           on:click={copyPubkey}
           style={`transform:scale(${scale},${scale})`}
         >
-          {formatPubkey($keys.pubkey)}
+          {formatPubkey($pubkey)}
         </div>
       {/if}
     </div>

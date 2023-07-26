@@ -1,5 +1,6 @@
 pub mod approver;
 pub mod derive;
+pub mod mobile;
 pub mod parser;
 pub mod root;
 pub mod rst;
@@ -7,14 +8,12 @@ pub mod rst;
 #[cfg(feature = "std")]
 pub mod policy;
 
-pub use sphinx_glyph;
-pub use vls_protocol;
-
 #[cfg(feature = "fspersist")]
 pub mod persist;
 
-#[cfg(feature = "vls-persist")]
-pub mod mobile;
+pub use lss_connector;
+pub use sphinx_glyph;
+pub use vls_protocol;
 
 pub use derive::node_keys as derive_node_keys;
 pub use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};

@@ -17,6 +17,7 @@ getrandom = { version = "0.2.7", features = ["js"] }
 secp256k1 = { version = "0.24.0", default-features = false }
 wasm-logger = "0.2.0"
 console_error_panic_hook = "0.1.6"
+log = "0.4"
 
 [profile.release]
 lto = true

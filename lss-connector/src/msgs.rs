@@ -286,6 +286,13 @@ impl Response {
             _ => Err(anyhow!("not a VlsMuts msg")),
         }
     }
+    pub fn get_muts(self) -> Result<Muts> {
+        match self {
+            Response::Created(m) => Ok(m.muts),
+            Response::VlsMuts(m) => Ok(m.muts),
+            _ => Err(anyhow!("no muts msg")),
+        }
+    }
 }
 
 #[cfg(test)]

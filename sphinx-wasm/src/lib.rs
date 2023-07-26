@@ -7,7 +7,7 @@ type Result<T> = std::result::Result<T, JsError>;
 
 #[wasm_bindgen]
 pub fn init_logs() {
-    wasm_logger::init(wasm_logger::Config::default());
+    wasm_logger::init(wasm_logger::Config::new(log::Level::Info));
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 }
 

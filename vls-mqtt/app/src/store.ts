@@ -64,6 +64,11 @@ export const keys = derived([loaded, seed], ([$loaded, $seed]) => {
   }
 });
 
+export const pubkey = derived([keys], ([$keys]) => {
+  if (!$keys) return "";
+  return $keys.pubkey;
+});
+
 export const isSigner = writable<boolean>(initialIsSigner);
 
 function signerParam(): boolean {
