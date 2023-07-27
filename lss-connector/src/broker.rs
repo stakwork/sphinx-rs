@@ -32,7 +32,7 @@ impl LssBroker {
     pub async fn get_server_pubkey(uri: &str) -> Result<(PublicKey, Vec<u8>)> {
         let spk = LssClient::get_server_pubkey(uri).await?;
         let server_pubkey = spk.serialize();
-        let msg = Msg::Init(Init { server_pubkey }).to_vec()?;
+        let msg = Msg::Init(Init { server_pubkey, sequence: 0u16 }).to_vec()?;
         Ok((spk, msg))
     }
     // returns Self and the msg to send to signer
@@ -55,10 +55,10 @@ impl LssBroker {
         })
     }
     // on reconnection
-    pub async fn make_init_msg(&self) -> Result<Vec<u8>> {
+    pub async fn make_init_msg(&self, sequence: u16) -> Result<Vec<u8>> {
         let spk = LssClient::get_server_pubkey(&self.uri).await?;
         let server_pubkey = spk.serialize();
-        Ok(Msg::Init(Init { server_pubkey }).to_vec()?)
+        Ok(Msg::Init(Init { server_pubkey, sequence }).to_vec()?)
     }
     // on reconnection
     // if no nonce was sent the the signer does not need state update

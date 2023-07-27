@@ -22,6 +22,7 @@ pub type Muts = Vec<(String, (u64, Vec<u8>))>;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Init {
     pub server_pubkey: [u8; 33],
+    pub sequence: u16,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -49,8 +50,9 @@ pub fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
         Msg::Init(init) => {
             rmp::serialize_map_len(&mut buff, 1u32)?;
             rmp::serialize_field_name(&mut buff, Some("Init"))?;
-            rmp::serialize_map_len(&mut buff, 1u32)?;
+            rmp::serialize_map_len(&mut buff, 2u32)?;
             rmp::serialize_bin(&mut buff, Some("server_pubkey"), &init.server_pubkey)?;
+            rmp::serialize_uint(&mut buff, Some("sequence"), init.sequence as u64)?;
             Ok(buff.into_vec())
         }
         Msg::Created(bm) => {
@@ -133,11 +135,12 @@ pub fn deserialize_lssmsg(b: &[u8]) -> Result<Msg> {
     let variant = rmp::deserialize_variant(&mut bytes)?;
     match variant.as_str() {
         "Init" => {
-            rmp::deserialize_map_len(&mut bytes, 1)?;
+            rmp::deserialize_map_len(&mut bytes, 2)?;
             let mut server_pubkey = [0u8; 33];
             let binary = rmp::deserialize_bin(&mut bytes, Some("server_pubkey"), 33)?;
             server_pubkey.copy_from_slice(&binary[..]);
-            Ok(Msg::Init(Init { server_pubkey }))
+            let sequence = rmp::deserialize_uint(&mut bytes, Some("sequence"))? as u16;
+            Ok(Msg::Init(Init { server_pubkey, sequence }))
         }
         "Created" => Ok(Msg::Created(
             deserialize_brokermuts(&mut bytes).map_err(Error::msg)?,
@@ -317,6 +320,7 @@ mod tests {
     fn test_msginit_serde() {
         let test = Msg::Init(Init {
             server_pubkey: [u8::MAX; 33],
+            sequence: 71u16,
         });
         let bytes = serialize_lssmsg(&test).unwrap();
         let object = deserialize_lssmsg(&bytes).unwrap();
