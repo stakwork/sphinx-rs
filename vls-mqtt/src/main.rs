@@ -66,8 +66,8 @@ impl LssChanMsg {
     }
 }
 
-#[rocket::launch]
-async fn rocket() -> _ {
+#[rocket::main]
+async fn main() {
     dotenv().ok();
 
     let (ctrl_tx, ctrl_rx) = mpsc::channel(1000);
@@ -139,7 +139,8 @@ async fn rocket() -> _ {
     rocket::tokio::spawn(async move {
         while let Some(msg) = vls_rx.recv().await {
             let s1 = approver.control().get_state();
-            let res_res = root::handle_with_lss(&rh_, &lss_signer, msg.message, None, true).map_err(Error::msg);
+            let res_res = root::handle_with_lss(&rh_, &lss_signer, msg.message, None, true)
+                .map_err(Error::msg);
             let s2 = approver.control().get_state();
             if s1 != s2 {
                 log::info!("===> VelocityApprover state updated");
@@ -165,7 +166,16 @@ async fn rocket() -> _ {
         }
     });
 
-    routes::launch_rocket(ctrl_tx, error_tx)
+    let r = routes::launch_rocket(ctrl_tx, error_tx)
+        .await
+        .expect("failed to ignite rocket");
+
+    let shutdown_handle = r.shutdown();
+
+    // shutdown.notify();
+    // shutdown.notify()
+
+    r.launch().await.expect("failed to launch rocket");
 }
 
 async fn listen_for_commands(

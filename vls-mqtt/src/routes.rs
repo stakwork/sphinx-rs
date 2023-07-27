@@ -67,22 +67,26 @@ async fn errors(error_tx: &State<broadcast::Sender<Vec<u8>>>, mut end: Shutdown)
     }
 }
 
-pub fn launch_rocket(
+pub async fn launch_rocket(
     tx: mpsc::Sender<ChannelRequest>,
     error_tx: broadcast::Sender<Vec<u8>>,
-) -> Rocket<Build> {
+) -> anyhow::Result<Rocket<Ignite>> {
     println!("=> launch_rocket");
     let config = Config {
         port: 9000,
         ..Config::default()
     };
-    rocket::build()
+    let r = rocket::build()
         .configure(config)
         .mount("/", FileServer::from(relative!("app/public")))
         .mount("/api/", routes![control, errors])
         .attach(CORS)
         .manage(tx)
         .manage(error_tx)
+        .ignite()
+        .await
+        .map_err(|_| anyhow::anyhow!("failed to ignite rocket"))?;
+    Ok(r)
 }
 
 #[derive(Debug, thiserror::Error)]
