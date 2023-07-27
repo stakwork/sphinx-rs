@@ -21,8 +21,11 @@ use sphinx_signer::Handler;
 use sphinx_signer::{self, approver::SphinxApprover, root, sphinx_glyph as glyph, RootHandler};
 use std::env;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+pub static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
 pub const ROOT_STORE: &str = "teststore";
 
@@ -163,6 +166,9 @@ async fn main() {
         loop {
             rocket::tokio::time::sleep(Duration::from_secs(60)).await;
             let _ = rh.node().get_heartbeat();
+            if SHUTDOWN.load(Ordering::Relaxed) {
+                break;
+            }
         }
     });
 
@@ -171,9 +177,11 @@ async fn main() {
         .expect("failed to ignite rocket");
 
     let shutdown_handle = r.shutdown();
-
-    // shutdown.notify();
-    // shutdown.notify()
+    rocket::tokio::spawn(async move {
+        if SHUTDOWN.load(Ordering::Relaxed) {
+            shutdown_handle.notify();
+        }
+    });
 
     r.launch().await.expect("failed to launch rocket");
 }
