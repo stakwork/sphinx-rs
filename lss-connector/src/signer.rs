@@ -146,7 +146,7 @@ impl LssSigner {
 // return the return_topic and bytes
 pub fn handle_lss_msg(
     msg: &[u8],
-    previous: &Option<(Vec<u8>, Vec<u8>)>,
+    previous: Option<(Vec<u8>, Vec<u8>)>,
     lss_signer: &LssSigner,
 ) -> Result<(String, Vec<u8>)> {
     use sphinx_glyph::topics;
@@ -170,10 +170,7 @@ pub fn handle_lss_msg(
             Ok((topics::INIT_2_RES.to_string(), bs))
         }
         Msg::Stored(bm) => {
-            if let None = previous {
-                return Err(anyhow!("should be previous msg bytes"));
-            }
-            let previous = previous.clone().unwrap();
+            let previous = previous.ok_or(anyhow!("should be previous msg bytes"))?;
             // get the previous lss msg (where i sent signer muts)
             let prev_lssmsg = Response::from_slice(&previous.1)?;
             // println!("previous lss res: {:?}", prev_lssmsg);

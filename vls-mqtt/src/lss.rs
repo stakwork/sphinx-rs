@@ -37,7 +37,7 @@ pub async fn init_lss(
     let lss_signer_ = lss_signer.clone();
     rocket::tokio::spawn(async move {
         while let Some(msg) = lss_rx.recv().await {
-            let ret = handle_lss_msg(&msg.message, &msg.previous, &lss_signer_);
+            let ret = handle_lss_msg(&msg.message, msg.previous, &lss_signer_);
             let _ = msg.reply_tx.send(ret);
         }
     });

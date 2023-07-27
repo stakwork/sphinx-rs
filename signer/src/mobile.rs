@@ -122,7 +122,7 @@ pub fn run_lss(
     let (_res, _rh, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2)?;
 
     let prev = (previous_vls, previous_lss);
-    let (topic, res) = handle_lss_msg(&lss_msg, &Some(prev), &lss_signer)?;
+    let (topic, res) = handle_lss_msg(&lss_msg, Some(prev), &lss_signer)?;
     let ret = if &topic == topics::VLS_RES {
         RunReturn::new_vls(&topic, res, u16::default())
     } else {
