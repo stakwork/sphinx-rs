@@ -42,6 +42,8 @@ export const policy = writable<Policy>(defaultPolicy);
 
 export const allowlist = writable<string[]>([]);
 
+export const cmds = writable<string[]>([]);
+
 export const genSeed = (): string => {
   return Array.from(
     window.crypto.getRandomValues(new Uint8Array(32)),

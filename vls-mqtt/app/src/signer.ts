@@ -1,6 +1,7 @@
 import { sphinx } from "./wasm";
 import { now, argsAndState, storeMutations, clearAll } from "./signerUtils";
 import * as Paho from "paho-mqtt";
+import { cmds } from "./store";
 
 // broker: sequence 0 != expected 1
 
@@ -157,10 +158,15 @@ export async function run_vls(p: Uint8Array) {
   try {
     const a = await argsAndState();
     const ret = sphinx.run_vls(a.args, a.state, lss_msg1, lss_msg2, p);
+    console.log("=================================", ret);
     if (ret.topic === Topics.LSS_RES) {
       prev_vls = ret.vls_bytes;
       prev_lss = ret.lss_bytes;
       await storeMutations(ret.state);
+    } else {
+      if (ret.cmd) {
+        cmds.update((cs) => [...cs, ret.cmd]);
+      }
     }
     processVlsResult(ret);
   } catch (e) {

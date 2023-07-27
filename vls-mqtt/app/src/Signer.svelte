@@ -1,7 +1,7 @@
 <script>
   import * as signer from "./signer";
   import { onDestroy } from "svelte";
-  import { keys, pubkey } from "./store";
+  import { keys, pubkey, cmds } from "./store";
   import { Button } from "carbon-components-svelte";
   import PlayFilled from "carbon-icons-svelte/lib/PlayFilled.svelte";
   import SubtractAlt from "carbon-icons-svelte/lib/SubtractAlt.svelte";
@@ -37,6 +37,11 @@
       iconDescription="Clear State"
     />
   </div>
+  <div class="cmd-wrap">
+    {#each $cmds as cmd}
+      <div class="cmd">{`=> ${cmd}`}</div>
+    {/each}
+  </div>
 </main>
 
 <style>
@@ -50,5 +55,15 @@
   }
   .gap {
     width: 1rem;
+  }
+  .cmd-wrap {
+    margin-top: 2rem;
+    display: flex;
+    flex-direction: column-reverse;
+    max-height: calc(100vh - 205px);
+    overflow: auto;
+  }
+  .cmd {
+    margin: 0.2rem 0;
   }
 </style>
