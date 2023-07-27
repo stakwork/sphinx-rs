@@ -3,9 +3,26 @@ import * as msgpack from "@msgpack/msgpack";
 import { type Policy, seed, lss_nonce, policy, allowlist } from "./store";
 import { get } from "svelte/store";
 
+// store state mutations in IndexedDB
 const forage = localforage.createInstance({
   name: "vls",
 });
+
+export type State = { [k: string]: Bytes };
+
+export type Bytes = Uint8Array;
+
+export type Velocity = (number | Bytes)[];
+
+export interface Args {
+  seed: Uint8Array;
+  network: string;
+  policy: Policy;
+  velocity?: Velocity;
+  allowlist: string[];
+  timestamp: number; // unix ts in seconds
+  lss_nonce: Uint8Array;
+}
 
 interface ArgsAndState {
   args: string;
@@ -36,22 +53,6 @@ function makeArgs(): Args {
     timestamp: now(),
     lss_nonce: fromHexString(get(lss_nonce)),
   };
-}
-
-export type State = { [k: string]: Bytes };
-
-export type Bytes = Uint8Array;
-
-export type Velocity = (number | Bytes)[];
-
-export interface Args {
-  seed: Uint8Array;
-  network: string;
-  policy: Policy;
-  velocity?: Velocity;
-  allowlist: string[];
-  timestamp: number; // unix ts in seconds
-  lss_nonce: Uint8Array;
 }
 
 function stringifyArgs(a: Args): string {

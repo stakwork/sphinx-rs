@@ -1,3 +1,4 @@
+use crate::approver::SphinxApprover;
 use crate::root::{builder_inner, handle_with_lss};
 use anyhow::Result;
 use lightning_signer::bitcoin::Network;
@@ -61,15 +62,21 @@ pub fn run_init_1(
     args: Args,
     state: State,
     lss_msg1: Vec<u8>,
-) -> Result<(RunReturn, RootHandlerBuilder, LssSigner)> {
+) -> Result<(
+    RunReturn,
+    RootHandlerBuilder,
+    Arc<SphinxApprover>,
+    LssSigner,
+)> {
     let init = Msg::from_slice(&lss_msg1)?.into_init()?;
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
     let nonce = args.lss_nonce.clone();
-    let rhb = root_handler_builder(args, state)?;
+    let (rhb, approver) = root_handler_builder(args, state)?;
     let (lss_signer, res1) = LssSigner::new(&rhb, &server_pubkey, Some(nonce));
     Ok((
         RunReturn::new_lss(topics::INIT_1_RES, res1),
         rhb,
+        approver,
         lss_signer,
     ))
 }
@@ -79,13 +86,14 @@ pub fn run_init_2(
     state: State,
     lss_msg1: Vec<u8>,
     lss_msg2: Vec<u8>,
-) -> Result<(RunReturn, RootHandler, LssSigner)> {
-    let (_res1, rhb, lss_signer) = run_init_1(args, state.clone(), lss_msg1)?;
+) -> Result<(RunReturn, RootHandler, Arc<SphinxApprover>, LssSigner)> {
+    let (_res1, rhb, approver, lss_signer) = run_init_1(args, state.clone(), lss_msg1)?;
     let created = Msg::from_slice(&lss_msg2)?.into_created()?;
     let (root_handler, res2) = lss_signer.build_with_lss(created, rhb, Some(state))?;
     Ok((
         RunReturn::new_lss(topics::INIT_2_RES, res2),
         root_handler,
+        approver,
         lss_signer,
     ))
 }
@@ -98,7 +106,7 @@ pub fn run_vls(
     vls_msg: Vec<u8>,
     expected_sequence: Option<u16>,
 ) -> Result<RunReturn> {
-    let (_res, rh, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2)?;
+    let (_res, rh, _approver, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2)?;
 
     let (vls_res, lss_res, sequence) =
         handle_with_lss(&rh, &lss_signer, vls_msg, expected_sequence, true)?;
@@ -119,7 +127,7 @@ pub fn run_lss(
     previous_vls: Vec<u8>,
     previous_lss: Vec<u8>,
 ) -> Result<RunReturn> {
-    let (_res, _rh, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2)?;
+    let (_res, _rh, _approver, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2)?;
 
     let prev = (previous_vls, previous_lss);
     let (topic, res) = handle_lss_msg(&lss_msg, Some(prev), &lss_signer)?;
@@ -131,7 +139,10 @@ pub fn run_lss(
     Ok(ret)
 }
 
-fn root_handler_builder(args: Args, state: State) -> Result<RootHandlerBuilder> {
+fn root_handler_builder(
+    args: Args,
+    state: State,
+) -> Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
     use std::time::UNIX_EPOCH;
 
     let tmp = ThreadMemoPersister {};
@@ -144,7 +155,7 @@ fn root_handler_builder(args: Args, state: State) -> Result<RootHandlerBuilder> 
     let persister = Arc::new(tmp);
     let clock = Arc::new(NowClock::new(d));
     let stf = Arc::new(NowStartingTimeFactory::new(d));
-    let (rhb, _approver) = builder_inner(
+    let (rhb, approver) = builder_inner(
         args.seed,
         args.network,
         args.policy,
@@ -158,7 +169,7 @@ fn root_handler_builder(args: Args, state: State) -> Result<RootHandlerBuilder> 
     if !muts.is_empty() {
         log::info!("root_handler_builder MUTS: {:?}", muts);
     }
-    Ok(rhb)
+    Ok((rhb, approver))
 }
 
 impl RunReturn {
@@ -313,7 +324,8 @@ mod tests {
         })
         .to_vec()?;
 
-        let (res1, _rhb, _lss_signer) = run_init_1(args.clone(), state.clone(), bi1.clone())?;
+        let (res1, _rhb, _approver, _lss_signer) =
+            run_init_1(args.clone(), state.clone(), bi1.clone())?;
         let lss_bytes = res1.lss_bytes.unwrap();
 
         let si1 = Response::from_slice(&lss_bytes)?.into_init()?;
@@ -322,7 +334,7 @@ mod tests {
 
         let bi2 = lss_broker.get_created_state_msg(&si1).await?;
 
-        let (res2, _rh, _lss_signer) =
+        let (res2, _rh, _approver, _lss_signer) =
             run_init_2(args.clone(), state.clone(), bi1.clone(), bi2.clone())?;
         let lss_bytes2 = res2.lss_bytes.unwrap();
 
