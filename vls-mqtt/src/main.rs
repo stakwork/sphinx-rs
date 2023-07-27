@@ -72,7 +72,12 @@ impl LssChanMsg {
 #[rocket::main]
 async fn main() {
     dotenv().ok();
+    loop {
+        run().await;
+    }
+}
 
+async fn run() {
     let (ctrl_tx, ctrl_rx) = mpsc::channel(1000);
     let (error_tx, error_rx) = broadcast::channel(1000);
 
