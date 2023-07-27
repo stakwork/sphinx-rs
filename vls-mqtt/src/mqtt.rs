@@ -8,6 +8,7 @@ use rocket::tokio::sync::{broadcast, mpsc};
 use rumqttc::{self, AsyncClient, Event, EventLoop, MqttOptions, Packet, QoS};
 use std::env;
 use std::error::Error;
+use std::process::exit;
 use std::time::Duration;
 
 pub async fn start(
@@ -112,15 +113,24 @@ async fn main_listener(
     // say hello to start
     publish(client, &client_id, topics::HELLO, &[]).await;
 
+    let mut expected_sequence: Option<u16> = None;
     let mut msgs: Option<(Vec<u8>, Vec<u8>)> = None;
     loop {
         match eventloop.poll().await {
             Ok(event) => {
                 if let Some((topic, msg_bytes)) = incoming_bytes(event) {
-                    let (return_topic, bytes) =
-                        got_msg(&topic, &msg_bytes, &vls_tx, &lss_tx, &mut msgs).await;
+                    let (return_topic, bytes, sequence) =
+                        got_msg(&topic, &msg_bytes, expected_sequence, &vls_tx, &lss_tx, &mut msgs).await;
                     if return_topic == topics::ERROR {
                         let _ = error_tx.send(bytes.clone());
+                        let error_msg = String::from_utf8(bytes.clone()).unwrap();
+                        if error_msg.starts_with("invalid sequence") {
+                            exit(0);
+                        }
+                    } else {
+                        if let Some(seq) = sequence {
+                            expected_sequence = Some(seq + 1);
+                        }
                     }
                     // println!("publish back to broker! {}", &return_topic);
                     publish(client, &client_id, &return_topic, &bytes).await;
@@ -141,26 +151,27 @@ async fn main_listener(
 async fn got_msg(
     topic: &str,
     msg_bytes: &[u8],
+    expected_sequence: Option<u16>,
     vls_tx: &mpsc::Sender<VlsChanMsg>,
     lss_tx: &mpsc::Sender<LssChanMsg>,
     msgs: &mut Option<(Vec<u8>, Vec<u8>)>,
-) -> (String, Vec<u8>) {
+) -> (String, Vec<u8>, Option<u16>) {
     // println!("GOT MSG on {} {:?}", topic, msg_bytes);
     if topic.ends_with(topics::VLS) {
-        let (vls_msg, reply_rx) = VlsChanMsg::new(msg_bytes.to_vec());
+        let (vls_msg, reply_rx) = VlsChanMsg::new(msg_bytes.to_vec(), expected_sequence);
         let _ = vls_tx.send(vls_msg).await;
         match reply_rx.await.unwrap() {
-            Ok((vls_bytes, lss_bytes, _sequence)) => {
+            Ok((vls_bytes, lss_bytes, sequence)) => {
                 if lss_bytes.len() == 0 {
                     // no muts, respond directly back!
-                    (topics::VLS_RES.to_string(), vls_bytes)
+                    (topics::VLS_RES.to_string(), vls_bytes, Some(sequence))
                 } else {
                     // muts! do LSS first!
                     *msgs = Some((vls_bytes, lss_bytes.clone()));
-                    (topics::LSS_RES.to_string(), lss_bytes)
+                    (topics::LSS_RES.to_string(), lss_bytes, Some(sequence))
                 }
             }
-            Err(e) => (topics::ERROR.to_string(), e.to_string().as_bytes().to_vec()),
+            Err(e) => (topics::ERROR.to_string(), e.to_string().as_bytes().to_vec(), None),
         }
     } else if topic.ends_with(topics::LSS_MSG)
         || topic.ends_with(topics::INIT_1_MSG)
@@ -173,17 +184,17 @@ async fn got_msg(
             Ok((topic, payload)) => {
                 // println!("got something back from LSS Helper to send on {}", &topic);
                 *msgs = None;
-                (topic, payload.to_vec())
+                (topic, payload.to_vec(), None)
             }
             Err(e) => {
                 println!("LSS ERROR {:?}", e);
-                (topics::ERROR.to_string(), e.to_string().as_bytes().to_vec())
+                (topics::ERROR.to_string(), e.to_string().as_bytes().to_vec(), None)
             }
         }
     } else {
         log::warn!("unrecognized topic {}", topic);
         let err = format!("=> bad topic {}", topic);
-        (topics::ERROR.to_string(), err.as_bytes().to_vec())
+        (topics::ERROR.to_string(), err.as_bytes().to_vec(), None)
     }
 }
 
