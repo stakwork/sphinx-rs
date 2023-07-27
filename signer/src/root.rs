@@ -133,7 +133,7 @@ fn handle_inner(
     mut bytes: Vec<u8>,
     expected_sequence: Option<u16>,
     do_log: bool,
-) -> Result<(Vec<u8>, Mutations, u16), VlsHandlerError> {
+) -> Result<(Vec<u8>, Mutations, u16, String), VlsHandlerError> {
     // println!("Signer is handling these bytes: {:?}", bytes);
     let msgs::SerialRequestHeader {
         sequence,
@@ -162,9 +162,9 @@ fn handle_inner(
         }
     }
 
+    let cmd = vls_cmd(&message);
     if do_log {
-        vls_log(&message);
-        // log::info!("VLS: {:?}", message);
+        log::info!("VLS: => {}", &cmd);
     }
     let reply = if dbid > 0 {
         let handler = root_handler.for_new_client(dbid, PubKey(peer_id), dbid);
@@ -188,7 +188,7 @@ fn handle_inner(
     msgs::write_vec(&mut &mut buf, vls_msg.as_vec())
         .map_err(|e| VlsHandlerError::MsgWrite(format!("{:?}", e)))?;
     //println!("handled message, replying with: {:?}", out_md);
-    Ok((buf, mutations, sequence))
+    Ok((buf, mutations, sequence, cmd))
 }
 
 pub fn handle(
@@ -197,7 +197,7 @@ pub fn handle(
     expected_sequence: Option<u16>,
     do_log: bool,
 ) -> Result<(Vec<u8>, u16), VlsHandlerError> {
-    let (out_bytes, _muts, sequence) =
+    let (out_bytes, _muts, sequence, _cmd) =
         handle_inner(root_handler, bytes, expected_sequence, do_log)?;
     Ok((out_bytes, sequence))
 }
@@ -208,8 +208,8 @@ pub fn handle_with_lss(
     bytes: Vec<u8>,
     expected_sequence: Option<u16>,
     do_log: bool,
-) -> Result<(Vec<u8>, Vec<u8>, u16), VlsHandlerError> {
-    let (out_bytes, mutations, sequence) =
+) -> Result<(Vec<u8>, Vec<u8>, u16, String), VlsHandlerError> {
+    let (out_bytes, mutations, sequence, cmd) =
         handle_inner(root_handler, bytes, expected_sequence, do_log)?;
     let lss_bytes = if mutations.is_empty() {
         Vec::new()
@@ -223,7 +223,7 @@ pub fn handle_with_lss(
             .to_vec()
             .map_err(|e| VlsHandlerError::LssWrite(format!("{:?}", e)))?
     };
-    Ok((out_bytes, lss_bytes, sequence))
+    Ok((out_bytes, lss_bytes, sequence, cmd))
 }
 
 pub fn parse_ping_and_form_response(mut msg_bytes: Vec<u8>) -> Vec<u8> {
@@ -244,7 +244,7 @@ pub fn parse_ping_and_form_response(mut msg_bytes: Vec<u8>) -> Vec<u8> {
     buf
 }
 
-fn vls_log(msg: &Message) {
+fn vls_cmd(msg: &Message) -> String {
     let m = match msg {
         Message::Ping(_) => "Ping",
         Message::Pong(_) => "Pong",
@@ -335,5 +335,5 @@ fn vls_log(msg: &Message) {
         Message::NodeInfoReply(_) => "NodeInfoReply",
         Message::Unknown(_) => "Unknown",
     };
-    log::info!("VLS: => {}", m);
+    m.to_string()
 }

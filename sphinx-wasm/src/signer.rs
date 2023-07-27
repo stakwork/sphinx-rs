@@ -8,6 +8,8 @@ pub struct VlsResponse {
     vls_bytes: Option<Vec<u8>>,
     lss_bytes: Option<Vec<u8>>,
     sequence: u16,
+    cmd: String,
+    velocity: Option<Vec<u8>>,
     state: Option<Vec<u8>>,
 }
 
@@ -18,6 +20,8 @@ impl From<cy::VlsResponse> for VlsResponse {
             vls_bytes: vr.vls_bytes,
             lss_bytes: vr.lss_bytes,
             sequence: vr.sequence,
+            cmd: vr.cmd,
+            velocity: vr.velocity,
             state: vr.state,
         }
     }
@@ -40,6 +44,14 @@ impl VlsResponse {
     #[wasm_bindgen(getter)]
     pub fn sequence(&self) -> u16 {
         self.sequence
+    }
+    #[wasm_bindgen(getter)]
+    pub fn cmd(&self) -> String {
+        self.cmd.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn velocity(&self) -> Option<Vec<u8>> {
+        self.velocity.clone()
     }
     #[wasm_bindgen(getter)]
     pub fn state(&self) -> Option<Vec<u8>> {

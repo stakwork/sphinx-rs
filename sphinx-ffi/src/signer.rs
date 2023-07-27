@@ -15,6 +15,8 @@ pub struct VlsResponse {
     pub vls_bytes: Option<Vec<u8>>,
     pub lss_bytes: Option<Vec<u8>>,
     pub sequence: u16,
+    pub cmd: String,
+    pub velocity: Option<Vec<u8>>,
     pub state: Option<Vec<u8>>,
 }
 
@@ -142,6 +144,8 @@ impl VlsResponse {
             vls_bytes: ret.vls_bytes,
             lss_bytes: ret.lss_bytes,
             sequence: ret.sequence,
+            cmd: ret.cmd,
+            velocity: ret.velocity,
             state,
         }
     }
