@@ -20,6 +20,7 @@ pub struct LssSigner {
     pub helper: ExternalPersistHelper,
     pub client_id: PublicKey,
     pub auth_token: [u8; 32],
+    pub state: Arc<Mutex<BTreeMap<String, (u64, Vec<u8>)>>>,
 }
 
 impl LssSigner {
@@ -62,6 +63,7 @@ impl LssSigner {
                 helper,
                 client_id,
                 auth_token,
+                state: Arc::new(Mutex::new(Default::default())),
             },
             msg_bytes,
         )
@@ -101,7 +103,7 @@ impl LssSigner {
             return Err(anyhow!("invalid server hmac"));
         }
 
-        let mut sta = BTreeMap::new(); // state.unwrap_or_default();
+        let mut sta = self.state.lock().unwrap();
         for (key, version_value) in c.muts.into_iter() {
             sta.insert(key, version_value);
         }
@@ -110,8 +112,7 @@ impl LssSigner {
                 sta.insert(key, version_value);
             }
         }
-        let st = Arc::new(Mutex::new(sta));
-        let handler_builder = handler_builder.lss_state(st);
+        let handler_builder = handler_builder.lss_state(self.state.clone());
         let (handler, muts) = handler_builder
             .build()
             .map_err(|_| anyhow!("failed to build"))?;
@@ -131,11 +132,11 @@ impl LssSigner {
     pub fn server_hmac(&self, mutations: &Mutations) -> [u8; 32] {
         self.helper.server_hmac(mutations)
     }
-    pub fn check_hmac(&self, bm: BrokerMutations) -> bool {
+    pub fn check_hmac(&self, bm: &BrokerMutations) -> bool {
         match bm.server_hmac {
             Some(hmac) => self
                 .helper
-                .check_hmac(&Mutations::from_vec(bm.muts), hmac.to_vec()),
+                .check_hmac(&Mutations::from_vec(bm.muts.clone()), hmac.to_vec()),
             None => false,
         }
     }
@@ -162,9 +163,14 @@ pub fn handle_lss_msg(
         Msg::Created(bm) => {
             // dont need to check muts if theyre empty
             if !bm.muts.is_empty() {
-                if !lss_signer.check_hmac(bm) {
+                if !lss_signer.check_hmac(&bm) {
                     return Err(anyhow!("Invalid server hmac"));
                 }
+                let mut state = lss_signer.state.lock().unwrap();
+                for (key, version_value) in bm.muts.into_iter() {
+                    state.insert(key, version_value);
+                }
+                drop(state);
             }
             let bs = lss_signer.empty_created();
             Ok((topics::INIT_2_RES.to_string(), bs))
