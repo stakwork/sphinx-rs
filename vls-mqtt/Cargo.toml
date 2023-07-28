@@ -2,6 +2,7 @@
 name = "vls-mqtt"
 version = "0.1.0"
 edition = "2021"
+default-run = "vls-mqtt"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -20,3 +21,7 @@ chrono = "0.4"
 fsdb = { version = "0.1.11" }
 anyhow = "1"
 rand = "0.8.5"
+
+[[bin]]
+name = "multi"
+path = "src/multi.rs"

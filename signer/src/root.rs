@@ -34,6 +34,8 @@ pub enum VlsHandlerError {
     MsgWrite(String),
     #[error("failed lss_msg.to_vec: {0}")]
     LssWrite(String),
+    // vls-mqtt tests against "invalid sequence" at the start of the error
+    // message to detect a bad sequence error, exit(0), and restart the signer
     #[error("invalid sequence: {0}, expected {1}")]
     BadSequence(u16, u16),
     #[error("client {0} handler error: {1}")]
