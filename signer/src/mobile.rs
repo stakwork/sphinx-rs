@@ -63,14 +63,14 @@ pub struct RunReturn {
 pub fn run_init_1(
     args: Args,
     state: State,
-    lss_msg1: Vec<u8>,
+    lss_msg1: &[u8],
 ) -> Result<(
     RunReturn,
     RootHandlerBuilder,
     Arc<SphinxApprover>,
     LssSigner,
 )> {
-    let init = Msg::from_slice(&lss_msg1)?.into_init()?;
+    let init = Msg::from_slice(lss_msg1)?.into_init()?;
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
     let nonce = args.lss_nonce.clone();
     let (rhb, approver) = root_handler_builder(args, state)?;
@@ -86,8 +86,8 @@ pub fn run_init_1(
 pub fn run_init_2(
     args: Args,
     state: State,
-    lss_msg1: Vec<u8>,
-    lss_msg2: Vec<u8>,
+    lss_msg1: &[u8],
+    lss_msg2: &[u8],
 ) -> Result<(RunReturn, RootHandler, Arc<SphinxApprover>, LssSigner)> {
     let (_res1, rhb, approver, lss_signer) = run_init_1(args, state.clone(), lss_msg1)?;
     let created = Msg::from_slice(&lss_msg2)?.into_created()?;
@@ -103,15 +103,15 @@ pub fn run_init_2(
 pub fn run_vls(
     args: Args,
     state: State,
-    lss_msg1: Vec<u8>,
-    lss_msg2: Vec<u8>,
-    vls_msg: Vec<u8>,
+    lss_msg1: &[u8],
+    lss_msg2: &[u8],
+    vls_msg: &[u8],
     expected_sequence: Option<u16>,
 ) -> Result<RunReturn> {
     let (_res, rh, _approver, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2)?;
 
     let (vls_res, lss_res, sequence, cmd) =
-        handle_with_lss(&rh, &lss_signer, vls_msg, expected_sequence, true)?;
+        handle_with_lss(&rh, &lss_signer, vls_msg.to_vec(), expected_sequence, true)?;
     let ret = if lss_res.is_empty() {
         RunReturn::new_vls(topics::VLS_RES, vls_res, sequence, cmd)
     } else {
@@ -123,15 +123,15 @@ pub fn run_vls(
 pub fn run_lss(
     args: Args,
     state: State,
-    lss_msg1: Vec<u8>,
-    lss_msg2: Vec<u8>,
-    lss_msg: Vec<u8>,
-    previous_vls: Vec<u8>,
-    previous_lss: Vec<u8>,
+    lss_msg1: &[u8],
+    lss_msg2: &[u8],
+    lss_msg: &[u8],
+    previous_vls: &[u8],
+    previous_lss: &[u8],
 ) -> Result<RunReturn> {
     let (_res, _rh, _approver, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2)?;
 
-    let prev = (previous_vls, previous_lss);
+    let prev = (previous_vls.to_vec(), previous_lss.to_vec());
     let (topic, res) = handle_lss_msg(&lss_msg, Some(prev), &lss_signer)?;
     let ret = if &topic == topics::VLS_RES {
         RunReturn::new_vls(&topic, res, u16::default(), "VLS".to_string())
@@ -338,8 +338,7 @@ mod tests {
         })
         .to_vec()?;
 
-        let (res1, _rhb, _approver, _lss_signer) =
-            run_init_1(args.clone(), state.clone(), bi1.clone())?;
+        let (res1, _rhb, _approver, _lss_signer) = run_init_1(args.clone(), state.clone(), &bi1)?;
         let lss_bytes = res1.lss_bytes.unwrap();
 
         let si1 = Response::from_slice(&lss_bytes)?.into_init()?;
@@ -349,7 +348,7 @@ mod tests {
         let bi2 = lss_broker.get_created_state_msg(&si1).await?;
 
         let (res2, _rh, _approver, _lss_signer) =
-            run_init_2(args.clone(), state.clone(), bi1.clone(), bi2.clone())?;
+            run_init_2(args.clone(), state.clone(), &bi1, &bi2)?;
         let lss_bytes2 = res2.lss_bytes.unwrap();
 
         let si2 = Response::from_slice(&lss_bytes2)?.into_created()?;
@@ -364,9 +363,9 @@ mod tests {
             let rr = run_vls(
                 args.clone(),
                 state.clone(),
-                bi1.clone(),
-                bi2.clone(),
-                m,
+                &bi1,
+                &bi2,
+                &m,
                 Some(expected_sequence),
             )?;
             expected_sequence = expected_sequence + 1;
@@ -384,11 +383,11 @@ mod tests {
                 let _lss_rr = run_lss(
                     args.clone(),
                     state.clone(),
-                    bi1.clone(),
-                    bi2.clone(),
-                    lss_msg_bytes,
-                    rr.vls_bytes.unwrap(),
-                    rr.lss_bytes.unwrap(),
+                    &bi1,
+                    &bi2,
+                    &lss_msg_bytes,
+                    &rr.vls_bytes.unwrap(),
+                    &rr.lss_bytes.unwrap(),
                 )?;
                 // println!("lss rr {:?}", lss_rr);
             }

@@ -9,6 +9,8 @@ let MQTT;
 
 let CLIENT_ID;
 
+let sequence: number | undefined = undefined;
+
 export enum Topics {
   VLS = "vls",
   VLS_RES = "vls-res",
@@ -38,12 +40,12 @@ export async function clear() {
   await clearAll();
 }
 
-export async function initialize(ks: sphinx.Keys) {
+export async function initialize(secret: string, pubkey: string) {
   try {
     sphinx.init_logs();
 
-    const userName = ks.pubkey;
-    const password = sphinx.make_auth_token(now(), ks.secret);
+    const userName = pubkey;
+    const password = sphinx.make_auth_token(now(), secret);
     console.log("auth_token", password);
 
     const host = "localhost";
@@ -55,6 +57,7 @@ export async function initialize(ks: sphinx.Keys) {
 
     async function onConnectionLost() {
       console.log("onConnectionLost");
+      sequence = undefined;
       await sleep(1000);
       mqttConnect(userName, password, useSSL);
     }
@@ -76,6 +79,59 @@ function mqttConnect(userName: string, password: string, useSSL: boolean) {
     publish(Topics.HELLO, "");
   }
   MQTT.connect({ onSuccess, useSSL, userName, password });
+}
+
+type VlsHandler = (
+  args: string,
+  state: Uint8Array,
+  p: Uint8Array,
+  sequence?: number
+) => sphinx.VlsResponse;
+
+const funcs: { [k: string]: VlsHandler } = {
+  [Topics.INIT_1_MSG]: sphinx.run_init_1,
+  [Topics.INIT_2_MSG]: sphinx.run_init_2,
+  [Topics.VLS]: sphinx.run_vls,
+  [Topics.LSS_MSG]: sphinx.run_lss,
+};
+
+async function processMessage(topic: string, payload: Uint8Array) {
+  try {
+    // console.log("=====>>>>> GOT A MSG", topic, payload);
+    const ts = topic.split("/");
+    const last = ts[ts.length - 1];
+    if (!funcs[last]) {
+      return console.log("bad topic", last);
+    }
+    const a = await argsAndState();
+    const ret = funcs[last](a.args, a.state, payload, sequence);
+    await processVlsResult(ret);
+    if (last === Topics.VLS) {
+      if (ret.cmd) {
+        cmds.update((cs) => [...cs, ret.cmd]);
+      }
+      if (ret.sequence || ret.sequence === 0) {
+        sequence = ret.sequence + 1;
+      }
+    }
+  } catch (e) {
+    console.error(e);
+    if (e.toString().startsWith("Error: VLS Failed: invalid sequence")) {
+      console.log("BAD SEQUENCE ERROR");
+      await restart();
+    }
+  }
+}
+
+async function restart() {
+  await clearAll();
+  sequence = null;
+  publish(Topics.HELLO, "");
+}
+
+async function processVlsResult(ret: sphinx.VlsResponse) {
+  await storeMutations(ret.state);
+  publish(ret.topic as Topics, ret.bytes);
 }
 
 function publish(topic: Topics, payload: any) {
@@ -102,94 +158,6 @@ function sub(topic: Topics) {
 export function say_bye() {
   console.log("say bye!");
   publish(Topics.BYE, "");
-}
-
-function processMessage(topic: string, payload: Uint8Array) {
-  const funcs: { [k: string]: (Uint8Array) => void } = {};
-  funcs[Topics.INIT_1_MSG] = run_init_1;
-  funcs[Topics.INIT_2_MSG] = run_init_2;
-  funcs[Topics.VLS] = run_vls;
-  funcs[Topics.LSS_MSG] = run_lss;
-  // console.log("=====>>>>> GOT A MSG", topic, payload);
-  const ts = topic.split("/");
-  const last = ts[ts.length - 1];
-  if (funcs[last]) {
-    funcs[last](payload);
-  } else {
-    console.log("bad topic", last);
-  }
-}
-
-let lss_msg1: Uint8Array = Uint8Array.from([]);
-let lss_msg2: Uint8Array = Uint8Array.from([]);
-let prev_vls: Uint8Array = Uint8Array.from([]);
-let prev_lss: Uint8Array = Uint8Array.from([]);
-
-function processVlsResult(ret: sphinx.VlsResponse) {
-  let payload = ret.topic === Topics.VLS_RES ? ret.vls_bytes : ret.lss_bytes;
-  publish(ret.topic as Topics, payload);
-}
-
-export async function run_init_1(p: Uint8Array) {
-  try {
-    // save Init Msg
-    lss_msg1 = p;
-    const a = await argsAndState();
-    const ret = sphinx.run_init_1(a.args, a.state, p);
-    processVlsResult(ret);
-  } catch (e) {
-    console.log("run_init_1 failed:", e);
-  }
-}
-
-export async function run_init_2(p: Uint8Array) {
-  try {
-    // save Created Msg
-    lss_msg2 = p;
-    const a = await argsAndState();
-    const ret = sphinx.run_init_2(a.args, a.state, lss_msg1, p);
-    processVlsResult(ret);
-  } catch (e) {
-    console.log("run_init_2 failed:", e);
-  }
-}
-
-export async function run_vls(p: Uint8Array) {
-  try {
-    const a = await argsAndState();
-    const ret = sphinx.run_vls(a.args, a.state, lss_msg1, lss_msg2, p);
-    console.log("=================================", ret);
-    if (ret.topic === Topics.LSS_RES) {
-      prev_vls = ret.vls_bytes;
-      prev_lss = ret.lss_bytes;
-      await storeMutations(ret.state);
-    } else {
-      if (ret.cmd) {
-        cmds.update((cs) => [...cs, ret.cmd]);
-      }
-    }
-    processVlsResult(ret);
-  } catch (e) {
-    console.log("run_vls failed:", e);
-  }
-}
-
-export async function run_lss(p: Uint8Array) {
-  try {
-    const a = await argsAndState();
-    const ret = sphinx.run_lss(
-      a.args,
-      a.state,
-      lss_msg1,
-      lss_msg2,
-      p,
-      prev_vls,
-      prev_lss
-    );
-    processVlsResult(ret);
-  } catch (e) {
-    console.log("run_lss failed:", e);
-  }
 }
 
 export const genId = (): string => {

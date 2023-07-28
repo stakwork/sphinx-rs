@@ -30,10 +30,10 @@ pub fn parse_control_response(msg: &str) -> Result<String> {
     Ok(cy::parse_response(msg.to_string())?)
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(getter_with_clone)]
 pub struct Keys {
-    secret: String,
-    pubkey: String,
+    pub secret: String,
+    pub pubkey: String,
 }
 
 impl From<cy::Keys> for Keys {
@@ -42,18 +42,6 @@ impl From<cy::Keys> for Keys {
             secret: keys.secret,
             pubkey: keys.pubkey,
         }
-    }
-}
-
-#[wasm_bindgen]
-impl Keys {
-    #[wasm_bindgen(getter)]
-    pub fn secret(&self) -> String {
-        self.secret.clone()
-    }
-    #[wasm_bindgen(getter)]
-    pub fn pubkey(&self) -> String {
-        self.pubkey.clone()
     }
 }
 

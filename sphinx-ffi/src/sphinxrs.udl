@@ -25,12 +25,11 @@ dictionary Keys {
 
 dictionary VlsResponse {
     string topic;
-    bytes? vls_bytes;
-    bytes? lss_bytes;
+    bytes bytes;
     u16 sequence;
     string cmd;
     bytes? velocity;
-    bytes? state;
+    bytes state;
 };
 
 namespace sphinxrs {
@@ -53,13 +52,13 @@ namespace sphinxrs {
   [Throws=SphinxError]
   string parse_response(string res);
   [Throws=SphinxError]
-  VlsResponse run_init_1(string args, bytes state, bytes msg1);
+  VlsResponse run_init_1(string args, bytes state, bytes msg1, u16? expected_sequence);
   [Throws=SphinxError]
-  VlsResponse run_init_2(string args, bytes state, bytes msg1, bytes msg2);
+  VlsResponse run_init_2(string args, bytes state, bytes msg2, u16? expected_sequence);
   [Throws=SphinxError]
-  VlsResponse run_vls(string args, bytes state, bytes msg1, bytes msg2, bytes vls_msg, u16? expected_sequence);
+  VlsResponse run_vls(string args, bytes state, bytes vls_msg, u16? expected_sequence);
   [Throws=SphinxError]
-  VlsResponse run_lss(string args, bytes state, bytes msg1, bytes msg2, bytes lss_msg, bytes prev_vls, bytes prev_lss);
+  VlsResponse run_lss(string args, bytes state, bytes lss_msg, u16? expected_sequence);
   [Throws=SphinxError]
   string make_auth_token(u32 ts, string secret);
 };
