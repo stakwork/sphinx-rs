@@ -85,20 +85,20 @@ type State = { [k: string]: Bytes };
 
 interface VlsResponse {
   topic: string;
-  vls_bytes?: Bytes;
-  lss_bytes?: Bytes;
-  sequence: number;
-  state?: Bytes; // Map of strings to bytes, serialized with msgpack
+  bytes: Bytes;
+  sequence?: number;
+  cmd: string; // the name of the last VLS command to be run
+  state: Bytes; // Map of strings to bytes, serialized with msgpack
 }
 ```
 
-**`run_init_1(args: String, state: Bytes, msg1: Bytes)`**
+**`run_init_1(args: String, state: Bytes, msg1: Bytes, sequence?: u16)`**
 
-**`run_init_2(args: String, state: Bytes, msg1: Bytes, msg2: Bytes)`**
+**`run_init_2(args: String, state: Bytes, msg2: Bytes, sequence?: u16)`**
 
-**`run_vls(args: String, state: Bytes, msg1: Bytes, msg2: Bytes, vls_msg: Bytes, sequence: u16)`**
+**`run_vls(args: String, state: Bytes, vls_msg: Bytes, sequence?: u16)`**
 
-**`run_lss(args: String, state: Bytes, msg1: Bytes, msg2: Bytes, lss_msg: Bytes, previous_vls_msg: Bytes, previous_lss_msg: Bytes)`**
+**`run_lss(args: String, state: Bytes, lss_msg: Bytes, sequence?: u16)`**
 
 ### mobile signer instructions
 
@@ -113,25 +113,18 @@ interface VlsResponse {
 5. publish to `{CLIENT_ID}/hello` to let the broker know you are ready
 6. when a MQTT message is received:
 
-- `init-1-msg`:
-  - store the received bytes (msg1)
-  - `run_init_1`
-- `init-2-msg`:
-  - store the received bytes (msg2)
-  - `run_init_2`
-- `vls-msg`:
-  - load up all locally stored mutations
-  - `run_vls`
-  - if the response topic is `lss-res`, then:
-    - store the `vls_bytes` (previous_vls_msg)
-    - store the `lss_bytes` (previous_lss_msg)
-    - store ALL the returned mutations:
-      - msgpack.decode(response.state)
-      - store each key/value pair
-- `lss-msg`:
-  - `run_lss`
-
-After each run, publish the bytes on the returned topic. If the topic == `vls-res`, then use the `vls_bytes`. Otherwise, use the `lss_bytes`
+- store a "sequence" number, starting as "undefined"
+- load up ALL your stored State into a Map (dictionary or object) and encode with messagepack. Then run the proper function based on the topic received:
+- `init-1-msg`: `run_init_1`
+- `init-2-msg`: `run_init_2`
+- `vls-msg`: `run_vls`
+- `lss-msg`: `run_lss`
+- after each call, store ALL the returned mutations:
+  - msgpack.decode(response.state)
+  - store each key/value pair
+- Then publish the bytes on the returned topic.
+- if the topic was `vls-msg`, then set the stored "sequence" number to equal the response.sequence + 1
+- if you get an "invalid sequence" error, that means another signer signed instead (if you are running multiple signers). So clear ALL your stored state, set "sequence" back to undefined, and publish to `{CLIENT_ID}/hello` again
 
 ### kotlin
 

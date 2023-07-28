@@ -9,7 +9,7 @@
   let started = false;
   function start() {
     started = true;
-    signer.initialize($keys);
+    signer.initialize($keys.secret, $keys.pubkey);
   }
 
   function clear() {
