@@ -71,14 +71,20 @@ Each mobile signer call returns a `VlsResponse` object.
 ```ts
 type Bytes = Uint8Array;
 
+interface Policy {
+  msat_per_interval: number;
+  interval: Interval; // "daily" or "hourly"
+  htlc_limit_msat: number;
+}
+
 interface Args {
   seed: Bytes; // 32 bytes
   network: string; // "bitcoin" or "regtest"
   policy: Policy;
-  velocity?: Velocity;
-  allowlist: string[];
-  timestamp: number; // unix ts in seconds
+  allowlist: string[]; // list of btc addresses
+  timestamp: number; // unix ts in seconds (10 digits)
   lss_nonce: Bytes; // random 32 bytes
+  velocity?: Velocity; // optional
 }
 
 type State = { [k: string]: Bytes };
@@ -87,7 +93,7 @@ interface VlsResponse {
   topic: string;
   bytes: Bytes;
   sequence?: number;
-  cmd: string; // the name of the last VLS command to be run
+  cmd: string; // the name of the last VLS command that was run
   state: Bytes; // Map of strings to bytes, serialized with msgpack
 }
 ```
@@ -114,17 +120,17 @@ interface VlsResponse {
 6. when a MQTT message is received:
 
 - store a "sequence" number, starting as "undefined"
-- load up ALL your stored State into a Map (dictionary or object) and encode with messagepack. Then run the proper function based on the topic received:
+- load up ALL your stored State into a Map (dictionary or object) and encode with msgpack. Then run the proper function based on the topic received:
 - `init-1-msg`: `run_init_1`
 - `init-2-msg`: `run_init_2`
 - `vls-msg`: `run_vls`
 - `lss-msg`: `run_lss`
-- after each call, store ALL the returned mutations:
-  - msgpack.decode(response.state)
+- after each call, store ALL the returned State:
+  - msgpack.decode(`response.state`)
   - store each key/value pair
-- Then publish the bytes on the returned topic.
-- if the topic was `vls-msg`, then set the stored "sequence" number to equal the response.sequence + 1
-- if you get an "invalid sequence" error, that means another signer signed instead (if you are running multiple signers). So clear ALL your stored state, set "sequence" back to undefined, and publish to `{CLIENT_ID}/hello` again
+- Then publish the `bytes` on the returned `topic`.
+- if the topic was `vls-msg`, then set the stored "sequence" number to equal the `response.sequence` + 1
+- if you get an "invalid sequence" error, that means another signer signed instead (if you are running multiple signers). So clear ALL your stored state, set "sequence" back to undefined, and publish to `{CLIENT_ID}/hello` again.
 
 ### kotlin
 
