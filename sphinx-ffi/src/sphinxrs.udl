@@ -28,6 +28,8 @@ dictionary VlsResponse {
     bytes? vls_bytes;
     bytes? lss_bytes;
     u16 sequence;
+    string cmd;
+    bytes? velocity;
     bytes? state;
 };
 

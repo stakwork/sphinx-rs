@@ -31,12 +31,25 @@ pub const ROOT_STORE: &str = "teststore";
 pub struct VlsChanMsg {
     pub message: Vec<u8>,
     pub expected_sequence: Option<u16>,
-    pub reply_tx: oneshot::Sender<Result<(Vec<u8>, Vec<u8>, u16)>>,
+    pub reply_tx: oneshot::Sender<Result<(Vec<u8>, Vec<u8>, u16, String)>>,
 }
 impl VlsChanMsg {
-    pub fn new(message: Vec<u8>, expected_sequence: Option<u16>) -> (Self, oneshot::Receiver<Result<(Vec<u8>, Vec<u8>, u16)>>) {
+    pub fn new(
+        message: Vec<u8>,
+        expected_sequence: Option<u16>,
+    ) -> (
+        Self,
+        oneshot::Receiver<Result<(Vec<u8>, Vec<u8>, u16, String)>>,
+    ) {
         let (reply_tx, reply_rx) = oneshot::channel();
-        (Self { message, expected_sequence, reply_tx }, reply_rx)
+        (
+            Self {
+                message,
+                expected_sequence,
+                reply_tx,
+            },
+            reply_rx,
+        )
     }
 }
 
@@ -140,7 +153,9 @@ async fn rocket() -> _ {
     rocket::tokio::spawn(async move {
         while let Some(msg) = vls_rx.recv().await {
             let s1 = approver.control().get_state();
-            let res_res = root::handle_with_lss(&rh_, &lss_signer, msg.message, msg.expected_sequence, false).map_err(Error::msg);
+            let res_res =
+                root::handle_with_lss(&rh_, &lss_signer, msg.message, msg.expected_sequence, false)
+                    .map_err(Error::msg);
             let s2 = approver.control().get_state();
             if s1 != s2 {
                 log::info!("===> VelocityApprover state updated");

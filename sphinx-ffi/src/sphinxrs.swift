@@ -446,15 +446,19 @@ public struct VlsResponse {
     public var `vlsBytes`: Data?
     public var `lssBytes`: Data?
     public var `sequence`: UInt16
+    public var `cmd`: String
+    public var `velocity`: Data?
     public var `state`: Data?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(`topic`: String, `vlsBytes`: Data?, `lssBytes`: Data?, `sequence`: UInt16, `state`: Data?) {
+    public init(`topic`: String, `vlsBytes`: Data?, `lssBytes`: Data?, `sequence`: UInt16, `cmd`: String, `velocity`: Data?, `state`: Data?) {
         self.`topic` = `topic`
         self.`vlsBytes` = `vlsBytes`
         self.`lssBytes` = `lssBytes`
         self.`sequence` = `sequence`
+        self.`cmd` = `cmd`
+        self.`velocity` = `velocity`
         self.`state` = `state`
     }
 }
@@ -474,6 +478,12 @@ extension VlsResponse: Equatable, Hashable {
         if lhs.`sequence` != rhs.`sequence` {
             return false
         }
+        if lhs.`cmd` != rhs.`cmd` {
+            return false
+        }
+        if lhs.`velocity` != rhs.`velocity` {
+            return false
+        }
         if lhs.`state` != rhs.`state` {
             return false
         }
@@ -485,6 +495,8 @@ extension VlsResponse: Equatable, Hashable {
         hasher.combine(`vlsBytes`)
         hasher.combine(`lssBytes`)
         hasher.combine(`sequence`)
+        hasher.combine(`cmd`)
+        hasher.combine(`velocity`)
         hasher.combine(`state`)
     }
 }
@@ -497,6 +509,8 @@ public struct FfiConverterTypeVlsResponse: FfiConverterRustBuffer {
             `vlsBytes`: FfiConverterOptionData.read(from: &buf), 
             `lssBytes`: FfiConverterOptionData.read(from: &buf), 
             `sequence`: FfiConverterUInt16.read(from: &buf), 
+            `cmd`: FfiConverterString.read(from: &buf), 
+            `velocity`: FfiConverterOptionData.read(from: &buf), 
             `state`: FfiConverterOptionData.read(from: &buf)
         )
     }
@@ -506,6 +520,8 @@ public struct FfiConverterTypeVlsResponse: FfiConverterRustBuffer {
         FfiConverterOptionData.write(value.`vlsBytes`, into: &buf)
         FfiConverterOptionData.write(value.`lssBytes`, into: &buf)
         FfiConverterUInt16.write(value.`sequence`, into: &buf)
+        FfiConverterString.write(value.`cmd`, into: &buf)
+        FfiConverterOptionData.write(value.`velocity`, into: &buf)
         FfiConverterOptionData.write(value.`state`, into: &buf)
     }
 }

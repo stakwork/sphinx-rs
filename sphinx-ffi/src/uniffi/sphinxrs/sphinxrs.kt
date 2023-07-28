@@ -651,6 +651,8 @@ data class VlsResponse (
     var `vlsBytes`: ByteArray?, 
     var `lssBytes`: ByteArray?, 
     var `sequence`: UShort, 
+    var `cmd`: String, 
+    var `velocity`: ByteArray?, 
     var `state`: ByteArray?
 ) {
     
@@ -663,6 +665,8 @@ public object FfiConverterTypeVlsResponse: FfiConverterRustBuffer<VlsResponse> {
             FfiConverterOptionalByteArray.read(buf),
             FfiConverterOptionalByteArray.read(buf),
             FfiConverterUShort.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalByteArray.read(buf),
             FfiConverterOptionalByteArray.read(buf),
         )
     }
@@ -672,6 +676,8 @@ public object FfiConverterTypeVlsResponse: FfiConverterRustBuffer<VlsResponse> {
             FfiConverterOptionalByteArray.allocationSize(value.`vlsBytes`) +
             FfiConverterOptionalByteArray.allocationSize(value.`lssBytes`) +
             FfiConverterUShort.allocationSize(value.`sequence`) +
+            FfiConverterString.allocationSize(value.`cmd`) +
+            FfiConverterOptionalByteArray.allocationSize(value.`velocity`) +
             FfiConverterOptionalByteArray.allocationSize(value.`state`)
     )
 
@@ -680,6 +686,8 @@ public object FfiConverterTypeVlsResponse: FfiConverterRustBuffer<VlsResponse> {
             FfiConverterOptionalByteArray.write(value.`vlsBytes`, buf)
             FfiConverterOptionalByteArray.write(value.`lssBytes`, buf)
             FfiConverterUShort.write(value.`sequence`, buf)
+            FfiConverterString.write(value.`cmd`, buf)
+            FfiConverterOptionalByteArray.write(value.`velocity`, buf)
             FfiConverterOptionalByteArray.write(value.`state`, buf)
     }
 }
