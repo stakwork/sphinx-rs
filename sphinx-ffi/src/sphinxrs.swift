@@ -443,19 +443,17 @@ public func FfiConverterTypeKeys_lower(_ value: Keys) -> RustBuffer {
 
 public struct VlsResponse {
     public var `topic`: String
-    public var `vlsBytes`: Data?
-    public var `lssBytes`: Data?
+    public var `bytes`: Data
     public var `sequence`: UInt16
     public var `cmd`: String
     public var `velocity`: Data?
-    public var `state`: Data?
+    public var `state`: Data
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(`topic`: String, `vlsBytes`: Data?, `lssBytes`: Data?, `sequence`: UInt16, `cmd`: String, `velocity`: Data?, `state`: Data?) {
+    public init(`topic`: String, `bytes`: Data, `sequence`: UInt16, `cmd`: String, `velocity`: Data?, `state`: Data) {
         self.`topic` = `topic`
-        self.`vlsBytes` = `vlsBytes`
-        self.`lssBytes` = `lssBytes`
+        self.`bytes` = `bytes`
         self.`sequence` = `sequence`
         self.`cmd` = `cmd`
         self.`velocity` = `velocity`
@@ -469,10 +467,7 @@ extension VlsResponse: Equatable, Hashable {
         if lhs.`topic` != rhs.`topic` {
             return false
         }
-        if lhs.`vlsBytes` != rhs.`vlsBytes` {
-            return false
-        }
-        if lhs.`lssBytes` != rhs.`lssBytes` {
+        if lhs.`bytes` != rhs.`bytes` {
             return false
         }
         if lhs.`sequence` != rhs.`sequence` {
@@ -492,8 +487,7 @@ extension VlsResponse: Equatable, Hashable {
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(`topic`)
-        hasher.combine(`vlsBytes`)
-        hasher.combine(`lssBytes`)
+        hasher.combine(`bytes`)
         hasher.combine(`sequence`)
         hasher.combine(`cmd`)
         hasher.combine(`velocity`)
@@ -506,23 +500,21 @@ public struct FfiConverterTypeVlsResponse: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> VlsResponse {
         return try VlsResponse(
             `topic`: FfiConverterString.read(from: &buf), 
-            `vlsBytes`: FfiConverterOptionData.read(from: &buf), 
-            `lssBytes`: FfiConverterOptionData.read(from: &buf), 
+            `bytes`: FfiConverterData.read(from: &buf), 
             `sequence`: FfiConverterUInt16.read(from: &buf), 
             `cmd`: FfiConverterString.read(from: &buf), 
             `velocity`: FfiConverterOptionData.read(from: &buf), 
-            `state`: FfiConverterOptionData.read(from: &buf)
+            `state`: FfiConverterData.read(from: &buf)
         )
     }
 
     public static func write(_ value: VlsResponse, into buf: inout [UInt8]) {
         FfiConverterString.write(value.`topic`, into: &buf)
-        FfiConverterOptionData.write(value.`vlsBytes`, into: &buf)
-        FfiConverterOptionData.write(value.`lssBytes`, into: &buf)
+        FfiConverterData.write(value.`bytes`, into: &buf)
         FfiConverterUInt16.write(value.`sequence`, into: &buf)
         FfiConverterString.write(value.`cmd`, into: &buf)
         FfiConverterOptionData.write(value.`velocity`, into: &buf)
-        FfiConverterOptionData.write(value.`state`, into: &buf)
+        FfiConverterData.write(value.`state`, into: &buf)
     }
 }
 
@@ -850,54 +842,50 @@ public func `parseResponse`(`res`: String) throws -> String {
     )
 }
 
-public func `runInit1`(`args`: String, `state`: Data, `msg1`: Data) throws -> VlsResponse {
+public func `runInit1`(`args`: String, `state`: Data, `msg1`: Data, `expectedSequence`: UInt16?) throws -> VlsResponse {
     return try  FfiConverterTypeVlsResponse.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_run_init_1(
         FfiConverterString.lower(`args`),
         FfiConverterData.lower(`state`),
-        FfiConverterData.lower(`msg1`),$0)
+        FfiConverterData.lower(`msg1`),
+        FfiConverterOptionUInt16.lower(`expectedSequence`),$0)
 }
     )
 }
 
-public func `runInit2`(`args`: String, `state`: Data, `msg1`: Data, `msg2`: Data) throws -> VlsResponse {
+public func `runInit2`(`args`: String, `state`: Data, `msg2`: Data, `expectedSequence`: UInt16?) throws -> VlsResponse {
     return try  FfiConverterTypeVlsResponse.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_run_init_2(
         FfiConverterString.lower(`args`),
         FfiConverterData.lower(`state`),
-        FfiConverterData.lower(`msg1`),
-        FfiConverterData.lower(`msg2`),$0)
+        FfiConverterData.lower(`msg2`),
+        FfiConverterOptionUInt16.lower(`expectedSequence`),$0)
 }
     )
 }
 
-public func `runVls`(`args`: String, `state`: Data, `msg1`: Data, `msg2`: Data, `vlsMsg`: Data, `expectedSequence`: UInt16?) throws -> VlsResponse {
+public func `runVls`(`args`: String, `state`: Data, `vlsMsg`: Data, `expectedSequence`: UInt16?) throws -> VlsResponse {
     return try  FfiConverterTypeVlsResponse.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_run_vls(
         FfiConverterString.lower(`args`),
         FfiConverterData.lower(`state`),
-        FfiConverterData.lower(`msg1`),
-        FfiConverterData.lower(`msg2`),
         FfiConverterData.lower(`vlsMsg`),
         FfiConverterOptionUInt16.lower(`expectedSequence`),$0)
 }
     )
 }
 
-public func `runLss`(`args`: String, `state`: Data, `msg1`: Data, `msg2`: Data, `lssMsg`: Data, `prevVls`: Data, `prevLss`: Data) throws -> VlsResponse {
+public func `runLss`(`args`: String, `state`: Data, `lssMsg`: Data, `expectedSequence`: UInt16?) throws -> VlsResponse {
     return try  FfiConverterTypeVlsResponse.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_run_lss(
         FfiConverterString.lower(`args`),
         FfiConverterData.lower(`state`),
-        FfiConverterData.lower(`msg1`),
-        FfiConverterData.lower(`msg2`),
         FfiConverterData.lower(`lssMsg`),
-        FfiConverterData.lower(`prevVls`),
-        FfiConverterData.lower(`prevLss`),$0)
+        FfiConverterOptionUInt16.lower(`expectedSequence`),$0)
 }
     )
 }
@@ -954,16 +942,16 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_parse_response() != 12980) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_run_init_1() != 42322) {
+    if (uniffi_sphinxrs_checksum_func_run_init_1() != 44577) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_run_init_2() != 13191) {
+    if (uniffi_sphinxrs_checksum_func_run_init_2() != 3141) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_run_vls() != 35014) {
+    if (uniffi_sphinxrs_checksum_func_run_vls() != 7208) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_run_lss() != 63303) {
+    if (uniffi_sphinxrs_checksum_func_run_lss() != 41202) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_make_auth_token() != 13236) {
