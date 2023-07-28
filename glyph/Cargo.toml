@@ -7,6 +7,9 @@ description = "Sphinx lightning hardware signer"
 repository = "https://github.com/stakwork/sphinx-rs"
 license = "MIT"
 
+[lib]
+doctest = false
+
 [features]
 default = ["std"]
 std = ["anyhow/std", "hex/std", "serde_json/std", "sphinx-auther/std"]

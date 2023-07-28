@@ -7,6 +7,9 @@ description = "Sphinx lightning hardware signer"
 repository = "https://github.com/stakwork/sphinx-rs"
 license = "MIT"
 
+[lib]
+doctest = false
+
 [features]
 default = ["fspersist", "persist", "std"]
 fspersist = ["fsdb"]

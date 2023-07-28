@@ -7,6 +7,9 @@ description = "LSS connector utils"
 repository = "https://github.com/stakwork/sphinx-rs"
 license = "MIT"
 
+[lib]
+doctest = false
+
 [features]
 default = ["broker", "std"]
 std = ["vls-protocol-signer/std", "anyhow/std", "secp256k1/rand-std", "secp256k1/std", "sphinx-glyph/std"]
