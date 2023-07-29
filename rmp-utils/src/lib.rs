@@ -238,3 +238,11 @@ fn state_map_serde() {
     let object = deserialize_state_map(&bytes).unwrap();
     assert_eq!(test, object);
 }
+
+#[test]
+fn ser_velocity_test() {
+    let vel = (1, vec![123, 456, 789]);
+    let bytes = serialize_velocity(&vel).unwrap();
+    let vel2 = deserialize_velocity(&bytes).unwrap();
+    assert_eq!(vel, vel2);
+}
