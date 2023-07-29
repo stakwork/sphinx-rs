@@ -18,7 +18,6 @@ export interface Args {
   seed: Uint8Array;
   network: string;
   policy: Policy;
-  velocity?: Velocity;
   allowlist: string[];
   timestamp: number; // unix ts in seconds
   lss_nonce: Uint8Array;

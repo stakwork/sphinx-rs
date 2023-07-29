@@ -122,8 +122,8 @@ async fn rocket() -> _ {
         seed32,
         network,
         initial_policy,
-        initial_velocity,
         initial_allowlist,
+        initial_velocity,
         persister,
     )
     .expect("failed to init signer");

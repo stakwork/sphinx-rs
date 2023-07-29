@@ -3,8 +3,6 @@ import { now, argsAndState, storeMutations, clearAll } from "./signerUtils";
 import * as Paho from "paho-mqtt";
 import { cmds } from "./store";
 
-// broker: sequence 0 != expected 1
-
 let MQTT;
 
 let CLIENT_ID;

@@ -42,7 +42,6 @@ pub struct Args {
     seed: [u8; 32],
     network: Network,
     policy: Policy,
-    velocity: Option<Velocity>,
     allowlist: Vec<String>,
     timestamp: u64, // number of seconds
     lss_nonce: [u8; 32],
@@ -57,13 +56,14 @@ pub struct RunReturn {
     pub lss_bytes: Option<Vec<u8>>,
     pub sequence: u16,
     pub cmd: String,
-    pub velocity: Option<Vec<u8>>,
+    pub velocity: Option<Velocity>,
 }
 
 pub fn run_init_1(
     args: Args,
     state: State,
     lss_msg1: &[u8],
+    velocity: Option<Velocity>,
 ) -> Result<(
     RunReturn,
     RootHandlerBuilder,
@@ -73,7 +73,7 @@ pub fn run_init_1(
     let init = Msg::from_slice(lss_msg1)?.into_init()?;
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
     let nonce = args.lss_nonce.clone();
-    let (rhb, approver) = root_handler_builder(args, state)?;
+    let (rhb, approver) = root_handler_builder(args, state, velocity)?;
     let (lss_signer, res1) = LssSigner::new(&rhb, &server_pubkey, Some(nonce));
     Ok((
         RunReturn::new_lss(topics::INIT_1_RES, res1, "LssInit".to_string()),
@@ -88,8 +88,9 @@ pub fn run_init_2(
     state: State,
     lss_msg1: &[u8],
     lss_msg2: &[u8],
+    velocity: Option<Velocity>,
 ) -> Result<(RunReturn, RootHandler, Arc<SphinxApprover>, LssSigner)> {
-    let (_res1, rhb, approver, lss_signer) = run_init_1(args, state.clone(), lss_msg1)?;
+    let (_res1, rhb, approver, lss_signer) = run_init_1(args, state.clone(), lss_msg1, velocity)?;
     let created = Msg::from_slice(&lss_msg2)?.into_created()?;
     let (root_handler, res2) = lss_signer.build_with_lss(created, rhb, Some(state))?;
     Ok((
@@ -107,16 +108,21 @@ pub fn run_vls(
     lss_msg2: &[u8],
     vls_msg: &[u8],
     expected_sequence: Option<u16>,
+    velocity: Option<Velocity>,
 ) -> Result<RunReturn> {
-    let (_res, rh, _approver, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2)?;
-
+    let (_res, rh, approver, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2, velocity)?;
+    let s1 = approver.control().get_state();
     let (vls_res, lss_res, sequence, cmd) =
         handle_with_lss(&rh, &lss_signer, vls_msg.to_vec(), expected_sequence, true)?;
-    let ret = if lss_res.is_empty() {
+    let mut ret = if lss_res.is_empty() {
         RunReturn::new_vls(topics::VLS_RES, vls_res, sequence, cmd)
     } else {
         RunReturn::new(topics::LSS_RES, vls_res, lss_res, sequence, cmd)
     };
+    let s2 = approver.control().get_state();
+    if s1 != s2 {
+        ret.set_velocity(s2);
+    }
     Ok(ret)
 }
 
@@ -129,7 +135,7 @@ pub fn run_lss(
     previous_vls: &[u8],
     previous_lss: &[u8],
 ) -> Result<RunReturn> {
-    let (_res, _rh, _approver, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2)?;
+    let (_res, _rh, _approver, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2, None)?;
 
     let prev = (previous_vls.to_vec(), previous_lss.to_vec());
     let (topic, res) = handle_lss_msg(&lss_msg, Some(prev), &lss_signer)?;
@@ -144,6 +150,7 @@ pub fn run_lss(
 fn root_handler_builder(
     args: Args,
     state: State,
+    velocity: Option<Velocity>,
 ) -> Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
     use std::time::UNIX_EPOCH;
 
@@ -161,8 +168,8 @@ fn root_handler_builder(
         args.seed,
         args.network,
         args.policy,
-        args.velocity,
         args.allowlist,
+        velocity,
         persister,
         clock,
         stf,
@@ -210,6 +217,9 @@ impl RunReturn {
             cmd,
             velocity: None,
         }
+    }
+    pub fn set_velocity(&mut self, velocity: Velocity) {
+        self.velocity = Some(velocity);
     }
 }
 
@@ -266,7 +276,6 @@ mod tests {
             seed: [1; 32],
             network: Network::Regtest,
             policy: Default::default(),
-            velocity: None,
             allowlist: vec![],
             timestamp: ts.as_secs(),
             lss_nonce: [32; 32],
@@ -338,7 +347,8 @@ mod tests {
         })
         .to_vec()?;
 
-        let (res1, _rhb, _approver, _lss_signer) = run_init_1(args.clone(), state.clone(), &bi1)?;
+        let (res1, _rhb, _approver, _lss_signer) =
+            run_init_1(args.clone(), state.clone(), &bi1, None)?;
         let lss_bytes = res1.lss_bytes.unwrap();
 
         let si1 = Response::from_slice(&lss_bytes)?.into_init()?;
@@ -348,7 +358,7 @@ mod tests {
         let bi2 = lss_broker.get_created_state_msg(&si1).await?;
 
         let (res2, _rh, _approver, _lss_signer) =
-            run_init_2(args.clone(), state.clone(), &bi1, &bi2)?;
+            run_init_2(args.clone(), state.clone(), &bi1, &bi2, None)?;
         let lss_bytes2 = res2.lss_bytes.unwrap();
 
         let si2 = Response::from_slice(&lss_bytes2)?.into_created()?;
@@ -367,6 +377,7 @@ mod tests {
                 &bi2,
                 &m,
                 Some(expected_sequence),
+                None,
             )?;
             expected_sequence = expected_sequence + 1;
             println!("===> SEQ {:?}", rr.sequence);

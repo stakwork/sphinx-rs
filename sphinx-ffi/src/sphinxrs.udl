@@ -28,7 +28,6 @@ dictionary VlsResponse {
     bytes bytes;
     u16 sequence;
     string cmd;
-    bytes? velocity;
     bytes state;
 };
 

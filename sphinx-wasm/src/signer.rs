@@ -8,7 +8,6 @@ pub struct VlsResponse {
     pub bytes: Vec<u8>,
     pub sequence: u16,
     pub cmd: String,
-    pub velocity: Option<Vec<u8>>,
     pub state: Vec<u8>,
 }
 
@@ -19,7 +18,6 @@ impl From<cy::VlsResponse> for VlsResponse {
             bytes: vr.bytes,
             sequence: vr.sequence,
             cmd: vr.cmd,
-            velocity: vr.velocity,
             state: vr.state,
         }
     }

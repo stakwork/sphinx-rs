@@ -84,7 +84,6 @@ interface Args {
   allowlist: string[]; // list of btc addresses
   timestamp: number; // unix ts in seconds (10 digits)
   lss_nonce: Bytes; // random 32 bytes
-  velocity?: Velocity; // optional
 }
 
 type State = { [k: string]: Bytes };

@@ -16,7 +16,6 @@ pub struct VlsResponse {
     pub bytes: Vec<u8>,
     pub sequence: u16,
     pub cmd: String,
-    pub velocity: Option<Vec<u8>>,
     pub state: Vec<u8>,
 }
 
@@ -24,6 +23,7 @@ pub const MSG_1: &str = "MSG_1";
 pub const MSG_2: &str = "MSG_2";
 pub const PREV_VLS: &str = "PREV_VLS";
 pub const PREV_LSS: &str = "PREV_LSS";
+pub const VELOCITY: &str = "VELOCITY";
 
 pub fn run_init_1(
     args_json: String,
@@ -37,10 +37,12 @@ pub fn run_init_1(
     let _ = pull_from(&mut easy_state, MSG_2);
     let _ = pull_from(&mut easy_state, PREV_VLS);
     let _ = pull_from(&mut easy_state, PREV_LSS);
+    let _ = pull_from(&mut easy_state, VELOCITY);
     let state = state_from_easy_state(easy_state)?;
-    let ret = mobile::run_init_1(args, state, &msg1).map_err(|e| SphinxError::InitFailed {
-        r: format!("{:?}", e),
-    })?;
+    let ret =
+        mobile::run_init_1(args, state, &msg1, None).map_err(|e| SphinxError::InitFailed {
+            r: format!("{:?}", e),
+        })?;
     let mut extras = BTreeMap::new();
     extras.insert(MSG_1.to_string(), msg1);
     let muts = ser_state(&None, extras)?;
@@ -59,11 +61,13 @@ pub fn run_init_2(
     let _ = pull_from(&mut easy_state, MSG_2);
     let _ = pull_from(&mut easy_state, PREV_VLS);
     let _ = pull_from(&mut easy_state, PREV_LSS);
+    let _ = pull_from(&mut easy_state, VELOCITY);
     let state = state_from_easy_state(easy_state)?;
-    let ret =
-        mobile::run_init_2(args, state, &msg1, &msg2).map_err(|e| SphinxError::InitFailed {
+    let ret = mobile::run_init_2(args, state, &msg1, &msg2, None).map_err(|e| {
+        SphinxError::InitFailed {
             r: format!("{:?}", e),
-        })?;
+        }
+    })?;
     let mut extras = BTreeMap::new();
     extras.insert(MSG_2.to_string(), msg2);
     let muts = ser_state(&ret.0.lss_bytes, extras)?;
@@ -82,8 +86,10 @@ pub fn run_vls(
     let msg2 = pull_from(&mut easy_state, MSG_2)?;
     let _ = pull_from(&mut easy_state, PREV_VLS);
     let _ = pull_from(&mut easy_state, PREV_LSS);
+    let vel = pull_from(&mut easy_state, VELOCITY)?;
+    let velocity = vel_from_mp(Some(vel))?;
     let state = state_from_easy_state(easy_state)?;
-    let ran = mobile::run_vls(args, state, &msg1, &msg2, &vls_msg, sequence);
+    let ran = mobile::run_vls(args, state, &msg1, &msg2, &vls_msg, sequence, velocity);
     let ret = ran.map_err(|e| SphinxError::VlsFailed {
         r: format!("{:?}", e),
     })?;
@@ -96,6 +102,9 @@ pub fn run_vls(
         PREV_LSS.to_string(),
         ret.lss_bytes.clone().unwrap_or(Vec::new()),
     );
+    if let Some(vel) = ser_velocity(&ret.velocity)? {
+        extras.insert(VELOCITY.to_string(), vel);
+    }
     let muts = ser_state(&ret.lss_bytes, extras)?;
     Ok(VlsResponse::new(ret, muts)?)
 }
@@ -112,6 +121,7 @@ pub fn run_lss(
     let msg2 = pull_from(&mut easy_state, MSG_2)?;
     let prev_vls = pull_from(&mut easy_state, PREV_VLS)?;
     let prev_lss = pull_from(&mut easy_state, PREV_LSS)?;
+    let _ = pull_from(&mut easy_state, VELOCITY);
     let state = state_from_easy_state(easy_state)?;
     let ret = mobile::run_lss(args, state, &msg1, &msg2, &lss_msg, &prev_vls, &prev_lss).map_err(
         |e| SphinxError::LssFailed {
@@ -191,6 +201,17 @@ fn state_from_easy_state(es: EasyState) -> Result<mobile::State> {
     Ok(s)
 }
 
+fn ser_velocity(velocity: &Option<(u64, Vec<u64>)>) -> Result<Option<Vec<u8>>> {
+    Ok(match velocity {
+        Some(v) => Some(
+            rmp_utils::serialize_velocity(v).map_err(|e| SphinxError::BadState {
+                r: format!("bad velocity {:?}", e),
+            })?,
+        ),
+        None => None,
+    })
+}
+
 impl VlsResponse {
     pub fn new(ret: mobile::RunReturn, state: Vec<u8>) -> Result<Self> {
         let bytes_opt = if ret.topic == topics::VLS_RES {
@@ -206,7 +227,6 @@ impl VlsResponse {
             bytes: bytes,
             sequence: ret.sequence,
             cmd: ret.cmd,
-            velocity: ret.velocity,
             state,
         })
     }
@@ -216,12 +236,15 @@ pub fn run_init_1_og(
     args_string: String,
     state_mp: Vec<u8>,
     msg1: Vec<u8>,
+    vel: Option<Vec<u8>>,
 ) -> Result<mobile::RunReturn> {
     let args = args_from_json(&args_string)?;
     let state = state_from_mp(&state_mp)?;
-    let ret = mobile::run_init_1(args, state, &msg1).map_err(|e| SphinxError::InitFailed {
-        r: format!("{:?}", e),
-    })?;
+    let velocity = vel_from_mp(vel)?;
+    let ret =
+        mobile::run_init_1(args, state, &msg1, velocity).map_err(|e| SphinxError::InitFailed {
+            r: format!("{:?}", e),
+        })?;
     Ok(ret.0)
 }
 
@@ -230,13 +253,16 @@ pub fn run_init_2_og(
     state_mp: Vec<u8>,
     msg1: Vec<u8>,
     msg2: Vec<u8>,
+    vel: Option<Vec<u8>>,
 ) -> Result<mobile::RunReturn> {
     let args = args_from_json(&args_string)?;
     let state = state_from_mp(&state_mp)?;
-    let ret =
-        mobile::run_init_2(args, state, &msg1, &msg2).map_err(|e| SphinxError::InitFailed {
+    let velocity = vel_from_mp(vel)?;
+    let ret = mobile::run_init_2(args, state, &msg1, &msg2, velocity).map_err(|e| {
+        SphinxError::InitFailed {
             r: format!("{:?}", e),
-        })?;
+        }
+    })?;
     Ok(ret.0)
 }
 
@@ -247,10 +273,12 @@ pub fn run_vls_og(
     msg2: Vec<u8>,
     vls_msg: Vec<u8>,
     sequence: Option<u16>,
+    vel: Option<Vec<u8>>,
 ) -> Result<mobile::RunReturn> {
     let args = args_from_json(&args_string)?;
     let state = state_from_mp(&state_mp)?;
-    let ret = mobile::run_vls(args, state, &msg1, &msg2, &vls_msg, sequence);
+    let velocity = vel_from_mp(vel)?;
+    let ret = mobile::run_vls(args, state, &msg1, &msg2, &vls_msg, sequence, velocity);
     Ok(ret.map_err(|e| SphinxError::VlsFailed {
         r: format!("{:?}", e),
     })?)
@@ -281,6 +309,18 @@ fn state_from_mp(state_mp: &[u8]) -> Result<mobile::State> {
             r: format!("{:?}", e),
         })?;
     Ok(state)
+}
+fn vel_from_mp(vel_mp: Option<Vec<u8>>) -> Result<Option<(u64, Vec<u64>)>> {
+    Ok(match vel_mp {
+        Some(v) => {
+            Some(
+                rmp_utils::deserialize_velocity(&v).map_err(|e| SphinxError::BadState {
+                    r: format!("{:?}", e),
+                })?,
+            )
+        }
+        None => None,
+    })
 }
 fn args_from_json(args_string: &str) -> Result<mobile::Args> {
     let args: mobile::Args =
