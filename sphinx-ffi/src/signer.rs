@@ -86,8 +86,8 @@ pub fn run_vls(
     let msg2 = pull_from(&mut easy_state, MSG_2)?;
     let _ = pull_from(&mut easy_state, PREV_VLS);
     let _ = pull_from(&mut easy_state, PREV_LSS);
-    let vel = pull_from(&mut easy_state, VELOCITY)?;
-    let velocity = vel_from_mp(Some(vel))?;
+    let vel = pull_from(&mut easy_state, VELOCITY).ok();
+    let velocity = vel_from_mp(vel)?;
     let state = state_from_easy_state(easy_state)?;
     let ran = mobile::run_vls(args, state, &msg1, &msg2, &vls_msg, sequence, velocity);
     let ret = ran.map_err(|e| SphinxError::VlsFailed {
