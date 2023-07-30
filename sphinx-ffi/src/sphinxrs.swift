@@ -446,17 +446,15 @@ public struct VlsResponse {
     public var `bytes`: Data
     public var `sequence`: UInt16
     public var `cmd`: String
-    public var `velocity`: Data?
     public var `state`: Data
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(`topic`: String, `bytes`: Data, `sequence`: UInt16, `cmd`: String, `velocity`: Data?, `state`: Data) {
+    public init(`topic`: String, `bytes`: Data, `sequence`: UInt16, `cmd`: String, `state`: Data) {
         self.`topic` = `topic`
         self.`bytes` = `bytes`
         self.`sequence` = `sequence`
         self.`cmd` = `cmd`
-        self.`velocity` = `velocity`
         self.`state` = `state`
     }
 }
@@ -476,9 +474,6 @@ extension VlsResponse: Equatable, Hashable {
         if lhs.`cmd` != rhs.`cmd` {
             return false
         }
-        if lhs.`velocity` != rhs.`velocity` {
-            return false
-        }
         if lhs.`state` != rhs.`state` {
             return false
         }
@@ -490,7 +485,6 @@ extension VlsResponse: Equatable, Hashable {
         hasher.combine(`bytes`)
         hasher.combine(`sequence`)
         hasher.combine(`cmd`)
-        hasher.combine(`velocity`)
         hasher.combine(`state`)
     }
 }
@@ -503,7 +497,6 @@ public struct FfiConverterTypeVlsResponse: FfiConverterRustBuffer {
             `bytes`: FfiConverterData.read(from: &buf), 
             `sequence`: FfiConverterUInt16.read(from: &buf), 
             `cmd`: FfiConverterString.read(from: &buf), 
-            `velocity`: FfiConverterOptionData.read(from: &buf), 
             `state`: FfiConverterData.read(from: &buf)
         )
     }
@@ -513,7 +506,6 @@ public struct FfiConverterTypeVlsResponse: FfiConverterRustBuffer {
         FfiConverterData.write(value.`bytes`, into: &buf)
         FfiConverterUInt16.write(value.`sequence`, into: &buf)
         FfiConverterString.write(value.`cmd`, into: &buf)
-        FfiConverterOptionData.write(value.`velocity`, into: &buf)
         FfiConverterData.write(value.`state`, into: &buf)
     }
 }
@@ -544,6 +536,7 @@ public enum SphinxError {
     case BadResponse(`r`: String)
     case BadArgs(`r`: String)
     case BadState(`r`: String)
+    case BadVelocity(`r`: String)
     case InitFailed(`r`: String)
     case LssFailed(`r`: String)
     case VlsFailed(`r`: String)
@@ -603,13 +596,16 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
         case 13: return .BadState(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 14: return .InitFailed(
+        case 14: return .BadVelocity(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 15: return .LssFailed(
+        case 15: return .InitFailed(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 16: return .VlsFailed(
+        case 16: return .LssFailed(
+            `r`: try FfiConverterString.read(from: &buf)
+            )
+        case 17: return .VlsFailed(
             `r`: try FfiConverterString.read(from: &buf)
             )
 
@@ -689,18 +685,23 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .InitFailed(`r`):
+        case let .BadVelocity(`r`):
             writeInt(&buf, Int32(14))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .LssFailed(`r`):
+        case let .InitFailed(`r`):
             writeInt(&buf, Int32(15))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .VlsFailed(`r`):
+        case let .LssFailed(`r`):
             writeInt(&buf, Int32(16))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .VlsFailed(`r`):
+            writeInt(&buf, Int32(17))
             FfiConverterString.write(`r`, into: &buf)
             
         }
@@ -728,27 +729,6 @@ fileprivate struct FfiConverterOptionUInt16: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterUInt16.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-fileprivate struct FfiConverterOptionData: FfiConverterRustBuffer {
-    typealias SwiftType = Data?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterData.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterData.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }

@@ -36,6 +36,17 @@ pub fn serialize_state_vec(
     Ok(())
 }
 
+pub fn serialize_velocity(vel: &(u64, Vec<u64>)) -> Result<Vec<u8>> {
+    let mut buff = encode::buffer::ByteBuf::new();
+    encode::write_array_len(&mut buff, 2).map_err(Error::msg)?;
+    encode::write_u64(&mut buff, vel.0).map_err(Error::msg)?;
+    encode::write_array_len(&mut buff, vel.1.len() as u32).map_err(Error::msg)?;
+    for payment in vel.1.iter() {
+        encode::write_u64(&mut buff, *payment).map_err(Error::msg)?;
+    }
+    Ok(buff.into_vec())
+}
+
 pub fn deserialize_state_vec(
     bytes: &mut decode::bytes::Bytes,
     field_name: Option<&str>,
@@ -57,6 +68,21 @@ pub fn deserialize_state_vec(
         log::info!("deserialize_state_vec: end");
     }
     Ok(object)
+}
+
+pub fn deserialize_velocity(b: &[u8]) -> Result<(u64, Vec<u64>)> {
+    let mut bytes = decode::bytes::Bytes::new(b);
+    let _ = decode::read_array_len(&mut bytes)
+        .map_err(|_| Error::msg("could not read array length"))?;
+    let bucket = decode::read_u64(&mut bytes).map_err(|_| Error::msg("could not read u64"))?;
+    let len = decode::read_array_len(&mut bytes)
+        .map_err(|_| Error::msg("could not read array length"))?;
+    let mut pmts: Vec<u64> = Vec::with_capacity(len as usize);
+    for _ in 0..len {
+        let x = decode::read_u64(&mut bytes).map_err(|_| Error::msg("could not read u64"))?;
+        pmts.push(x);
+    }
+    Ok((bucket, pmts))
 }
 
 pub fn serialize_state_map(map: &BTreeMap<String, (u64, Vec<u8>)>) -> Result<Vec<u8>> {
@@ -211,4 +237,12 @@ fn state_map_serde() {
     let bytes = serialize_state_map(&test).unwrap();
     let object = deserialize_state_map(&bytes).unwrap();
     assert_eq!(test, object);
+}
+
+#[test]
+fn ser_velocity_test() {
+    let vel = (1, vec![123, 456, 789]);
+    let bytes = serialize_velocity(&vel).unwrap();
+    let vel2 = deserialize_velocity(&bytes).unwrap();
+    assert_eq!(vel, vel2);
 }
