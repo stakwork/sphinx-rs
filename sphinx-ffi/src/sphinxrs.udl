@@ -13,6 +13,7 @@ interface SphinxError {
   BadResponse(string r);
   BadArgs(string r);
   BadState(string r);
+  BadVelocity(string r);
   InitFailed(string r);
   LssFailed(string r);
   VlsFailed(string r);

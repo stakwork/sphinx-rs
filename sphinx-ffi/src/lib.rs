@@ -45,6 +45,8 @@ pub enum SphinxError {
     BadArgs { r: String },
     #[error("Bad State: {r}")]
     BadState { r: String },
+    #[error("Bad Velocity: {r}")]
+    BadVelocity { r: String },
     #[error("Init Failed: {r}")]
     InitFailed { r: String },
     #[error("LSS Failed: {r}")]

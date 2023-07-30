@@ -132,7 +132,7 @@ pub fn run_lss(
     Ok(VlsResponse::new(ret, muts)?)
 }
 
-pub fn pull_from(easy_state: &mut EasyState, key: &str) -> Result<Vec<u8>> {
+fn pull_from(easy_state: &mut EasyState, key: &str) -> Result<Vec<u8>> {
     let msg = easy_state.remove(key).ok_or(SphinxError::BadState {
         r: format!("missing {}", key),
     })?;
@@ -213,7 +213,7 @@ fn ser_velocity(velocity: &Option<(u64, Vec<u64>)>) -> Result<Option<Vec<u8>>> {
 }
 
 impl VlsResponse {
-    pub fn new(ret: mobile::RunReturn, state: Vec<u8>) -> Result<Self> {
+    fn new(ret: mobile::RunReturn, state: Vec<u8>) -> Result<Self> {
         let bytes_opt = if ret.topic == topics::VLS_RES {
             ret.vls_bytes
         } else {
@@ -313,11 +313,10 @@ fn state_from_mp(state_mp: &[u8]) -> Result<mobile::State> {
 fn vel_from_mp(vel_mp: Option<Vec<u8>>) -> Result<Option<(u64, Vec<u64>)>> {
     Ok(match vel_mp {
         Some(v) => {
-            Some(
-                rmp_utils::deserialize_velocity(&v).map_err(|e| SphinxError::BadState {
-                    r: format!("{:?}", e),
-                })?,
-            )
+            let vs = rmp_utils::deserialize_velocity(&v).map_err(|e| SphinxError::BadVelocity {
+                r: format!("{:?}", e),
+            })?;
+            Some(vs)
         }
         None => None,
     })

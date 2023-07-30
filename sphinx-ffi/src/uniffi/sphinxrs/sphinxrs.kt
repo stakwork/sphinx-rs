@@ -651,7 +651,6 @@ data class VlsResponse (
     var `bytes`: ByteArray, 
     var `sequence`: UShort, 
     var `cmd`: String, 
-    var `velocity`: ByteArray?, 
     var `state`: ByteArray
 ) {
     
@@ -664,7 +663,6 @@ public object FfiConverterTypeVlsResponse: FfiConverterRustBuffer<VlsResponse> {
             FfiConverterByteArray.read(buf),
             FfiConverterUShort.read(buf),
             FfiConverterString.read(buf),
-            FfiConverterOptionalByteArray.read(buf),
             FfiConverterByteArray.read(buf),
         )
     }
@@ -674,7 +672,6 @@ public object FfiConverterTypeVlsResponse: FfiConverterRustBuffer<VlsResponse> {
             FfiConverterByteArray.allocationSize(value.`bytes`) +
             FfiConverterUShort.allocationSize(value.`sequence`) +
             FfiConverterString.allocationSize(value.`cmd`) +
-            FfiConverterOptionalByteArray.allocationSize(value.`velocity`) +
             FfiConverterByteArray.allocationSize(value.`state`)
     )
 
@@ -683,7 +680,6 @@ public object FfiConverterTypeVlsResponse: FfiConverterRustBuffer<VlsResponse> {
             FfiConverterByteArray.write(value.`bytes`, buf)
             FfiConverterUShort.write(value.`sequence`, buf)
             FfiConverterString.write(value.`cmd`, buf)
-            FfiConverterOptionalByteArray.write(value.`velocity`, buf)
             FfiConverterByteArray.write(value.`state`, buf)
     }
 }
@@ -786,6 +782,13 @@ sealed class SphinxException: Exception() {
             get() = "r=${ `r` }"
     }
     
+    class BadVelocity(
+        val `r`: String
+        ) : SphinxException() {
+        override val message
+            get() = "r=${ `r` }"
+    }
+    
     class InitFailed(
         val `r`: String
         ) : SphinxException() {
@@ -859,13 +862,16 @@ public object FfiConverterTypeSphinxError : FfiConverterRustBuffer<SphinxExcepti
             13 -> SphinxException.BadState(
                 FfiConverterString.read(buf),
                 )
-            14 -> SphinxException.InitFailed(
+            14 -> SphinxException.BadVelocity(
                 FfiConverterString.read(buf),
                 )
-            15 -> SphinxException.LssFailed(
+            15 -> SphinxException.InitFailed(
                 FfiConverterString.read(buf),
                 )
-            16 -> SphinxException.VlsFailed(
+            16 -> SphinxException.LssFailed(
+                FfiConverterString.read(buf),
+                )
+            17 -> SphinxException.VlsFailed(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -935,6 +941,11 @@ public object FfiConverterTypeSphinxError : FfiConverterRustBuffer<SphinxExcepti
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.BadState -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4
+                + FfiConverterString.allocationSize(value.`r`)
+            )
+            is SphinxException.BadVelocity -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4
                 + FfiConverterString.allocationSize(value.`r`)
@@ -1024,18 +1035,23 @@ public object FfiConverterTypeSphinxError : FfiConverterRustBuffer<SphinxExcepti
                 FfiConverterString.write(value.`r`, buf)
                 Unit
             }
-            is SphinxException.InitFailed -> {
+            is SphinxException.BadVelocity -> {
                 buf.putInt(14)
                 FfiConverterString.write(value.`r`, buf)
                 Unit
             }
-            is SphinxException.LssFailed -> {
+            is SphinxException.InitFailed -> {
                 buf.putInt(15)
                 FfiConverterString.write(value.`r`, buf)
                 Unit
             }
-            is SphinxException.VlsFailed -> {
+            is SphinxException.LssFailed -> {
                 buf.putInt(16)
+                FfiConverterString.write(value.`r`, buf)
+                Unit
+            }
+            is SphinxException.VlsFailed -> {
+                buf.putInt(17)
                 FfiConverterString.write(value.`r`, buf)
                 Unit
             }
@@ -1069,35 +1085,6 @@ public object FfiConverterOptionalUShort: FfiConverterRustBuffer<UShort?> {
         } else {
             buf.put(1)
             FfiConverterUShort.write(value, buf)
-        }
-    }
-}
-
-
-
-
-public object FfiConverterOptionalByteArray: FfiConverterRustBuffer<ByteArray?> {
-    override fun read(buf: ByteBuffer): ByteArray? {
-        if (buf.get().toInt() == 0) {
-            return null
-        }
-        return FfiConverterByteArray.read(buf)
-    }
-
-    override fun allocationSize(value: ByteArray?): Int {
-        if (value == null) {
-            return 1
-        } else {
-            return 1 + FfiConverterByteArray.allocationSize(value)
-        }
-    }
-
-    override fun write(value: ByteArray?, buf: ByteBuffer) {
-        if (value == null) {
-            buf.put(0)
-        } else {
-            buf.put(1)
-            FfiConverterByteArray.write(value, buf)
         }
     }
 }
