@@ -128,7 +128,7 @@ async function restart() {
 }
 
 async function processVlsResult(ret: sphinx.VlsResponse) {
-  await storeMutations(ret.state);
+  const vel = await storeMutations(ret.state);
   publish(ret.topic as Topics, ret.bytes);
 }
 

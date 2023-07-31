@@ -27,18 +27,14 @@ pub const VELOCITY: &str = "VELOCITY";
 
 pub fn run_init_1(
     args_json: String,
-    easy_state_mp: Vec<u8>,
+    easy_mp: Vec<u8>,
     msg1: Vec<u8>,
     _sequence: Option<u16>,
 ) -> Result<VlsResponse> {
     let args = args_from_json(&args_json)?;
-    let mut easy_state = easy_state_from_mp(&easy_state_mp)?;
-    let _ = pull_from(&mut easy_state, MSG_1);
-    let _ = pull_from(&mut easy_state, MSG_2);
-    let _ = pull_from(&mut easy_state, PREV_VLS);
-    let _ = pull_from(&mut easy_state, PREV_LSS);
-    let _ = pull_from(&mut easy_state, VELOCITY);
-    let state = state_from_easy_state(easy_state)?;
+    let mut easy = easy_from_mp(&easy_mp)?;
+    pull_unchecked(&mut easy, &[MSG_1, MSG_2, PREV_VLS, PREV_LSS, VELOCITY]);
+    let state = state_from_easy(easy)?;
     let ret =
         mobile::run_init_1(args, state, &msg1, None).map_err(|e| SphinxError::InitFailed {
             r: format!("{:?}", e),
@@ -51,18 +47,15 @@ pub fn run_init_1(
 
 pub fn run_init_2(
     args_json: String,
-    easy_state_mp: Vec<u8>,
+    easy_mp: Vec<u8>,
     msg2: Vec<u8>,
     _sequence: Option<u16>,
 ) -> Result<VlsResponse> {
     let args = args_from_json(&args_json)?;
-    let mut easy_state = easy_state_from_mp(&easy_state_mp)?;
-    let msg1 = pull_from(&mut easy_state, MSG_1)?;
-    let _ = pull_from(&mut easy_state, MSG_2);
-    let _ = pull_from(&mut easy_state, PREV_VLS);
-    let _ = pull_from(&mut easy_state, PREV_LSS);
-    let _ = pull_from(&mut easy_state, VELOCITY);
-    let state = state_from_easy_state(easy_state)?;
+    let mut easy = easy_from_mp(&easy_mp)?;
+    let msg1 = pull_from(&mut easy, MSG_1)?;
+    pull_unchecked(&mut easy, &[MSG_2, PREV_VLS, PREV_LSS, VELOCITY]);
+    let state = state_from_easy(easy)?;
     let ret = mobile::run_init_2(args, state, &msg1, &msg2, None).map_err(|e| {
         SphinxError::InitFailed {
             r: format!("{:?}", e),
@@ -76,32 +69,27 @@ pub fn run_init_2(
 
 pub fn run_vls(
     args_json: String,
-    easy_state_mp: Vec<u8>,
+    easy_mp: Vec<u8>,
     vls_msg: Vec<u8>,
     sequence: Option<u16>,
 ) -> Result<VlsResponse> {
     let args = args_from_json(&args_json)?;
-    let mut easy_state = easy_state_from_mp(&easy_state_mp)?;
-    let msg1 = pull_from(&mut easy_state, MSG_1)?;
-    let msg2 = pull_from(&mut easy_state, MSG_2)?;
-    let _ = pull_from(&mut easy_state, PREV_VLS);
-    let _ = pull_from(&mut easy_state, PREV_LSS);
-    let vel = pull_from(&mut easy_state, VELOCITY).ok();
+    let mut easy = easy_from_mp(&easy_mp)?;
+    let msg1 = pull_from(&mut easy, MSG_1)?;
+    let msg2 = pull_from(&mut easy, MSG_2)?;
+    pull_unchecked(&mut easy, &[PREV_VLS, PREV_LSS]);
+    let vel = pull_from(&mut easy, VELOCITY).ok();
     let velocity = vel_from_mp(vel)?;
-    let state = state_from_easy_state(easy_state)?;
+    let state = state_from_easy(easy)?;
     let ran = mobile::run_vls(args, state, &msg1, &msg2, &vls_msg, sequence, velocity);
     let ret = ran.map_err(|e| SphinxError::VlsFailed {
         r: format!("{:?}", e),
     })?;
     let mut extras = BTreeMap::new();
-    extras.insert(
-        PREV_VLS.to_string(),
-        ret.vls_bytes.clone().unwrap_or(Vec::new()),
-    );
-    extras.insert(
-        PREV_LSS.to_string(),
-        ret.lss_bytes.clone().unwrap_or(Vec::new()),
-    );
+    let vlsb = ret.vls_bytes.clone().unwrap_or(Vec::new());
+    extras.insert(PREV_VLS.to_string(), vlsb);
+    let lssb = ret.lss_bytes.clone().unwrap_or(Vec::new());
+    extras.insert(PREV_LSS.to_string(), lssb);
     if let Some(vel) = ser_velocity(&ret.velocity)? {
         extras.insert(VELOCITY.to_string(), vel);
     }
@@ -111,18 +99,18 @@ pub fn run_vls(
 
 pub fn run_lss(
     args_json: String,
-    easy_state_mp: Vec<u8>,
+    easy_mp: Vec<u8>,
     lss_msg: Vec<u8>,
     _sequence: Option<u16>,
 ) -> Result<VlsResponse> {
     let args = args_from_json(&args_json)?;
-    let mut easy_state = easy_state_from_mp(&easy_state_mp)?;
-    let msg1 = pull_from(&mut easy_state, MSG_1)?;
-    let msg2 = pull_from(&mut easy_state, MSG_2)?;
-    let prev_vls = pull_from(&mut easy_state, PREV_VLS)?;
-    let prev_lss = pull_from(&mut easy_state, PREV_LSS)?;
-    let _ = pull_from(&mut easy_state, VELOCITY);
-    let state = state_from_easy_state(easy_state)?;
+    let mut easy = easy_from_mp(&easy_mp)?;
+    let msg1 = pull_from(&mut easy, MSG_1)?;
+    let msg2 = pull_from(&mut easy, MSG_2)?;
+    let prev_vls = pull_from(&mut easy, PREV_VLS)?;
+    let prev_lss = pull_from(&mut easy, PREV_LSS)?;
+    pull_unchecked(&mut easy, &[VELOCITY]);
+    let state = state_from_easy(easy)?;
     let ret = mobile::run_lss(args, state, &msg1, &msg2, &lss_msg, &prev_vls, &prev_lss).map_err(
         |e| SphinxError::LssFailed {
             r: format!("{:?}", e),
@@ -132,8 +120,14 @@ pub fn run_lss(
     Ok(VlsResponse::new(ret, muts)?)
 }
 
-fn pull_from(easy_state: &mut EasyState, key: &str) -> Result<Vec<u8>> {
-    let msg = easy_state.remove(key).ok_or(SphinxError::BadState {
+fn pull_unchecked(easy: &mut EasyState, keys: &[&str]) {
+    for k in keys {
+        let _ = pull_from(easy, k);
+    }
+}
+
+fn pull_from(easy: &mut EasyState, key: &str) -> Result<Vec<u8>> {
+    let msg = easy.remove(key).ok_or(SphinxError::BadState {
         r: format!("missing {}", key),
     })?;
     Ok(msg)
@@ -180,7 +174,7 @@ fn easy_muts(m: Muts) -> EasyState {
     h
 }
 
-fn easy_state_from_mp(state_mp: &[u8]) -> Result<EasyState> {
+fn easy_from_mp(state_mp: &[u8]) -> Result<EasyState> {
     let es: EasyState =
         rmp_utils::deserialize_simple_state_map(state_mp).map_err(|e| SphinxError::BadState {
             r: format!("{:?}", e),
@@ -188,7 +182,7 @@ fn easy_state_from_mp(state_mp: &[u8]) -> Result<EasyState> {
     Ok(es)
 }
 
-fn state_from_easy_state(es: EasyState) -> Result<mobile::State> {
+fn state_from_easy(es: EasyState) -> Result<mobile::State> {
     let mut s: mobile::State = BTreeMap::new();
     for (k, mut vv) in es {
         let bs = vv.split_off(vv.len() - 8);

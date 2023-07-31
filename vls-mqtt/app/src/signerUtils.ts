@@ -12,8 +12,6 @@ export type State = { [k: string]: Bytes };
 
 export type Bytes = Uint8Array;
 
-export type Velocity = (number | Bytes)[];
-
 export interface Args {
   seed: Uint8Array;
   network: string;
@@ -34,12 +32,32 @@ export async function argsAndState(): Promise<ArgsAndState> {
   return { args, state };
 }
 
-export async function storeMutations(inc: Uint8Array) {
+export async function storeMutations(inc: Uint8Array): Promise<number[]> {
   try {
     const muts: State = msgpack.decode(inc) as State;
     await persist_muts(muts);
+    if (muts["VELOCITY"]) {
+      return parseVelocity(muts["VELOCITY"]);
+    }
   } catch (e) {
     console.error(e);
+  }
+}
+
+function parseVelocity(veldata: Uint8Array | undefined): number[] {
+  if (!veldata) return;
+  try {
+    const vel = msgpack.decode(veldata);
+    if (Array.isArray(vel)) {
+      if (vel.length > 1) {
+        const pmts = vel[1];
+        if (Array.isArray(pmts)) {
+          return pmts;
+        }
+      }
+    }
+  } catch (e) {
+    console.error("invalid velocity");
   }
 }
 

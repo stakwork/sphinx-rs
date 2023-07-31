@@ -264,23 +264,6 @@ impl NowStartingTimeFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(feature = "broker-test")]
-    use lss_connector::{tokio, Init, LssBroker, Msg, Response};
-
-    fn empty_args() -> Args {
-        use std::time::SystemTime;
-        let ts = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-        Args {
-            seed: [1; 32],
-            network: Network::Regtest,
-            policy: Default::default(),
-            allowlist: vec![],
-            timestamp: ts.as_secs(),
-            lss_nonce: [32; 32],
-        }
-    }
 
     // cargo test test_args_der --no-default-features --features no-std,persist,broker-test -- --nocapture
     #[test]
@@ -307,6 +290,25 @@ mod tests {
 
             let s = state.clone();
             println!("STATE {:?}", s);
+        }
+    }
+
+    #[cfg(feature = "broker-test")]
+    use lss_connector::{tokio, Init, LssBroker, Msg, Response};
+
+    #[cfg(feature = "broker-test")]
+    fn empty_args() -> Args {
+        use std::time::SystemTime;
+        let ts = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
+        Args {
+            seed: [1; 32],
+            network: Network::Regtest,
+            policy: Default::default(),
+            allowlist: vec![],
+            timestamp: ts.as_secs(),
+            lss_nonce: [32; 32],
         }
     }
 
@@ -407,6 +409,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "broker-test")]
     #[rustfmt::skip]
     fn msgs() -> Vec<Vec<u8>> {
         vec![
