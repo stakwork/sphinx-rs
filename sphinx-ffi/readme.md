@@ -97,7 +97,7 @@ interface VlsResponse {
 }
 ```
 
-**`run_init_1(topic: String, args: String, state: Bytes, msg1: Bytes, sequence?: u16)`**
+**`run(topic: String, args: String, state: Bytes, msg1: Bytes, sequence?: u16)`**
 
 ### mobile signer instructions
 
