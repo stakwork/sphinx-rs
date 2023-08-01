@@ -382,15 +382,9 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_parse_response(`res`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_run_init_1(`args`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`msg1`: RustBuffer.ByValue,`expectedSequence`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_run_init_2(`args`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`msg2`: RustBuffer.ByValue,`expectedSequence`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_run_vls(`args`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`vlsMsg`: RustBuffer.ByValue,`expectedSequence`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_run_lss(`args`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`lssMsg`: RustBuffer.ByValue,`expectedSequence`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_make_auth_token(`ts`: Int,`secret`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_run(`topic`: RustBuffer.ByValue,`args`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`msg1`: RustBuffer.ByValue,`expectedSequence`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun ffi_sphinxrs_rustbuffer_alloc(`size`: Int,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
@@ -418,15 +412,9 @@ internal interface _UniFFILib : Library {
     ): Short
     fun uniffi_sphinxrs_checksum_func_parse_response(
     ): Short
-    fun uniffi_sphinxrs_checksum_func_run_init_1(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_run_init_2(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_run_vls(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_run_lss(
-    ): Short
     fun uniffi_sphinxrs_checksum_func_make_auth_token(
+    ): Short
+    fun uniffi_sphinxrs_checksum_func_run(
     ): Short
     fun ffi_sphinxrs_uniffi_contract_version(
     ): Int
@@ -472,19 +460,10 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
     if (lib.uniffi_sphinxrs_checksum_func_parse_response() != 12980.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_sphinxrs_checksum_func_run_init_1() != 44577.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_run_init_2() != 3141.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_run_vls() != 7208.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_run_lss() != 41202.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
     if (lib.uniffi_sphinxrs_checksum_func_make_auth_token() != 13236.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_sphinxrs_checksum_func_run() != 47350.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -768,6 +747,13 @@ sealed class SphinxException: Exception() {
             get() = "r=${ `r` }"
     }
     
+    class BadTopic(
+        val `r`: String
+        ) : SphinxException() {
+        override val message
+            get() = "r=${ `r` }"
+    }
+    
     class BadArgs(
         val `r`: String
         ) : SphinxException() {
@@ -856,22 +842,25 @@ public object FfiConverterTypeSphinxError : FfiConverterRustBuffer<SphinxExcepti
             11 -> SphinxException.BadResponse(
                 FfiConverterString.read(buf),
                 )
-            12 -> SphinxException.BadArgs(
+            12 -> SphinxException.BadTopic(
                 FfiConverterString.read(buf),
                 )
-            13 -> SphinxException.BadState(
+            13 -> SphinxException.BadArgs(
                 FfiConverterString.read(buf),
                 )
-            14 -> SphinxException.BadVelocity(
+            14 -> SphinxException.BadState(
                 FfiConverterString.read(buf),
                 )
-            15 -> SphinxException.InitFailed(
+            15 -> SphinxException.BadVelocity(
                 FfiConverterString.read(buf),
                 )
-            16 -> SphinxException.LssFailed(
+            16 -> SphinxException.InitFailed(
                 FfiConverterString.read(buf),
                 )
-            17 -> SphinxException.VlsFailed(
+            17 -> SphinxException.LssFailed(
+                FfiConverterString.read(buf),
+                )
+            18 -> SphinxException.VlsFailed(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -931,6 +920,11 @@ public object FfiConverterTypeSphinxError : FfiConverterRustBuffer<SphinxExcepti
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.BadResponse -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4
+                + FfiConverterString.allocationSize(value.`r`)
+            )
+            is SphinxException.BadTopic -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4
                 + FfiConverterString.allocationSize(value.`r`)
@@ -1025,33 +1019,38 @@ public object FfiConverterTypeSphinxError : FfiConverterRustBuffer<SphinxExcepti
                 FfiConverterString.write(value.`r`, buf)
                 Unit
             }
-            is SphinxException.BadArgs -> {
+            is SphinxException.BadTopic -> {
                 buf.putInt(12)
                 FfiConverterString.write(value.`r`, buf)
                 Unit
             }
-            is SphinxException.BadState -> {
+            is SphinxException.BadArgs -> {
                 buf.putInt(13)
                 FfiConverterString.write(value.`r`, buf)
                 Unit
             }
-            is SphinxException.BadVelocity -> {
+            is SphinxException.BadState -> {
                 buf.putInt(14)
                 FfiConverterString.write(value.`r`, buf)
                 Unit
             }
-            is SphinxException.InitFailed -> {
+            is SphinxException.BadVelocity -> {
                 buf.putInt(15)
                 FfiConverterString.write(value.`r`, buf)
                 Unit
             }
-            is SphinxException.LssFailed -> {
+            is SphinxException.InitFailed -> {
                 buf.putInt(16)
                 FfiConverterString.write(value.`r`, buf)
                 Unit
             }
-            is SphinxException.VlsFailed -> {
+            is SphinxException.LssFailed -> {
                 buf.putInt(17)
+                FfiConverterString.write(value.`r`, buf)
+                Unit
+            }
+            is SphinxException.VlsFailed -> {
+                buf.putInt(18)
                 FfiConverterString.write(value.`r`, buf)
                 Unit
             }
@@ -1171,46 +1170,19 @@ fun `parseResponse`(`res`: String): String {
 
 @Throws(SphinxException::class)
 
-fun `runInit1`(`args`: String, `state`: ByteArray, `msg1`: ByteArray, `expectedSequence`: UShort?): VlsResponse {
-    return FfiConverterTypeVlsResponse.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_run_init_1(FfiConverterString.lower(`args`),FfiConverterByteArray.lower(`state`),FfiConverterByteArray.lower(`msg1`),FfiConverterOptionalUShort.lower(`expectedSequence`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `runInit2`(`args`: String, `state`: ByteArray, `msg2`: ByteArray, `expectedSequence`: UShort?): VlsResponse {
-    return FfiConverterTypeVlsResponse.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_run_init_2(FfiConverterString.lower(`args`),FfiConverterByteArray.lower(`state`),FfiConverterByteArray.lower(`msg2`),FfiConverterOptionalUShort.lower(`expectedSequence`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `runVls`(`args`: String, `state`: ByteArray, `vlsMsg`: ByteArray, `expectedSequence`: UShort?): VlsResponse {
-    return FfiConverterTypeVlsResponse.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_run_vls(FfiConverterString.lower(`args`),FfiConverterByteArray.lower(`state`),FfiConverterByteArray.lower(`vlsMsg`),FfiConverterOptionalUShort.lower(`expectedSequence`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `runLss`(`args`: String, `state`: ByteArray, `lssMsg`: ByteArray, `expectedSequence`: UShort?): VlsResponse {
-    return FfiConverterTypeVlsResponse.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_run_lss(FfiConverterString.lower(`args`),FfiConverterByteArray.lower(`state`),FfiConverterByteArray.lower(`lssMsg`),FfiConverterOptionalUShort.lower(`expectedSequence`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
 fun `makeAuthToken`(`ts`: UInt, `secret`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
     _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_make_auth_token(FfiConverterUInt.lower(`ts`),FfiConverterString.lower(`secret`),_status)
+})
+}
+
+@Throws(SphinxException::class)
+
+fun `run`(`topic`: String, `args`: String, `state`: ByteArray, `msg1`: ByteArray, `expectedSequence`: UShort?): VlsResponse {
+    return FfiConverterTypeVlsResponse.lift(
+    rustCallWithError(SphinxException) { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_run(FfiConverterString.lower(`topic`),FfiConverterString.lower(`args`),FfiConverterByteArray.lower(`state`),FfiConverterByteArray.lower(`msg1`),FfiConverterOptionalUShort.lower(`expectedSequence`),_status)
 })
 }
 

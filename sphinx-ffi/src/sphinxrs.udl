@@ -11,6 +11,7 @@ interface SphinxError {
   InvalidNetwork(string r);
   BadRequest(string r);
   BadResponse(string r);
+  BadTopic(string r);
   BadArgs(string r);
   BadState(string r);
   BadVelocity(string r);
@@ -52,13 +53,7 @@ namespace sphinxrs {
   [Throws=SphinxError]
   string parse_response(string res);
   [Throws=SphinxError]
-  VlsResponse run_init_1(string args, bytes state, bytes msg1, u16? expected_sequence);
-  [Throws=SphinxError]
-  VlsResponse run_init_2(string args, bytes state, bytes msg2, u16? expected_sequence);
-  [Throws=SphinxError]
-  VlsResponse run_vls(string args, bytes state, bytes vls_msg, u16? expected_sequence);
-  [Throws=SphinxError]
-  VlsResponse run_lss(string args, bytes state, bytes lss_msg, u16? expected_sequence);
-  [Throws=SphinxError]
   string make_auth_token(u32 ts, string secret);
+  [Throws=SphinxError]
+  VlsResponse run(string topic, string args, bytes state, bytes msg1, u16? expected_sequence);
 };

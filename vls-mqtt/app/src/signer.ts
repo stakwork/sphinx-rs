@@ -1,5 +1,6 @@
 import { sphinx } from "./wasm";
-import { now, argsAndState, storeMutations, clearAll } from "./signerUtils";
+import * as utils from "./signerUtils";
+import { Topics } from "./signerUtils";
 import * as Paho from "paho-mqtt";
 import { cmds } from "./store";
 
@@ -9,41 +10,12 @@ let CLIENT_ID;
 
 let sequence: number | undefined = undefined;
 
-export enum Topics {
-  VLS = "vls",
-  VLS_RES = "vls-res",
-  CONTROL = "control",
-  CONTROL_RES = "control-res",
-  PROXY = "proxy",
-  PROXY_RES = "proxy-res",
-  ERROR = "error",
-  INIT_1_MSG = "init-1-msg",
-  INIT_1_RES = "init-1-res",
-  INIT_2_MSG = "init-2-msg",
-  INIT_2_RES = "init-2-res",
-  LSS_MSG = "lss-msg",
-  LSS_RES = "lss-res",
-  HELLO = "hello",
-  BYE = "bye",
-}
-
-function suball() {
-  const ts = [Topics.VLS, Topics.INIT_1_MSG, Topics.INIT_2_MSG, Topics.LSS_MSG];
-  for (let t of ts) {
-    sub(t);
-  }
-}
-
-export async function clear() {
-  await clearAll();
-}
-
 export async function initialize(secret: string, pubkey: string) {
   try {
     sphinx.init_logs();
 
     const userName = pubkey;
-    const password = sphinx.make_auth_token(now(), secret);
+    const password = sphinx.make_auth_token(utils.now(), secret);
     console.log("auth_token", password);
 
     const host = "localhost";
@@ -67,47 +39,36 @@ export async function initialize(secret: string, pubkey: string) {
   }
 }
 
+function subscribeAll() {
+  const ts = [Topics.VLS, Topics.INIT_1_MSG, Topics.INIT_2_MSG, Topics.LSS_MSG];
+  for (let t of ts) {
+    subscribe(t);
+  }
+}
+
 function mqttConnect(userName: string, password: string, useSSL: boolean) {
   function onSuccess() {
     console.log("MQTT connected!");
     MQTT.onMessageArrived = function (m) {
       processMessage(m.topic, new Uint8Array(m.payloadBytes));
     };
-    suball();
+    subscribeAll();
     publish(Topics.HELLO, "");
   }
   MQTT.connect({ onSuccess, useSSL, userName, password });
 }
 
-type VlsHandler = (
-  args: string,
-  state: Uint8Array,
-  p: Uint8Array,
-  sequence?: number
-) => sphinx.VlsResponse;
-
-const funcs: { [k: string]: VlsHandler } = {
-  [Topics.INIT_1_MSG]: sphinx.run_init_1,
-  [Topics.INIT_2_MSG]: sphinx.run_init_2,
-  [Topics.VLS]: sphinx.run_vls,
-  [Topics.LSS_MSG]: sphinx.run_lss,
-};
-
 async function processMessage(topic: string, payload: Uint8Array) {
   try {
-    // console.log("=====>>>>> GOT A MSG", topic, payload);
-    const ts = topic.split("/");
-    const last = ts[ts.length - 1];
-    if (!funcs[last]) {
-      return console.log("bad topic", last);
-    }
-    const a = await argsAndState();
-    const ret = funcs[last](a.args, a.state, payload, sequence);
+    const a = await utils.argsAndState();
+    const ret = sphinx.run(topic, a.args, a.state, payload, sequence);
     await processVlsResult(ret);
-    if (last === Topics.VLS) {
+    if (topic.endsWith(Topics.VLS)) {
       if (ret.cmd) {
+        // store command history
         cmds.update((cs) => [...cs, ret.cmd]);
       }
+      // update expected sequence
       if (ret.sequence || ret.sequence === 0) {
         sequence = ret.sequence + 1;
       }
@@ -121,15 +82,24 @@ async function processMessage(topic: string, payload: Uint8Array) {
   }
 }
 
-async function restart() {
-  await clearAll();
-  sequence = null;
-  publish(Topics.HELLO, "");
+async function processVlsResult(ret: sphinx.VlsResponse) {
+  const vel = await utils.storeMutations(ret.state);
+  publish(ret.topic as Topics, ret.bytes);
 }
 
-async function processVlsResult(ret: sphinx.VlsResponse) {
-  const vel = await storeMutations(ret.state);
-  publish(ret.topic as Topics, ret.bytes);
+export async function clear() {
+  await utils.clearAll();
+}
+
+export function say_bye() {
+  console.log("say bye!");
+  publish(Topics.BYE, "");
+}
+
+async function restart() {
+  await utils.clearAll();
+  sequence = null;
+  publish(Topics.HELLO, "");
 }
 
 function publish(topic: Topics, payload: any) {
@@ -142,7 +112,7 @@ function publish(topic: Topics, payload: any) {
   }
 }
 
-function sub(topic: Topics) {
+function subscribe(topic: Topics) {
   try {
     if (!MQTT) return console.log("NO MQTT CLIENT");
     const t = `${CLIENT_ID}/${topic}`;
@@ -153,12 +123,7 @@ function sub(topic: Topics) {
   }
 }
 
-export function say_bye() {
-  console.log("say bye!");
-  publish(Topics.BYE, "");
-}
-
-export const genId = (): string => {
+const genId = (): string => {
   return Array.from(
     window.crypto.getRandomValues(new Uint8Array(16)),
     (byte) => {

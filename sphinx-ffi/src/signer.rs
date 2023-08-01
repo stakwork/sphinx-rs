@@ -25,7 +25,26 @@ pub const PREV_VLS: &str = "PREV_VLS";
 pub const PREV_LSS: &str = "PREV_LSS";
 pub const VELOCITY: &str = "VELOCITY";
 
-pub fn run_init_1(
+pub fn run(
+    topic: String,
+    args_json: String,
+    easy_mp: Vec<u8>,
+    msg: Vec<u8>,
+    sequence: Option<u16>,
+) -> Result<VlsResponse> {
+    let last = topic.split("/").last().unwrap_or("");
+    match last {
+        topics::INIT_1_MSG => Ok(run_init_1(args_json, easy_mp, msg, sequence)?),
+        topics::INIT_2_MSG => Ok(run_init_2(args_json, easy_mp, msg, sequence)?),
+        topics::VLS => Ok(run_vls(args_json, easy_mp, msg, sequence)?),
+        topics::LSS_MSG => Ok(run_lss(args_json, easy_mp, msg, sequence)?),
+        _ => Err(SphinxError::BadTopic {
+            r: format!("{:?}", topic),
+        }),
+    }
+}
+
+fn run_init_1(
     args_json: String,
     easy_mp: Vec<u8>,
     msg1: Vec<u8>,
@@ -45,7 +64,7 @@ pub fn run_init_1(
     Ok(VlsResponse::new(ret.0, muts)?)
 }
 
-pub fn run_init_2(
+fn run_init_2(
     args_json: String,
     easy_mp: Vec<u8>,
     msg2: Vec<u8>,
@@ -67,7 +86,7 @@ pub fn run_init_2(
     Ok(VlsResponse::new(ret.0, muts)?)
 }
 
-pub fn run_vls(
+fn run_vls(
     args_json: String,
     easy_mp: Vec<u8>,
     vls_msg: Vec<u8>,
@@ -97,7 +116,7 @@ pub fn run_vls(
     Ok(VlsResponse::new(ret, muts)?)
 }
 
-pub fn run_lss(
+fn run_lss(
     args_json: String,
     easy_mp: Vec<u8>,
     lss_msg: Vec<u8>,
@@ -226,7 +245,7 @@ impl VlsResponse {
     }
 }
 
-pub fn run_init_1_og(
+fn run_init_1_manual(
     args_string: String,
     state_mp: Vec<u8>,
     msg1: Vec<u8>,
@@ -242,7 +261,7 @@ pub fn run_init_1_og(
     Ok(ret.0)
 }
 
-pub fn run_init_2_og(
+fn run_init_2_manual(
     args_string: String,
     state_mp: Vec<u8>,
     msg1: Vec<u8>,
@@ -260,7 +279,7 @@ pub fn run_init_2_og(
     Ok(ret.0)
 }
 
-pub fn run_vls_og(
+fn run_vls_manual(
     args_string: String,
     state_mp: Vec<u8>,
     msg1: Vec<u8>,
@@ -278,7 +297,7 @@ pub fn run_vls_og(
     })?)
 }
 
-pub fn run_lss_og(
+fn run_lss_manual(
     args_string: String,
     state_mp: Vec<u8>,
     msg1: Vec<u8>,

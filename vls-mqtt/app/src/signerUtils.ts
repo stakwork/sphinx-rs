@@ -21,6 +21,24 @@ export interface Args {
   lss_nonce: Uint8Array;
 }
 
+export enum Topics {
+  VLS = "vls",
+  VLS_RES = "vls-res",
+  CONTROL = "control",
+  CONTROL_RES = "control-res",
+  PROXY = "proxy",
+  PROXY_RES = "proxy-res",
+  ERROR = "error",
+  INIT_1_MSG = "init-1-msg",
+  INIT_1_RES = "init-1-res",
+  INIT_2_MSG = "init-2-msg",
+  INIT_2_RES = "init-2-res",
+  LSS_MSG = "lss-msg",
+  LSS_RES = "lss-res",
+  HELLO = "hello",
+  BYE = "bye",
+}
+
 interface ArgsAndState {
   args: string;
   state: Uint8Array;

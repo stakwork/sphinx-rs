@@ -97,15 +97,19 @@ interface VlsResponse {
 }
 ```
 
-**`run_init_1(args: String, state: Bytes, msg1: Bytes, sequence?: u16)`**
-
-**`run_init_2(args: String, state: Bytes, msg2: Bytes, sequence?: u16)`**
-
-**`run_vls(args: String, state: Bytes, vls_msg: Bytes, sequence?: u16)`**
-
-**`run_lss(args: String, state: Bytes, lss_msg: Bytes, sequence?: u16)`**
+**`run_init_1(topic: String, args: String, state: Bytes, msg1: Bytes, sequence?: u16)`**
 
 ### mobile signer instructions
+
+First, run an example sphinx-swarm with CLN + bitcoind
+
+- `git clone https://github.com/stakwork/sphinx-swarm.git`
+- `cd sphinx-swarm`
+- `cargo run --bin cln`
+- this will run CLN and bitcoind inside docker
+- to shut them down you can run `./clear.sh`
+
+**Implementation instructions:**
 
 1. generate your seed: random 32 bytes
 2. run `node_keys(network, seed)` to get your keys.
@@ -116,14 +120,11 @@ interface VlsResponse {
 4. subscribe to topics:
    - `{CLIENT_ID}/vls`, `{CLIENT_ID}/init-1-msg`, `{CLIENT_ID}/init-2-msg`, `{CLIENT_ID}/lss-msg`
 5. publish to `{CLIENT_ID}/hello` to let the broker know you are ready
-6. when a MQTT message is received:
+6. make a "sequence" number (starting at null, not zero)
+7. when a MQTT message is received:
 
-- store a "sequence" number, starting as "undefined"
-- load up ALL your stored State into a Map (dictionary or object) and encode with msgpack. Then run the proper function based on the topic received:
-- `init-1-msg`: `run_init_1`
-- `init-2-msg`: `run_init_2`
-- `vls-msg`: `run_vls`
-- `lss-msg`: `run_lss`
+- load up ALL your stored State into a Map (dictionary or object) and encode with msgpack.
+- `run(topics, args, state, msg, sequence)`
 - after each call, store ALL the returned State:
   - msgpack.decode(`response.state`)
   - store each key/value pair

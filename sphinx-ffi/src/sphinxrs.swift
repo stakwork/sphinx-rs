@@ -534,6 +534,7 @@ public enum SphinxError {
     case InvalidNetwork(`r`: String)
     case BadRequest(`r`: String)
     case BadResponse(`r`: String)
+    case BadTopic(`r`: String)
     case BadArgs(`r`: String)
     case BadState(`r`: String)
     case BadVelocity(`r`: String)
@@ -590,22 +591,25 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
         case 11: return .BadResponse(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 12: return .BadArgs(
+        case 12: return .BadTopic(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 13: return .BadState(
+        case 13: return .BadArgs(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 14: return .BadVelocity(
+        case 14: return .BadState(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 15: return .InitFailed(
+        case 15: return .BadVelocity(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 16: return .LssFailed(
+        case 16: return .InitFailed(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 17: return .VlsFailed(
+        case 17: return .LssFailed(
+            `r`: try FfiConverterString.read(from: &buf)
+            )
+        case 18: return .VlsFailed(
             `r`: try FfiConverterString.read(from: &buf)
             )
 
@@ -675,33 +679,38 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .BadArgs(`r`):
+        case let .BadTopic(`r`):
             writeInt(&buf, Int32(12))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .BadState(`r`):
+        case let .BadArgs(`r`):
             writeInt(&buf, Int32(13))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .BadVelocity(`r`):
+        case let .BadState(`r`):
             writeInt(&buf, Int32(14))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .InitFailed(`r`):
+        case let .BadVelocity(`r`):
             writeInt(&buf, Int32(15))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .LssFailed(`r`):
+        case let .InitFailed(`r`):
             writeInt(&buf, Int32(16))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .VlsFailed(`r`):
+        case let .LssFailed(`r`):
             writeInt(&buf, Int32(17))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .VlsFailed(`r`):
+            writeInt(&buf, Int32(18))
             FfiConverterString.write(`r`, into: &buf)
             
         }
@@ -822,49 +831,14 @@ public func `parseResponse`(`res`: String) throws -> String {
     )
 }
 
-public func `runInit1`(`args`: String, `state`: Data, `msg1`: Data, `expectedSequence`: UInt16?) throws -> VlsResponse {
+public func `run`(`topic`: String, `args`: String, `state`: Data, `msg1`: Data, `expectedSequence`: UInt16?) throws -> VlsResponse {
     return try  FfiConverterTypeVlsResponse.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_run_init_1(
+    uniffi_sphinxrs_fn_func_run(
+        FfiConverterString.lower(`topic`),
         FfiConverterString.lower(`args`),
         FfiConverterData.lower(`state`),
         FfiConverterData.lower(`msg1`),
-        FfiConverterOptionUInt16.lower(`expectedSequence`),$0)
-}
-    )
-}
-
-public func `runInit2`(`args`: String, `state`: Data, `msg2`: Data, `expectedSequence`: UInt16?) throws -> VlsResponse {
-    return try  FfiConverterTypeVlsResponse.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_run_init_2(
-        FfiConverterString.lower(`args`),
-        FfiConverterData.lower(`state`),
-        FfiConverterData.lower(`msg2`),
-        FfiConverterOptionUInt16.lower(`expectedSequence`),$0)
-}
-    )
-}
-
-public func `runVls`(`args`: String, `state`: Data, `vlsMsg`: Data, `expectedSequence`: UInt16?) throws -> VlsResponse {
-    return try  FfiConverterTypeVlsResponse.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_run_vls(
-        FfiConverterString.lower(`args`),
-        FfiConverterData.lower(`state`),
-        FfiConverterData.lower(`vlsMsg`),
-        FfiConverterOptionUInt16.lower(`expectedSequence`),$0)
-}
-    )
-}
-
-public func `runLss`(`args`: String, `state`: Data, `lssMsg`: Data, `expectedSequence`: UInt16?) throws -> VlsResponse {
-    return try  FfiConverterTypeVlsResponse.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_run_lss(
-        FfiConverterString.lower(`args`),
-        FfiConverterData.lower(`state`),
-        FfiConverterData.lower(`lssMsg`),
         FfiConverterOptionUInt16.lower(`expectedSequence`),$0)
 }
     )
@@ -922,16 +896,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_parse_response() != 12980) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_run_init_1() != 44577) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_sphinxrs_checksum_func_run_init_2() != 3141) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_sphinxrs_checksum_func_run_vls() != 7208) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_sphinxrs_checksum_func_run_lss() != 41202) {
+    if (uniffi_sphinxrs_checksum_func_run() != 47350) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_make_auth_token() != 13236) {

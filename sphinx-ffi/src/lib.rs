@@ -41,6 +41,8 @@ pub enum SphinxError {
     BadRequest { r: String },
     #[error("Bad Response: {r}")]
     BadResponse { r: String },
+    #[error("Bad Topic: {r}")]
+    BadTopic { r: String },
     #[error("Bad Args: {r}")]
     BadArgs { r: String },
     #[error("Bad State: {r}")]

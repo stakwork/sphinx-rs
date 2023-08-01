@@ -81,13 +81,7 @@ RustBuffer uniffi_sphinxrs_fn_func_build_request(RustBuffer msg, RustBuffer secr
 );
 RustBuffer uniffi_sphinxrs_fn_func_parse_response(RustBuffer res, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_run_init_1(RustBuffer args, RustBuffer state, RustBuffer msg1, RustBuffer expected_sequence, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_run_init_2(RustBuffer args, RustBuffer state, RustBuffer msg2, RustBuffer expected_sequence, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_run_vls(RustBuffer args, RustBuffer state, RustBuffer vls_msg, RustBuffer expected_sequence, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_run_lss(RustBuffer args, RustBuffer state, RustBuffer lss_msg, RustBuffer expected_sequence, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_sphinxrs_fn_func_run(RustBuffer topic, RustBuffer args, RustBuffer state, RustBuffer msg1, RustBuffer expected_sequence, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_make_auth_token(uint32_t ts, RustBuffer secret, RustCallStatus *_Nonnull out_status
 );
@@ -126,16 +120,7 @@ uint16_t uniffi_sphinxrs_checksum_func_build_request(void
 uint16_t uniffi_sphinxrs_checksum_func_parse_response(void
     
 );
-uint16_t uniffi_sphinxrs_checksum_func_run_init_1(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_run_init_2(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_run_vls(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_run_lss(void
+uint16_t uniffi_sphinxrs_checksum_func_run(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_make_auth_token(void
