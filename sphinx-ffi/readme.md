@@ -114,6 +114,8 @@ First, run an example sphinx-swarm with CLN + bitcoind
 1. generate your seed: random 32 bytes
 2. run `node_keys(network, seed)` to get your keys.
 3. connect to the MQTT broker
+   - host: `localhost`
+   - port: `1883`
    - clientID: random string
    - username: keys.pubkey
    - password: `make_auth_token(timestamp, keys.secret)`
