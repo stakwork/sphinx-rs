@@ -140,7 +140,7 @@ rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-andro
 
 ./build-kotlin.sh
 
-### swift
+### ios
 
 rustup target add aarch64-apple-ios x86_64-apple-ios
 
@@ -148,4 +148,10 @@ armv7-apple-ios
 armv7s-apple-ios
 i386-apple-ios
 
-./build-swift.sh
+./build-ios.sh
+
+### mac
+
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+./build-mac.sh
