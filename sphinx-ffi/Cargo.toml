@@ -9,7 +9,7 @@ name = "sphinxrs"
 crate-type = ["staticlib", "cdylib"]
 
 [features]
-default = ["ffi", "no-std"]
+default = ["ffi", "std"]
 ffi = ["uniffi"]
 std = ["sphinx-signer/std", "sphinx-glyph/std"]
 no-std = ["sphinx-signer/no-std", "sphinx-glyph/no-std"]
@@ -17,7 +17,7 @@ wasm = []
 
 [dependencies]
 sphinx-crypter = { path = "../crypter" }
-sphinx-signer = { path = "../signer", default-features = false, features = ["persist"] }
+sphinx-signer = { path = "../signer", default-features = false, features = ["persist", "no-native"] }
 sphinx-glyph = { path = "../glyph", default-features = false }
 uniffi = { version = "0.24.1", optional = true }
 hex = { version = "0.4.3", default-features = false }

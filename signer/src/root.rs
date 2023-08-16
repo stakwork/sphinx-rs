@@ -67,11 +67,11 @@ pub fn builder(
 }
 
 fn make_clock() -> Arc<dyn Clock> {
-    #[cfg(feature = "std")]
+    #[cfg(not(feature = "no-native"))]
     {
         Arc::new(lightning_signer::util::clock::StandardClock())
     }
-    #[cfg(feature = "no-std")]
+    #[cfg(feature = "no-native")]
     {
         use lightning_signer::util::clock::ManualClock;
         use std::time::SystemTime;

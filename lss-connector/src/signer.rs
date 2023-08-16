@@ -9,10 +9,10 @@ use std::collections::BTreeMap;
 use vls_protocol_signer::handler::{RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
 
-#[cfg(feature = "std")]
+#[cfg(not(feature = "no-native"))]
 pub use lightning_signer::persist::SimpleEntropy;
 
-#[cfg(not(feature = "std"))]
+#[cfg(feature = "no-native")]
 use crate::not_entropy::NotEntropy;
 
 #[derive(Clone)]
@@ -37,12 +37,12 @@ impl LssSigner {
 
         #[allow(unused_assignments)]
         let mut new_nonce = [0; 32];
-        #[cfg(feature = "std")]
+        #[cfg(not(feature = "no-native"))]
         {
             let entropy = SimpleEntropy::new();
             new_nonce = helper.new_nonce(&entropy);
         }
-        #[cfg(not(feature = "std"))]
+        #[cfg(feature = "no-native")]
         {
             let n = _nonce.expect("nonce must be provided in no-std mode");
             let entropy = NotEntropy::new(n);

@@ -12,5 +12,5 @@ pub use signer::{handle_lss_msg, LssSigner};
 #[cfg(feature = "broker")]
 pub use broker::{lss_handle, tokio, LssBroker, LssPersister};
 
-#[cfg(not(feature = "std"))]
+#[cfg(feature = "no-native")]
 mod not_entropy;
