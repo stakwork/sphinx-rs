@@ -12,3 +12,7 @@ rmp = { version = "0.8.11", default-features = false }
 
 [dev-dependencies]
 rmp-serde = "1.1.1"
+
+[[bin]]
+name="playground"
+path="src/playground.rs"
