@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -103,4 +103,26 @@ pub struct OtaParams {
 pub struct WifiParams {
     pub ssid: String,
     pub password: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub enum SignerType {
+    ReceiveOnly,
+    ReceiveSend,
+}
+
+impl SignerType {
+    pub fn to_byte(&self) -> u8 {
+        match self {
+            SignerType::ReceiveOnly => 0x5a,
+            SignerType::ReceiveSend => 0x8c,
+        }
+    }
+    pub fn from_byte(b: u8) -> Result<Self> {
+        match b {
+            0x5a => Ok(SignerType::ReceiveOnly),
+            0x8c => Ok(SignerType::ReceiveSend),
+            _ => Err(anyhow!("SignerType byte incorrect: {:x}", b)),
+        }
+    }
 }
