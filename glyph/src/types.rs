@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
+use std::default::Default;
 use std::str::FromStr;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -124,5 +125,11 @@ impl SignerType {
             0x8c => Ok(SignerType::ReceiveSend),
             _ => Err(anyhow!("SignerType byte incorrect: {:x}", b)),
         }
+    }
+}
+
+impl Default for SignerType {
+    fn default() -> Self {
+        SignerType::ReceiveSend
     }
 }
