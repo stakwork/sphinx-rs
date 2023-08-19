@@ -106,7 +106,7 @@ pub struct WifiParams {
     pub password: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub enum SignerType {
     ReceiveOnly,
     ReceiveSend,
