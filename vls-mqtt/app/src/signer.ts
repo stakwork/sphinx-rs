@@ -28,7 +28,7 @@ export async function initialize(secret: string, pubkey: string) {
     async function onConnectionLost() {
       console.log("onConnectionLost");
       sequence = undefined;
-      await sleep(1000);
+      await sleep(3000);
       mqttConnect(userName, password, useSSL);
     }
     MQTT.onConnectionLost = onConnectionLost;
