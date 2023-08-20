@@ -1,47 +1,20 @@
-//use lss_connector::msgs::*;
-//use rmp_serde::encode::Error;
-/*
-use rand::{
-    distributions::{Alphanumeric, DistString},
-    Rng,
-};
-use vls_protocol_signer::lightning_signer::persist::Mutations;
-*/
-
+use lss_connector::deserialize_lssmsg;
 fn main() {
-    /*
-    let mut std_rng = rand::thread_rng();
+    // Bytes taken from https://github.com/stakwork/sphinx-ios/issues/256
+    let x = [
+        129, 167, 67, 114, 101, 97, 116, 101, 100, 130, 171, 115, 101, 114, 118, 101, 114, 95, 104,
+        109, 97, 99, 196, 32, 119, 214, 47, 249, 22, 189, 236, 199, 214, 79, 251, 12, 95, 63, 175,
+        101, 237, 105, 142, 5, 168, 38, 121, 166, 157, 127, 120, 161, 210, 130, 142, 50, 164, 109,
+        117, 116, 115, 144,
+    ];
+    let y = deserialize_lssmsg(&x);
+    println!("{:?}", y);
 
-    let init = Msg::Init(Init {
-        server_pubkey: [0u8; 33],
-    });
-
-    let _z = init.to_vec();
-
-        let auth_token = vec![
-            3, 1, 5, 6, 7, 3, 3, 2, 1, 5, 1, 2, 3, 4, 6, 1, 2, 3, 4, 5, 1, 2, 4, 5, 6, 7, 3, 4, 2, 1,
-            3, 4,
-        ];
-        //println!("len: {}", auth_token.len());
-
-        let init_response = Response::Init(InitResponse {
-            client_id: [0u8; 33],
-            auth_token,
-            nonce: Some([0u8; 32]),
-        });
-        let _ = init_response.to_vec();
-
-        let _z: Mutations = Mutations::from_vec(
-            (0..std_rng.gen_range(100..200))
-                .map(|_| {
-                    (
-                        Alphanumeric.sample_string(&mut rand::thread_rng(), std_rng.gen_range(10..20)),
-                        (std_rng.gen(), vec![std_rng.gen(); std_rng.gen_range(0..10)]),
-                    )
-                })
-                .collect(),
-        );
-
-    */
-    //println!("{:?}", z);
+    let a = [
+        129, 164, 73, 110, 105, 116, 129, 173, 115, 101, 114, 118, 101, 114, 95, 112, 117, 98, 107,
+        101, 121, 196, 33, 2, 116, 210, 87, 213, 129, 0, 4, 177, 77, 39, 94, 32, 210, 198, 74, 84,
+        30, 183, 174, 1, 133, 51, 137, 69, 135, 160, 29, 77, 74, 218, 206, 233,
+    ];
+    let b = deserialize_lssmsg(&a);
+    println!("{:?}", b);
 }

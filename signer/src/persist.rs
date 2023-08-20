@@ -60,19 +60,19 @@ impl Persist for FsPersister {
     ) -> Result<(), Error> {
         let pk = hex::encode(node_id.serialize());
         let state_entry = state.into();
-        let _ = self.states.put(&pk, state_entry);
+        let _ = self.states.put(&pk, &state_entry);
         let node_entry = NodeEntry {
             key_derivation_style: config.key_derivation_style as u8,
             network: config.network.to_string(),
         };
-        let _ = self.nodes.put(&pk, node_entry);
-        let _ = self.pubkeys.put(&pk, node_id.clone());
+        let _ = self.nodes.put(&pk, &node_entry);
+        let _ = self.pubkeys.put(&pk, &node_id);
         Ok(())
     }
     fn update_node(&self, node_id: &PublicKey, state: &CoreNodeState) -> Result<(), Error> {
         let pk = hex::encode(node_id.serialize());
         let state_entry = state.into();
-        let _ = self.states.put(&pk, state_entry);
+        let _ = self.states.put(&pk, &state_entry);
         Ok(())
     }
     fn delete_node(&self, node_id: &PublicKey) -> Result<(), Error> {
@@ -97,7 +97,7 @@ impl Persist for FsPersister {
             channel_setup: None,
             enforcement_state: EnforcementState::new(0),
         };
-        let _ = self.channels.put(&pk, &chan_id, entry);
+        let _ = self.channels.put(&pk, &chan_id, &entry);
         Ok(())
     }
     fn new_chain_tracker(
@@ -106,7 +106,7 @@ impl Persist for FsPersister {
         tracker: &ChainTracker<ChainMonitor>,
     ) -> Result<(), Error> {
         let pk = hex::encode(node_id.serialize());
-        let _ = self.chaintracker.put(&pk, tracker.into());
+        let _ = self.chaintracker.put(&pk, &tracker.into());
         Ok(())
     }
     fn update_tracker(
@@ -116,7 +116,7 @@ impl Persist for FsPersister {
     ) -> Result<(), Error> {
         log::info!("=> update_tracker");
         let pk = hex::encode(node_id.serialize());
-        let _ = self.chaintracker.put(&pk, tracker.into());
+        let _ = self.chaintracker.put(&pk, &tracker.into());
         log::info!("=> update_tracker complete");
         Ok(())
     }
@@ -133,7 +133,7 @@ impl Persist for FsPersister {
                 return Err(Error::NotFound("Failed on get_tracker".to_string()));
             }
         };
-        Ok(ret.into_tracker(node_id.clone(), validator_factory))
+        Ok(ret.into_tracker(node_id, validator_factory))
     }
     fn update_channel(&self, node_id: &PublicKey, channel: &Channel) -> Result<(), Error> {
         // log::info!("=> update_channel");
@@ -150,7 +150,7 @@ impl Persist for FsPersister {
             channel_setup: Some(channel.setup.clone()),
             enforcement_state: channel.enforcement_state.clone(),
         };
-        let _ = self.channels.put(&pk, &chan_id, entry);
+        let _ = self.channels.put(&pk, &chan_id, &entry);
         // log::info!("=> update_channel complete!");
         Ok(())
     }
@@ -195,7 +195,7 @@ impl Persist for FsPersister {
     ) -> Result<(), Error> {
         let pk = hex::encode(node_id.serialize());
         let entry = AllowlistItemEntry { allowlist };
-        let _ = self.allowlist.put(&pk, entry);
+        let _ = self.allowlist.put(&pk, &entry);
         Ok(())
     }
     fn get_node_allowlist(&self, node_id: &PublicKey) -> Result<Vec<String>, Error> {
