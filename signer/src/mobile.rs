@@ -1,6 +1,6 @@
 use crate::approver::SphinxApprover;
 use crate::root::{builder_inner, handle_with_lss};
-use anyhow::Result;
+use anyhow::{Error, Result};
 use lightning_signer::bitcoin::Network;
 use lightning_signer::persist::Persist;
 use lightning_signer::prelude::{Mutex, SendSync};
@@ -71,7 +71,7 @@ pub fn run_init_1(
     LssSigner,
 )> {
     let init = Msg::from_slice(lss_msg1)?.into_init()?;
-    let server_pubkey = PublicKey::from_slice(&init.server_pubkey)?;
+    let server_pubkey = PublicKey::from_slice(&init.server_pubkey).map_err(Error::msg)?;
     let nonce = args.lss_nonce.clone();
     let (rhb, approver) = root_handler_builder(args, state, velocity)?;
     let (lss_signer, res1) = LssSigner::new(&rhb, &server_pubkey, Some(nonce));
@@ -113,7 +113,8 @@ pub fn run_vls(
     let (_res, rh, approver, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2, velocity)?;
     let s1 = approver.control().get_state();
     let (vls_res, lss_res, sequence, cmd) =
-        handle_with_lss(&rh, &lss_signer, vls_msg.to_vec(), expected_sequence, true)?;
+        handle_with_lss(&rh, &lss_signer, vls_msg.to_vec(), expected_sequence, true)
+            .map_err(Error::msg)?;
     let mut ret = if lss_res.is_empty() {
         RunReturn::new_vls(topics::VLS_RES, vls_res, sequence, cmd)
     } else {
