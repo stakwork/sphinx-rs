@@ -1,5 +1,5 @@
 use crate::{sign_message, verify_message};
-use anyhow::anyhow;
+use anyhow::{anyhow, Error as AnyErr};
 use secp256k1::{PublicKey, SecretKey};
 use std::convert::TryInto;
 
@@ -58,9 +58,9 @@ pub fn parse_msg_no_nonce(input: &[u8], pk: &PublicKey) -> anyhow::Result<(Vec<u
         return Err(anyhow!("msg too short"));
     }
     let msg_sig = input.split_at(input.len() - SIG_LEN);
-    let sig: [u8; SIG_LEN] = msg_sig.1.try_into()?;
+    let sig: [u8; SIG_LEN] = msg_sig.1.try_into().map_err(AnyErr::msg)?;
     let msg_nonce = msg_sig.0.split_at(msg_sig.0.len() - 8);
-    let nonce_bytes: [u8; 8] = msg_nonce.1.try_into()?;
+    let nonce_bytes: [u8; 8] = msg_nonce.1.try_into().map_err(AnyErr::msg)?;
     let nonce = u64::from_be_bytes(nonce_bytes);
     let msg = msg_nonce.0;
     verify_message(msg_sig.0, &sig, pk)?;
