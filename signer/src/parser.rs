@@ -1,6 +1,7 @@
 use crate::vls_protocol;
 use serde::ser;
 use vls_protocol::msgs::{self, DeBolt, Message};
+use std::io::Cursor;
 
 pub fn raw_request_from_bytes(
     message: Vec<u8>,
@@ -47,27 +48,30 @@ pub fn raw_response_from_msg<T: ser::Serialize + DeBolt>(
 }
 
 pub fn request_from_bytes<T: DeBolt>(
-    mut msg: Vec<u8>,
+    msg: Vec<u8>,
 ) -> vls_protocol::Result<(T, msgs::SerialRequestHeader)> {
-    let srh: msgs::SerialRequestHeader = msgs::read_serial_request_header(&mut msg)?;
-    let reply: T = msgs::read_message(&mut msg)?;
+    let mut cursor = Cursor::new(msg);
+    let srh: msgs::SerialRequestHeader = msgs::read_serial_request_header(&mut cursor)?;
+    let reply: T = msgs::read_message(&mut cursor)?;
     Ok((reply, srh))
 }
 
 pub fn raw_response_from_bytes(
-    mut res: Vec<u8>,
+    res: Vec<u8>,
     expected_sequence: u16,
 ) -> vls_protocol::Result<Vec<u8>> {
-    msgs::read_serial_response_header(&mut res, expected_sequence)?;
-    Ok(msgs::read_raw(&mut res)?)
+    let mut cursor = Cursor::new(res);
+    msgs::read_serial_response_header(&mut cursor, expected_sequence)?;
+    Ok(msgs::read_raw(&mut cursor)?)
 }
 
 pub fn response_from_bytes(
-    mut res: Vec<u8>,
+    res: Vec<u8>,
     expected_sequence: u16,
 ) -> vls_protocol::Result<Message> {
-    msgs::read_serial_response_header(&mut res, expected_sequence)?;
-    Ok(msgs::read(&mut res)?)
+    let mut cursor = Cursor::new(res);
+    msgs::read_serial_response_header(&mut cursor, expected_sequence)?;
+    Ok(msgs::read(&mut cursor)?)
 }
 
 #[cfg(test)]

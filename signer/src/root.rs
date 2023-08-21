@@ -21,6 +21,7 @@ use vls_protocol::model::PubKey;
 use vls_protocol::msgs::{self, read_serial_request_header, write_serial_response_header, Message};
 use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
+use std::io::Cursor;
 
 #[derive(Error, Debug)]
 pub enum VlsHandlerError {
@@ -132,16 +133,17 @@ pub fn policy_interval(int: Interval) -> VelocityControlIntervalType {
 // returns the VLS return msg and the muts
 fn handle_inner(
     root_handler: &RootHandler,
-    mut bytes: Vec<u8>,
+    bytes: Vec<u8>,
     expected_sequence: Option<u16>,
     do_log: bool,
 ) -> Result<(Vec<u8>, Mutations, u16, String), VlsHandlerError> {
     // println!("Signer is handling these bytes: {:?}", bytes);
+    let mut cursor = Cursor::new(bytes);
     let msgs::SerialRequestHeader {
         sequence,
         peer_id,
         dbid,
-    } = read_serial_request_header(&mut bytes)
+    } = read_serial_request_header(&mut cursor)
         .map_err(|e| VlsHandlerError::HeaderRead(format!("{:?}", e)))?;
     log::info!("sequence: {}", sequence);
     if let Some(expected) = expected_sequence {
@@ -151,13 +153,13 @@ fn handle_inner(
     }
 
     let message =
-        msgs::read(&mut bytes).map_err(|e| VlsHandlerError::MsgRead(format!("{:?}", e)))?;
+        msgs::read(&mut cursor).map_err(|e| VlsHandlerError::MsgRead(format!("{:?}", e)))?;
 
     if let Message::HsmdInit(ref m) = message {
         if ChainHash::using_genesis_block(root_handler.node().network()).as_bytes()
-            != &m.chain_params.0
+            != m.chain_params.as_ref()
         {
-            log::warn!("chain network {:?}", &m.chain_params.0);
+            log::warn!("chain network {:?}", m.chain_params.as_ref());
             log::warn!("root handler network {:?}", root_handler.node().network());
             log::error!("The network setting of CLN and VLS don't match!");
             panic!("The network setting of CLN and VLS don't match!");
@@ -228,13 +230,14 @@ pub fn handle_with_lss(
     Ok((out_bytes, lss_bytes, sequence, cmd))
 }
 
-pub fn parse_ping_and_form_response(mut msg_bytes: Vec<u8>) -> Vec<u8> {
+pub fn parse_ping_and_form_response(msg_bytes: Vec<u8>) -> Vec<u8> {
+    let mut cursor = Cursor::new(msg_bytes);
     let msgs::SerialRequestHeader {
         sequence,
         peer_id: _,
         dbid: _,
-    } = msgs::read_serial_request_header(&mut msg_bytes).expect("read ping header");
-    let ping: msgs::Ping = msgs::read_message(&mut msg_bytes).expect("failed to read ping message");
+    } = msgs::read_serial_request_header(&mut cursor).expect("read ping header");
+    let ping: msgs::Ping = msgs::read_message(&mut cursor).expect("failed to read ping message");
     let mut buf = Vec::new();
     msgs::write_serial_response_header(&mut &mut buf, sequence)
         .expect("failed to write_serial_request_header");
@@ -336,6 +339,13 @@ fn vls_cmd(msg: &Message) -> String {
         Message::NodeInfo(_) => "NodeInfo",
         Message::NodeInfoReply(_) => "NodeInfoReply",
         Message::Unknown(_) => "Unknown",
+        Message::SignAnchorspend(_) => "SignAnchorspend",
+        Message::SignAnchorspendReply(_) => "SignAnchorspendReply",
+        Message::SignSpliceTx(_) => "SignAnchorspendReply",
+        Message::SignHtlcTxMingle(_) => "SignHtlcTxMingle",
+        Message::SignHtlcTxMingleReply(_) => "SignHtlcTxMingleReply",
+        Message::BlockChunk(_) => "BlockChunk",
+        Message::BlockChunkReply(_) => "BlockChunkReply",
     };
     m.to_string()
 }
