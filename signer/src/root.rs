@@ -4,6 +4,7 @@ use types::{Interval, Policy, Velocity};
 
 use lightning_signer::bitcoin::blockdata::constants::ChainHash;
 use lightning_signer::bitcoin::Network;
+use lightning_signer::io::Cursor;
 use lightning_signer::node::NodeServices;
 use lightning_signer::persist::{Mutations, Persist};
 use lightning_signer::policy::filter::PolicyFilter;
@@ -21,7 +22,6 @@ use vls_protocol::model::PubKey;
 use vls_protocol::msgs::{self, read_serial_request_header, write_serial_response_header, Message};
 use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
-use std::io::Cursor;
 
 #[derive(Error, Debug)]
 pub enum VlsHandlerError {
