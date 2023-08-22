@@ -7,6 +7,7 @@ use lightning_signer::node::{NodeConfig, NodeState as CoreNodeState};
 use lightning_signer::persist::model::{
     ChannelEntry as CoreChannelEntry, NodeEntry as CoreNodeEntry,
 };
+use lightning_signer::persist::ChainTrackerListenerEntry;
 use lightning_signer::persist::Persist;
 use lightning_signer::policy::validator::{EnforcementState, ValidatorFactory};
 use lightning_signer::Arc;
@@ -96,11 +97,18 @@ impl Persist for FsPersister {
             channel_value_satoshis: 0,
             channel_setup: None,
             enforcement_state: EnforcementState::new(0),
+            blockheight: Some(stub.blockheight),
         };
         let _ = self.channels.put(&pk, &chan_id, &entry);
         Ok(())
     }
-    fn new_chain_tracker(
+    fn delete_channel(&self, node_id: &PublicKey, channel: &ChannelId) -> Result<(), Error> {
+        let pk = hex::encode(node_id.serialize());
+        let chan_id = hex::encode(get_channel_key(channel.as_slice()));
+        let _ = self.channels.remove(&pk, &chan_id);
+        Ok(())
+    }
+    fn new_tracker(
         &self,
         node_id: &PublicKey,
         tracker: &ChainTracker<ChainMonitor>,
@@ -124,7 +132,7 @@ impl Persist for FsPersister {
         &self,
         node_id: PublicKey,
         validator_factory: Arc<dyn ValidatorFactory>,
-    ) -> Result<ChainTracker<ChainMonitor>, Error> {
+    ) -> Result<(ChainTracker<ChainMonitor>, Vec<ChainTrackerListenerEntry>), Error> {
         let pk = hex::encode(node_id.serialize());
         let ret: ChainTrackerEntry = match self.chaintracker.get(&pk) {
             Ok(ct) => ct,
@@ -149,6 +157,7 @@ impl Persist for FsPersister {
             channel_value_satoshis: channel.setup.channel_value_sat,
             channel_setup: Some(channel.setup.clone()),
             enforcement_state: channel.enforcement_state.clone(),
+            blockheight: None,
         };
         let _ = self.channels.put(&pk, &chan_id, &entry);
         // log::info!("=> update_channel complete!");

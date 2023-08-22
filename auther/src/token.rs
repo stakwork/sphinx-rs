@@ -1,6 +1,6 @@
 use crate::{recover_pubkey, sign_message, verify_message};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error as AnyErr, Result};
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use secp256k1::{PublicKey, SecretKey};
 use std::convert::TryInto;
@@ -50,8 +50,8 @@ impl Token {
         if bytes.len() != 69 {
             return Err(anyhow!("wrong length".to_string()));
         }
-        let ts: [u8; 4] = bytes[..4].try_into()?;
-        let sig: [u8; 65] = bytes[4..].try_into()?;
+        let ts: [u8; 4] = bytes[..4].try_into().map_err(AnyErr::msg)?;
+        let sig: [u8; 65] = bytes[4..].try_into().map_err(AnyErr::msg)?;
         Ok(Self(bytes_to_u32(ts), Some(sig)))
     }
     pub fn expected_len(&self) -> usize {

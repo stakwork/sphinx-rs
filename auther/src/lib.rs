@@ -3,7 +3,7 @@ pub mod token;
 
 pub use secp256k1;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error as AnyErr, Result};
 use secp256k1::ecdsa::{self, Signature};
 use secp256k1::hashes::sha256::Hash as Sha256Hash;
 use secp256k1::hashes::Hash;
@@ -26,8 +26,10 @@ pub fn verify_message(message: &[u8], sig: &[u8; 65], public_key: &PublicKey) ->
     let secp_ctx = Secp256k1::verification_only();
     let encmsg = lightning_hash(message)?;
     // remove the rid
-    let s = Signature::from_compact(&sig[1..])?;
-    secp_ctx.verify_ecdsa(&encmsg, &s, public_key)?;
+    let s = Signature::from_compact(&sig[1..]).map_err(AnyErr::msg)?;
+    secp_ctx
+        .verify_ecdsa(&encmsg, &s, public_key)
+        .map_err(AnyErr::msg)?;
     Ok(())
 }
 
@@ -35,11 +37,11 @@ pub fn recover_pubkey(message: &[u8], sig: &[u8; 65]) -> Result<PublicKey> {
     if sig.len() < 65 {
         return Err(anyhow!("too short sig".to_string()));
     }
-    let encmsg = lightning_hash(message)?;
+    let encmsg = lightning_hash(message).map_err(AnyErr::msg)?;
     let secp = Secp256k1::verification_only();
-    let id = ecdsa::RecoveryId::from_i32(sig[0] as i32 - MAGIC_NUMBER)?;
-    let s = ecdsa::RecoverableSignature::from_compact(&sig[1..], id)?;
-    Ok(secp.recover_ecdsa(&encmsg, &s)?)
+    let id = ecdsa::RecoveryId::from_i32(sig[0] as i32 - MAGIC_NUMBER).map_err(AnyErr::msg)?;
+    let s = ecdsa::RecoverableSignature::from_compact(&sig[1..], id).map_err(AnyErr::msg)?;
+    Ok(secp.recover_ecdsa(&encmsg, &s).map_err(AnyErr::msg)?)
 }
 
 pub fn lightning_hash(message: &[u8]) -> Result<Message> {
@@ -47,6 +49,6 @@ pub fn lightning_hash(message: &[u8]) -> Result<Message> {
     buffer.extend(message);
     let hash1 = Sha256Hash::hash(&buffer[..]);
     let hash2 = Sha256Hash::hash(&hash1[..]);
-    let encmsg = secp256k1::Message::from_slice(&hash2[..])?;
+    let encmsg = secp256k1::Message::from_slice(&hash2[..]).map_err(AnyErr::msg)?;
     Ok(encmsg)
 }
