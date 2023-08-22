@@ -37,7 +37,7 @@ pub fn request_from_msg<T: SerBolt + DeBolt>(
     Ok(buf)
 }
 
-pub fn raw_response_from_msg<T: ser::Serialize + DeBolt>(
+pub fn raw_response_from_msg<T: SerBolt + DeBolt>(
     msg: T,
     sequence: u16,
 ) -> vls_protocol::Result<Vec<u8>> {
