@@ -1,6 +1,6 @@
 use crate::vls_protocol;
 use serde::ser;
-use vls_protocol::msgs::{self, DeBolt, Message};
+use vls_protocol::msgs::{self, DeBolt, Message, SerBolt};
 use vls_protocol_signer::lightning_signer::io::Cursor;
 
 pub fn raw_request_from_bytes(
@@ -20,7 +20,7 @@ pub fn raw_request_from_bytes(
     Ok(buf)
 }
 
-pub fn request_from_msg<T: ser::Serialize + DeBolt>(
+pub fn request_from_msg<T: SerBolt + DeBolt>(
     msg: T,
     sequence: u16,
     peer_id: [u8; 33],
