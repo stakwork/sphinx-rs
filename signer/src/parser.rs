@@ -1,5 +1,4 @@
 use crate::vls_protocol;
-use serde::ser;
 use vls_protocol::msgs::{self, DeBolt, Message, SerBolt};
 use vls_protocol_signer::lightning_signer::io::Cursor;
 
@@ -79,12 +78,13 @@ mod tests {
     // cargo test parser::tests::test_parser -- --exact
     #[test]
     fn test_parser() {
+        use vls_protocol_signer::lightning_signer::io::Cursor;
         let msg = "hello";
         let ping = msgs::Ping {
             id: 0,
             message: WireString(msg.as_bytes().to_vec()),
         };
-        let mut buf = Vec::new();
+        let mut buf = Cursor::new(Vec::new());
         let srh = msgs::SerialRequestHeader {
             sequence: 0,
             peer_id: [0u8; 33],

@@ -39,3 +39,4 @@ thiserror = "1.0.44"
 
 [dev-dependencies]
 simple_logger = "4.2.0"
+bech32 = "0.9.1"
