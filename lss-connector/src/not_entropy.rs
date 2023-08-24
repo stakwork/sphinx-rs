@@ -1,4 +1,4 @@
-use lightning_signer::lightning::chain::keysinterface::EntropySource;
+use lightning_signer::lightning::sign::EntropySource;
 use vls_protocol_signer::lightning_signer;
 
 pub struct NotEntropy([u8; 32]);
