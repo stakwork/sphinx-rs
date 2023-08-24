@@ -20,14 +20,14 @@ no-native = []
 [dependencies]
 sphinx-glyph = { path = '../glyph', default-features = false }
 rmp-utils = { version = "0.1.0", path = "../rmp-utils" }
-vls-protocol-signer = { git = "https://gitlab.com/evanfeenstra1/validating-lightning-signer.git", rev = "0344fa9ee8d99edaece7020bd414b3b8c4dad7b3", default-features = false, features = ["secp-lowmemory"] }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "d7af836e2345befc45f6ac3bdde91a187ab8b2a5", default-features = false, features = ["secp-lowmemory"] }
 # vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory"] }
 log = "0.4"
 anyhow = { version = "1", default-features = false }
 secp256k1 = { version = "0.24.0", default-features = false, features = ["bitcoin_hashes"] }
 # broker libs
-lightning-storage-server = { git = "https://gitlab.com/evanfeenstra1/validating-lightning-signer.git", rev = "0344fa9ee8d99edaece7020bd414b3b8c4dad7b3", optional = true }
-vls-frontend = { git = "https://gitlab.com/evanfeenstra1/validating-lightning-signer.git", rev = "0344fa9ee8d99edaece7020bd414b3b8c4dad7b3", optional = true }
+lightning-storage-server = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "d7af836e2345befc45f6ac3bdde91a187ab8b2a5", optional = true }
+vls-frontend = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "d7af836e2345befc45f6ac3bdde91a187ab8b2a5", optional = true }
 # lightning-storage-server = { path = "../../vls/lightning-storage-server", optional = true }
 # vls-frontend = { path = "../../vls/vls-frontend", optional = true }
 tokio = { version = "1.27", features = ["macros", "rt-multi-thread"], optional = true }

@@ -22,9 +22,9 @@ no-native = ["lss-connector/no-native"]
 [dependencies]
 sphinx-glyph = { path = '../glyph', default-features = false }
 lss-connector = { path = "../lss-connector", default-features = false }
-vls-protocol-signer = { git = "https://gitlab.com/evanfeenstra1/validating-lightning-signer.git", rev = "0344fa9ee8d99edaece7020bd414b3b8c4dad7b3", default-features = false, features = ["secp-lowmemory"] }
-vls-protocol = { git = "https://gitlab.com/evanfeenstra1/validating-lightning-signer.git", rev = "0344fa9ee8d99edaece7020bd414b3b8c4dad7b3", default-features = false }
-vls-persist = { git = "https://gitlab.com/evanfeenstra1/validating-lightning-signer.git", rev = "0344fa9ee8d99edaece7020bd414b3b8c4dad7b3", default-features = false, features = ["memo"], optional = true }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "d7af836e2345befc45f6ac3bdde91a187ab8b2a5", default-features = false, features = ["secp-lowmemory"] }
+vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "d7af836e2345befc45f6ac3bdde91a187ab8b2a5", default-features = false }
+vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "d7af836e2345befc45f6ac3bdde91a187ab8b2a5", default-features = false, features = ["memo"], optional = true }
 # vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory"] }
 # vls-protocol = { path = "../../vls/vls-protocol" }
 # vls-persist = { path = "../../vls/vls-persist", default-features = false, features = ["memo"], optional = true }
