@@ -142,6 +142,8 @@ rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-andro
 
 ### ios
 
+use channel = "stable" in rust-toolchain.toml
+
 rustup target add aarch64-apple-ios x86_64-apple-ios
 
 armv7-apple-ios

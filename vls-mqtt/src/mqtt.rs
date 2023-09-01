@@ -168,7 +168,8 @@ async fn got_msg(
         let (vls_msg, reply_rx) = VlsChanMsg::new(msg_bytes.to_vec(), expected_sequence);
         let _ = vls_tx.send(vls_msg).await;
         match reply_rx.await.unwrap() {
-            Ok((vls_bytes, lss_bytes, sequence, _cmd)) => {
+            Ok((vls_bytes, lss_bytes, sequence, cmd)) => {
+                println!("RAN: {:?}", cmd);
                 if lss_bytes.len() == 0 {
                     // no muts, respond directly back!
                     (topics::VLS_RES.to_string(), vls_bytes, Some(sequence))
@@ -178,11 +179,14 @@ async fn got_msg(
                     (topics::LSS_RES.to_string(), lss_bytes, Some(sequence))
                 }
             }
-            Err(e) => (
-                topics::ERROR.to_string(),
-                e.to_string().as_bytes().to_vec(),
-                None,
-            ),
+            Err(e) => {
+                println!("ERROR: {:?}", e);
+                (
+                    topics::ERROR.to_string(),
+                    e.to_string().as_bytes().to_vec(),
+                    None,
+                )
+            }
         }
     } else if topic.ends_with(topics::LSS_MSG)
         || topic.ends_with(topics::INIT_1_MSG)
