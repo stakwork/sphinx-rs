@@ -29,6 +29,7 @@ pub struct FsPersister {
     allowlist: Bucket<AllowlistItemEntry>,
     chaintracker: Bucket<ChainTrackerEntry>,
     pubkeys: Bucket<PublicKey>,
+    prev_msgs: Bucket<Vec<u8>>,
 }
 
 impl SendSync for FsPersister {}
@@ -43,6 +44,7 @@ impl FsPersister {
             allowlist: db.bucket("allowlis", maxsize).expect("fail allowlis"),
             chaintracker: db.bucket("chaintra", maxsize).expect("fail chaintra"),
             pubkeys: db.bucket("pubkey", maxsize).expect("fail pubkey"),
+            prev_msgs: db.bucket("prevs", maxsize).expect("fail prevs"),
         }
     }
 }
@@ -50,6 +52,13 @@ impl FsPersister {
 fn get_channel_key(channel_id: &[u8]) -> &[u8] {
     let length = channel_id.len();
     channel_id.get(length - 11..length - 7).unwrap()
+}
+
+impl FsPersister {
+    pub fn add_prevs(&self, prev_vls: Vec<u8>, prev_lss: Vec<u8>) {
+        let _ = self.prev_msgs.put("prev_vls", &prev_vls);
+        let _ = self.prev_msgs.put("prev_lss", &prev_lss);
+    }
 }
 
 impl Persist for FsPersister {
