@@ -177,7 +177,7 @@ async fn rocket() -> _ {
     rocket::tokio::spawn(async move {
         loop {
             rocket::tokio::time::sleep(Duration::from_secs(60)).await;
-            let _ = rh.node().get_heartbeat();
+            // let _ = rh.node().get_heartbeat();
         }
     });
 

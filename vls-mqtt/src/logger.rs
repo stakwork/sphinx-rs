@@ -55,19 +55,27 @@ impl Log for MyLogger {
 }
 
 pub fn setup_logs(error_tx: broadcast::Sender<Vec<u8>>) {
+    // let (log_tx, mut log_rx) = broadcast::channel::<Vec<u8>>(1000);
+    // tokio::spawn(async move {
+    //     while let Ok(log_msg) = log_rx.recv().await {
+    //         println!("{}", String::from_utf8_lossy(&log_msg));
+    //     }
+    // });
     let elog1: Box<dyn Log> = Box::new(MyLogger {
-        filter: LevelFilter::Info,
+        filter: LevelFilter::Debug,
+        // tx: Some(log_tx),
         tx: None,
     });
     let elog2: Box<dyn Log> = Box::new(MyLogger {
-        filter: LevelFilter::Info,
+        filter: LevelFilter::Error,
         tx: Some(error_tx),
     });
     fern::Dispatch::new()
-        .level(LevelFilter::Warn)
-        .level_for("lightning_signer", LevelFilter::Info)
+        .level(LevelFilter::Debug)
+        // .level_for("lightning_signer", LevelFilter::Info)
         .level_for("rocket", LevelFilter::Info)
-        .level_for("sphinx_signer", LevelFilter::Info)
+        .level_for("rumqttc", LevelFilter::Warn)
+        // .level_for("sphinx_signer", LevelFilter::Info)
         .chain(elog1) // Chaining two logs
         .chain(elog2)
         .apply()
