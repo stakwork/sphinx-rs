@@ -59,6 +59,21 @@ impl FsPersister {
         let _ = self.prev_msgs.put("prev_vls", &prev_vls);
         let _ = self.prev_msgs.put("prev_lss", &prev_lss);
     }
+    pub fn read_prevs(&self) -> Result<(Vec<u8>, Vec<u8>), Error> {
+        let prev_vls = match self.prev_msgs.get("prev_vls") {
+            Ok(pv) => pv,
+            Err(_) => {
+                return Err(Error::NotFound("Failed to get prev_vls".to_string()));
+            }
+        };
+        let prev_lss = match self.prev_msgs.get("prev_lss") {
+            Ok(pl) => pl,
+            Err(_) => {
+                return Err(Error::NotFound("Failed to get prev_lss".to_string()));
+            }
+        };
+        Ok((prev_vls, prev_lss))
+    }
 }
 
 impl Persist for FsPersister {
