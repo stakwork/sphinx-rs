@@ -55,9 +55,13 @@ fn get_channel_key(channel_id: &[u8]) -> &[u8] {
 }
 
 impl FsPersister {
-    pub fn add_prevs(&self, prev_vls: Vec<u8>, prev_lss: Vec<u8>) {
-        let _ = self.prev_msgs.put("prev_vls", &prev_vls);
-        let _ = self.prev_msgs.put("prev_lss", &prev_lss);
+    pub fn set_prevs(&self, prev_vls: &Vec<u8>, prev_lss: &Vec<u8>) {
+        let _ = self.prev_msgs.put("prev_vls", prev_vls);
+        let _ = self.prev_msgs.put("prev_lss", prev_lss);
+    }
+    pub fn remove_prevs(&self) {
+        let _ = self.prev_msgs.remove("prev_vls");
+        let _ = self.prev_msgs.remove("prev_lss");
     }
     pub fn read_prevs(&self) -> Result<(Vec<u8>, Vec<u8>), Error> {
         let prev_vls = match self.prev_msgs.get("prev_vls") {
