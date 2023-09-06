@@ -28,20 +28,20 @@ rand = { version = "0.8", default-features = false }
 serde = { version = "1.0.168", default-features = false, features = ["derive"] }
 hex = { version = "0.4.3", default-features = false }
 anyhow = { version = "1", default-features = false }
-fsdb = { git = "https://github.com/Evanfeenstra/fsdb.git", rev = "78e174941ea0a373c2bb0ef518317b40ac80abf9", optional = true }
+fsdb = { git = "https://github.com/Evanfeenstra/fsdb.git", rev = "90c0dd3ba1b6ceaebd133e640d65d82a0b8be57d", optional = true }
 thiserror = "1.0.44"
 # vls
-# vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "c4e91b17f94c0c521d8af941e3c258f573378af1", default-features = false, features = ["secp-lowmemory"] }
-# vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "c4e91b17f94c0c521d8af941e3c258f573378af1", default-features = false }
-# vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "c4e91b17f94c0c521d8af941e3c258f573378af1", default-features = false, features = ["memo"], optional = true }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "ec5b54be8bddb2907f36c135faf18b22feee473c", default-features = false, features = ["secp-lowmemory"] }
+vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "ec5b54be8bddb2907f36c135faf18b22feee473c", default-features = false }
+vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "ec5b54be8bddb2907f36c135faf18b22feee473c", default-features = false, features = ["memo"], optional = true }
 # local
 # vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory"] }
 # vls-protocol = { path = "../../vls/vls-protocol" }
 # vls-persist = { path = "../../vls/vls-persist", default-features = false, features = ["memo"], optional = true }
 # evanfeenstra1
-vls-protocol-signer = { git = "https://gitlab.com/evanfeenstra1/validating-lightning-signer.git", rev = "dbaeb29b51f399ce993923cca3ef218b2029cd11", default-features = false, features = ["secp-lowmemory"] }
-vls-protocol = { git = "https://gitlab.com/evanfeenstra1/validating-lightning-signer.git", rev = "dbaeb29b51f399ce993923cca3ef218b2029cd11", default-features = false }
-vls-persist = { git = "https://gitlab.com/evanfeenstra1/validating-lightning-signer.git", rev = "dbaeb29b51f399ce993923cca3ef218b2029cd11", default-features = false, features = ["memo"], optional = true }
+# vls-protocol-signer = { git = "https://gitlab.com/evanfeenstra1/validating-lightning-signer.git", rev = "dbaeb29b51f399ce993923cca3ef218b2029cd11", default-features = false, features = ["secp-lowmemory"] }
+# vls-protocol = { git = "https://gitlab.com/evanfeenstra1/validating-lightning-signer.git", rev = "dbaeb29b51f399ce993923cca3ef218b2029cd11", default-features = false }
+# vls-persist = { git = "https://gitlab.com/evanfeenstra1/validating-lightning-signer.git", rev = "dbaeb29b51f399ce993923cca3ef218b2029cd11", default-features = false, features = ["memo"], optional = true }
 
 [dev-dependencies]
 simple_logger = "4.2.0"
