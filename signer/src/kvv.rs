@@ -32,8 +32,19 @@ impl SendSync for FsKVVStore {}
 impl FsKVVStore {
     pub fn new(path: &str, maxsize: Option<usize>) -> KVVPersister<Self> {
         let db = Fsdb::new(path).expect("could not create db");
-        let bucket = db.any_bucket(maxsize).expect("could not create bucket");
-        let versions = BTreeMap::new();
+        let bucket = db
+            .any_bucket::<Vec<u8>>(maxsize)
+            .expect("could not create bucket");
+
+        // seed the initial versions store
+        let mut versions = BTreeMap::new();
+        let fulllist = bucket.list_all().expect("could not list bucket");
+        for path in fulllist {
+            let item = bucket.get(&path).unwrap();
+            let (version, _) = Self::decode_vv(&item);
+            versions.insert(path, version);
+        }
+
         KVVPersister(Self {
             db: bucket,
             versions,
@@ -82,7 +93,9 @@ impl KVVStore for FsKVVStore {
 
     fn put_with_version(&self, key: &str, version: u64, value: &[u8]) -> Result<(), Error> {
         let vv = self.check_version(key, version, value)?;
-        self.db.put(key, &vv).expect("failed to insert");
+        self.db
+            .put(key, &vv)
+            .map_err(|_| Error::Internal("could not put".to_string()))?;
         Ok(())
     }
     fn put_batch(&self, kvvs: &[&KVV]) -> Result<(), Error> {
@@ -99,7 +112,9 @@ impl KVVStore for FsKVVStore {
             return Err(Error::VersionMismatch);
         } else {
             for vv in vvs {
-                self.db.put(&vv.0, &vv.1).expect("failed to insert");
+                self.db
+                    .put(&vv.0, &vv.1)
+                    .map_err(|_| Error::Internal("could not put".to_string()))?;
             }
         }
         Ok(())
@@ -116,12 +131,18 @@ impl KVVStore for FsKVVStore {
         Ok(self.versions.get(key).copied())
     }
     fn get_prefix(&self, prefix: &str) -> Result<Self::Iter, Error> {
-        let items = self.db.list(prefix).unwrap();
+        let items = self
+            .db
+            .list(prefix)
+            .map_err(|_| Error::Internal("could not list".to_string()))?;
         let mut result = Vec::new();
         for item in items {
-            let vv = self.db.get(&item).expect("couldnt get by prefix");
-            let (version, value) = Self::decode_vv(&vv);
             let key = format!("{}/{}", prefix, item);
+            let vv = self
+                .db
+                .get(&key)
+                .map_err(|_| Error::Internal("could not get".to_string()))?;
+            let (version, value) = Self::decode_vv(&vv);
             result.push(KVV(key, (version, value)));
         }
         Ok(Iter(result.into_iter()))
