@@ -1,6 +1,5 @@
 pub mod approver;
 pub mod derive;
-pub mod kvv;
 pub mod mobile;
 pub mod parser;
 pub mod root;
@@ -11,6 +10,9 @@ pub mod policy;
 
 #[cfg(feature = "fspersist")]
 pub mod persist;
+
+#[cfg(feature = "fspersist")]
+pub mod kvv;
 
 pub use lss_connector;
 pub use sphinx_glyph;
