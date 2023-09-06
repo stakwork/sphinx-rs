@@ -40,9 +40,13 @@ impl FsKVVStore {
         let mut versions = BTreeMap::new();
         let fulllist = bucket.list_all().expect("could not list bucket");
         for path in fulllist {
-            let item = bucket.get(&path).unwrap();
-            let (version, _) = Self::decode_vv(&item);
-            versions.insert(path, version);
+            match bucket.get(&path) {
+                Ok(item) => {
+                    let (version, _) = Self::decode_vv(&item);
+                    versions.insert(path, version);
+                }
+                Err(e) => log::error!("failed to seed version {:?}", e),
+            }
         }
 
         KVVPersister(Self {

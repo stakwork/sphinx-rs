@@ -28,7 +28,7 @@ rand = { version = "0.8", default-features = false }
 serde = { version = "1.0.168", default-features = false, features = ["derive"] }
 hex = { version = "0.4.3", default-features = false }
 anyhow = { version = "1", default-features = false }
-fsdb = { git = "https://github.com/Evanfeenstra/fsdb.git", rev = "f9937fd9b8f33d01cbfce724626690e0ba03398a", optional = true }
+fsdb = { git = "https://github.com/Evanfeenstra/fsdb.git", rev = "5afc0b120a16b5d498c2b62a20062d4ca4e55dc6", optional = true }
 thiserror = "1.0.44"
 # vls
 vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "ec5b54be8bddb2907f36c135faf18b22feee473c", default-features = false, features = ["secp-lowmemory"] }
