@@ -13,9 +13,10 @@ use lss::init_lss;
 use rocket::tokio::sync::{broadcast, mpsc, oneshot};
 use sphinx_signer::lightning_signer::bitcoin::Network;
 // use sphinx_signer::lightning_signer::persist::Persist;
-use sphinx_signer::lightning_signer::persist::Persist;
+// use sphinx_signer::lightning_signer::persist::Persist;
 use sphinx_signer::lightning_signer::wallet::Wallet;
-use sphinx_signer::persist::{BackupPersister, FsPersister, ThreadMemoPersister};
+// use sphinx_signer::persist::{BackupPersister, FsPersister, ThreadMemoPersister};
+use sphinx_signer::kvv::FsKVVStore;
 use sphinx_signer::policy::update_controls;
 use sphinx_signer::Handler;
 use sphinx_signer::{self, approver::SphinxApprover, root, sphinx_glyph as glyph, RootHandler};
@@ -101,22 +102,26 @@ async fn rocket() -> _ {
     let initial_velocity = ctrlr_db.read_velocity().ok();
     let ctrlr_db_mutex = Arc::new(Mutex::new(ctrlr_db));
     let mut ctrlr = Controller::new_with_persister(sk, pk, ctrlr_db_mutex.clone());
-    let node_id = ctrlr.pubkey();
+    // let node_id = ctrlr.pubkey();
 
     let seed32: [u8; 32] = seed.try_into().expect("invalid seed");
     let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
 
-    let fs_persister = FsPersister::new(&store_path, None);
-    let initial_allowlist = match fs_persister.get_node_allowlist(&node_id) {
-        Ok(al) => al,
-        Err(_) => {
-            log::warn!("no allowlist found in fs persister!");
-            Vec::new()
-        }
-    };
+    let fs_persister = FsKVVStore::new(&store_path, None);
+    // FIXME initial allowlist
+    let initial_allowlist = Vec::new();
+    // let initial_allowlist = match fs_persister.get_node_allowlist(&node_id) {
+    //     Ok(al) => al,
+    //     Err(_) => {
+    //         log::warn!("no allowlist found in fs persister!");
+    //         Vec::new()
+    //     }
+    // };
 
-    let lss_persister = ThreadMemoPersister {};
-    let persister = Arc::new(BackupPersister::new(fs_persister, lss_persister));
+    // let lss_persister = ThreadMemoPersister {};
+    // let persister = Arc::new(BackupPersister::new(fs_persister, lss_persister));
+
+    let persister = Arc::new(fs_persister);
 
     let (handler_builder, approver) = root::builder(
         seed32,
