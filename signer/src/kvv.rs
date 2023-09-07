@@ -4,7 +4,7 @@ use lightning_signer::SendSync;
 use log::error;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
-use vls_persist::kvv::{KVVPersister, KVVStore, KVV};
+pub use vls_persist::kvv::{cloud::CloudKVVStore, KVVPersister, KVVStore, KVV};
 use vls_protocol_signer::lightning_signer;
 extern crate alloc;
 
@@ -104,10 +104,10 @@ impl KVVStore for FsKVVStore {
     }
     fn put_batch(&self, kvvs: &[&KVV]) -> Result<(), Error> {
         let mut found_version_mismatch = false;
-        let mut vvs: Vec<(String, Vec<u8>)> = Vec::new();
+        let mut staged_vvs: Vec<(String, Vec<u8>)> = Vec::new();
         for kvv in kvvs.into_iter() {
             match self.check_version(&kvv.0, kvv.1 .0, &kvv.1 .1) {
-                Ok(vv) => vvs.push((kvv.0.clone(), vv)),
+                Ok(vv) => staged_vvs.push((kvv.0.clone(), vv)),
                 Err(_) => found_version_mismatch = true,
             }
         }
@@ -115,7 +115,7 @@ impl KVVStore for FsKVVStore {
             // abort the transaction
             return Err(Error::VersionMismatch);
         } else {
-            for vv in vvs {
+            for vv in staged_vvs {
                 self.db
                     .put(&vv.0, &vv.1)
                     .map_err(|_| Error::Internal("could not put".to_string()))?;

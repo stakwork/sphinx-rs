@@ -2,8 +2,6 @@ use crate::msgs::*;
 use anyhow::{anyhow, Result};
 use lightning_signer::persist::ExternalPersistHelper;
 use lightning_signer::persist::Mutations;
-use lightning_signer::prelude::Mutex;
-use lightning_signer::Arc;
 use secp256k1::PublicKey;
 use std::collections::BTreeMap;
 use vls_protocol_signer::handler::{RootHandler, RootHandlerBuilder};
@@ -111,8 +109,18 @@ impl LssSigner {
                 sta.insert(key, version_value);
             }
         }
-        let st = Arc::new(Mutex::new(sta));
-        let handler_builder = handler_builder.lss_state(st);
+
+        let muts: Vec<_> = sta
+            .iter()
+            .map(|(k, (v, vv))| (k.clone(), (*v, vv.clone())))
+            .collect();
+        let persister = handler_builder.persister();
+        persister
+            .put_batch_unlogged(Mutations::from_vec(muts))
+            .expect("put_batch_unlogged");
+
+        // let st = Arc::new(Mutex::new(sta));
+        // let handler_builder = handler_builder.lss_state(st);
         let (handler, muts) = handler_builder
             .build()
             .map_err(|_| anyhow!("failed to build"))?;

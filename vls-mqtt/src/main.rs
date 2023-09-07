@@ -16,7 +16,7 @@ use sphinx_signer::lightning_signer::bitcoin::Network;
 // use sphinx_signer::lightning_signer::persist::Persist;
 use sphinx_signer::lightning_signer::wallet::Wallet;
 // use sphinx_signer::persist::{BackupPersister, FsPersister, ThreadMemoPersister};
-use sphinx_signer::kvv::FsKVVStore;
+use sphinx_signer::kvv::{CloudKVVStore, FsKVVStore};
 use sphinx_signer::policy::update_controls;
 use sphinx_signer::Handler;
 use sphinx_signer::{self, approver::SphinxApprover, root, sphinx_glyph as glyph, RootHandler};
@@ -107,7 +107,8 @@ async fn rocket() -> _ {
     let seed32: [u8; 32] = seed.try_into().expect("invalid seed");
     let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
 
-    let fs_persister = FsKVVStore::new(&store_path, None);
+    let kvv_store = FsKVVStore::new(&store_path, None).0;
+    let fs_persister = CloudKVVStore::new(kvv_store);
     // FIXME initial allowlist
     let initial_allowlist = Vec::new();
     // let initial_allowlist = match fs_persister.get_node_allowlist(&node_id) {

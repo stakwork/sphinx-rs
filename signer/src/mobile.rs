@@ -2,8 +2,8 @@ use crate::approver::SphinxApprover;
 use crate::root::{builder_inner, handle_with_lss};
 use anyhow::{Error, Result};
 use lightning_signer::bitcoin::Network;
-use lightning_signer::persist::Persist;
-use lightning_signer::prelude::{Mutex, SendSync};
+use lightning_signer::persist::{Mutations, Persist};
+use lightning_signer::prelude::SendSync;
 use lightning_signer::signer::StartingTimeFactory;
 use lightning_signer::util::clock::Clock;
 use lightning_signer::Arc;
@@ -14,7 +14,7 @@ use sphinx_glyph::topics;
 use sphinx_glyph::types::{Policy, Velocity};
 use std::collections::BTreeMap;
 use std::time::Duration;
-pub use vls_persist::thread_memo_persister::ThreadMemoPersister;
+pub use vls_persist::kvv::memory::MemoryKVVStore;
 use vls_protocol_signer::handler::{RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
 
@@ -155,9 +155,13 @@ fn root_handler_builder(
 ) -> Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
     use std::time::UNIX_EPOCH;
 
-    let tmp = ThreadMemoPersister {};
-
-    let persist_ctx = tmp.enter(Arc::new(Mutex::new(state)));
+    let tmp = MemoryKVVStore::new();
+    let muts: Vec<_> = state
+        .iter()
+        .map(|(k, (v, vv))| (k.clone(), (*v, vv.clone())))
+        .collect();
+    tmp.put_batch_unlogged(Mutations::from_vec(muts))
+        .map_err(|_| anyhow::anyhow!("could not hydrate MemoryKVVStore"))?;
 
     let st = UNIX_EPOCH + Duration::from_secs(args.timestamp);
     let d = st.duration_since(UNIX_EPOCH).unwrap();
@@ -175,10 +179,10 @@ fn root_handler_builder(
         clock,
         stf,
     )?;
-    let muts = persist_ctx.exit();
-    if !muts.is_empty() {
-        log::info!("root_handler_builder MUTS: {:?}", muts);
-    }
+    // let muts = tmp.prepare();
+    // if !muts.is_empty() {
+    //     log::info!("root_handler_builder MUTS: {:?}", muts);
+    // }
     Ok((rhb, approver))
 }
 

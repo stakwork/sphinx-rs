@@ -20,7 +20,7 @@ use vls_protocol_signer::lightning_signer;
 use vls_protocol_signer::lightning_signer::persist::Error;
 
 pub use vls_persist::backup_persister::BackupPersister;
-pub use vls_persist::thread_memo_persister::ThreadMemoPersister;
+pub use vls_persist::kvv::memory::MemoryKVVStore;
 
 pub struct FsPersister {
     nodes: Bucket<NodeEntry>,
