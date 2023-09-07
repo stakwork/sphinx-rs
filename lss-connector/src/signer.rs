@@ -124,6 +124,9 @@ impl LssSigner {
         let (handler, muts) = handler_builder
             .build()
             .map_err(|_| anyhow!("failed to build"))?;
+        persister
+            .commit()
+            .map_err(|_| anyhow!("failed to commit"))?;
         let client_hmac = self.helper.client_hmac(&muts);
 
         let res = Response::Created(SignerMutations {

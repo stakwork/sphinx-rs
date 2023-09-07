@@ -11,12 +11,9 @@ use glyph::control::{ControlPersist, Controller};
 use glyph::ser::{serialize_controlresponse, ByteBuf};
 use lss::init_lss;
 use rocket::tokio::sync::{broadcast, mpsc, oneshot};
-use sphinx_signer::lightning_signer::bitcoin::Network;
-// use sphinx_signer::lightning_signer::persist::Persist;
-// use sphinx_signer::lightning_signer::persist::Persist;
-use sphinx_signer::lightning_signer::wallet::Wallet;
-// use sphinx_signer::persist::{BackupPersister, FsPersister, ThreadMemoPersister};
 use sphinx_signer::kvv::{CloudKVVStore, FsKVVStore};
+use sphinx_signer::lightning_signer::bitcoin::Network;
+use sphinx_signer::lightning_signer::wallet::Wallet;
 use sphinx_signer::policy::update_controls;
 use sphinx_signer::Handler;
 use sphinx_signer::{self, approver::SphinxApprover, root, sphinx_glyph as glyph, RootHandler};
@@ -172,6 +169,7 @@ async fn rocket() -> _ {
                 drop(ctrldb_);
             }
             let _ = msg.reply_tx.send(res_res);
+            rh_.commit();
         }
     });
 
