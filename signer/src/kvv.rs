@@ -169,6 +169,7 @@ impl KVVStore for FsKVVStore {
         let mut result = Vec::new();
         for item in items {
             let key = format!("{}/{}", prefix, item);
+            log::info!("LIST RES {:?}", key);
             let vv = self
                 .db
                 .get(&key)
