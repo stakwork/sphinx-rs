@@ -7,13 +7,12 @@ use std::convert::TryInto;
 pub use vls_persist::kvv::{cloud::CloudKVVStore, KVVPersister, KVVStore, KVV};
 use vls_protocol_signer::lightning_signer;
 extern crate alloc;
+use std::sync::Mutex;
 
-/// A key-version-value store backed by redb
+/// A key-version-value store backed by fsdb
 pub struct FsKVVStore {
     db: AnyBucket<Vec<u8>>,
-    // keep track of current versions for each key, so we can efficiently enforce versioning.
-    // we don't expect many keys, so this is OK for low-resource environments.
-    versions: BTreeMap<String, u64>,
+    versions: Mutex<BTreeMap<String, u64>>,
 }
 
 /// An iterator over a KVVStore range
@@ -51,7 +50,7 @@ impl FsKVVStore {
 
         KVVPersister(Self {
             db: bucket,
-            versions,
+            versions: Mutex::new(versions),
         })
     }
     fn decode_vv(vv: &[u8]) -> (u64, Vec<u8>) {
@@ -65,24 +64,29 @@ impl FsKVVStore {
         vv.extend_from_slice(value);
         vv
     }
-    fn check_version(&self, key: &str, version: u64, value: &[u8]) -> Result<Vec<u8>, Error> {
+    fn check_version(
+        &self,
+        key: &str,
+        version: u64,
+        prev: u64,
+        value: &[u8],
+    ) -> Result<Vec<u8>, Error> {
         let vv = Self::encode_vv(version, value);
-        if let Some(v) = self.versions.get(key) {
-            if version < *v {
-                error!("version mismatch for {}: {} < {}", key, version, v);
-                // version cannot go backwards
-                return Err(Error::VersionMismatch);
-            } else if version == *v {
-                // if same version, value must not have changed
-                if let Ok(existing) = self.db.get(key) {
-                    if existing != vv {
-                        error!("value mismatch for {}: {}", key, version);
-                        return Err(Error::VersionMismatch);
-                    }
+        if version < prev {
+            error!("version mismatch for {}: {} < {}", key, version, prev);
+            // version cannot go backwards
+            return Err(Error::VersionMismatch);
+        } else if version == prev {
+            // if same version, value must not have changed
+            if let Ok(existing) = self.db.get_raw(key) {
+                if existing != vv {
+                    error!("value mismatch for {}: {}", key, version);
+                    return Err(Error::VersionMismatch);
                 }
-                return Ok(vv);
             }
+            return Ok(vv);
         }
+
         Ok(vv)
     }
 }
@@ -91,24 +95,46 @@ impl KVVStore for FsKVVStore {
     type Iter = Iter;
 
     fn put(&self, key: &str, value: &[u8]) -> Result<(), Error> {
-        let version = self.versions.get(key).map(|v| v + 1).unwrap_or(0);
-        self.put_with_version(key, version, value)
+        let v = self
+            .versions
+            .lock()
+            .unwrap()
+            .get(key)
+            .map(|v| v + 1)
+            .unwrap_or(0);
+        self.put_with_version(key, v, value)
     }
 
     fn put_with_version(&self, key: &str, version: u64, value: &[u8]) -> Result<(), Error> {
-        let vv = self.check_version(key, version, value)?;
+        let mut vers = self.versions.lock().unwrap();
+        let vv = match vers.get(key) {
+            Some(prev) => self.check_version(key, version, *prev, value)?,
+            None => Self::encode_vv(version, value),
+        };
+        vers.insert(key.to_string(), version);
         self.db
-            .put(key, &vv)
+            .put_raw(key, &vv)
             .map_err(|_| Error::Internal("could not put".to_string()))?;
         Ok(())
     }
     fn put_batch(&self, kvvs: &[&KVV]) -> Result<(), Error> {
         let mut found_version_mismatch = false;
-        let mut staged_vvs: Vec<(String, Vec<u8>)> = Vec::new();
+        let mut staged_vvs: Vec<(String, u64, Vec<u8>)> = Vec::new();
+
+        let mut vers = self.versions.lock().unwrap();
         for kvv in kvvs.into_iter() {
-            match self.check_version(&kvv.0, kvv.1 .0, &kvv.1 .1) {
-                Ok(vv) => staged_vvs.push((kvv.0.clone(), vv)),
-                Err(_) => found_version_mismatch = true,
+            let key = kvv.0.clone();
+            let ver = kvv.1 .0;
+            let val = &kvv.1 .1;
+            match vers.get(&key) {
+                Some(prev) => match self.check_version(&key, ver, *prev, val) {
+                    Ok(vv) => staged_vvs.push((key.clone(), ver, vv)),
+                    Err(_) => found_version_mismatch = true,
+                },
+                None => {
+                    let vv = Self::encode_vv(ver, val);
+                    staged_vvs.push((key.clone(), ver, vv));
+                }
             }
         }
         if found_version_mismatch {
@@ -117,14 +143,15 @@ impl KVVStore for FsKVVStore {
         } else {
             for vv in staged_vvs {
                 self.db
-                    .put(&vv.0, &vv.1)
+                    .put_raw(&vv.0, &vv.2)
                     .map_err(|_| Error::Internal("could not put".to_string()))?;
+                vers.insert(vv.0, vv.1);
             }
         }
         Ok(())
     }
     fn get(&self, key: &str) -> Result<Option<(u64, Vec<u8>)>, Error> {
-        if let Ok(vv) = self.db.get(key) {
+        if let Ok(vv) = self.db.get_raw(key) {
             let (version, value) = Self::decode_vv(&vv);
             Ok(Some((version, value)))
         } else {
@@ -132,7 +159,7 @@ impl KVVStore for FsKVVStore {
         }
     }
     fn get_version(&self, key: &str) -> Result<Option<u64>, Error> {
-        Ok(self.versions.get(key).copied())
+        Ok(self.versions.lock().unwrap().get(key).copied())
     }
     fn get_prefix(&self, prefix: &str) -> Result<Self::Iter, Error> {
         let items = self

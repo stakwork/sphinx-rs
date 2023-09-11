@@ -28,12 +28,12 @@ rand = { version = "0.8", default-features = false }
 serde = { version = "1.0.168", default-features = false, features = ["derive"] }
 hex = { version = "0.4.3", default-features = false }
 anyhow = { version = "1", default-features = false }
-fsdb = { git = "https://github.com/Evanfeenstra/fsdb.git", rev = "5afc0b120a16b5d498c2b62a20062d4ca4e55dc6", optional = true }
+fsdb = { git = "https://github.com/Evanfeenstra/fsdb.git", rev = "13f66653ec3c14280fc8ab330108c710c1df3006", optional = true }
 thiserror = "1.0.44"
 # vls
-vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "512c375b1f9a767abcbdbe1cfb6a1d8ac22c6eab", default-features = false, features = ["secp-lowmemory"] }
-vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "512c375b1f9a767abcbdbe1cfb6a1d8ac22c6eab", default-features = false }
-vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "512c375b1f9a767abcbdbe1cfb6a1d8ac22c6eab", default-features = false, features = ["kvv"], optional = true }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "d7303c26a93d95dc09eb403a221f885b954883ed", default-features = false, features = ["secp-lowmemory"] }
+vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "d7303c26a93d95dc09eb403a221f885b954883ed", default-features = false }
+vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "d7303c26a93d95dc09eb403a221f885b954883ed", default-features = false, features = ["kvv"], optional = true }
 # local
 # vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory"] }
 # vls-protocol = { path = "../../vls/vls-protocol" }
@@ -46,4 +46,3 @@ vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-
 [dev-dependencies]
 simple_logger = "4.2.0"
 bech32 = "0.9.1"
-lightning-invoice = { path = "../../../evanf/rust-lightning/lightning-invoice" }

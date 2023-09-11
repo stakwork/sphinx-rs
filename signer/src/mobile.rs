@@ -14,6 +14,7 @@ use sphinx_glyph::topics;
 use sphinx_glyph::types::{Policy, Velocity};
 use std::collections::BTreeMap;
 use std::time::Duration;
+use vls_persist::kvv::cloud::CloudKVVStore;
 pub use vls_persist::kvv::memory::MemoryKVVStore;
 use vls_protocol_signer::handler::{RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
@@ -124,6 +125,7 @@ pub fn run_vls(
     if s1 != s2 {
         ret.set_velocity(s2);
     }
+    // rh.commit();
     Ok(ret)
 }
 
@@ -155,18 +157,21 @@ fn root_handler_builder(
 ) -> Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
     use std::time::UNIX_EPOCH;
 
-    let tmp = MemoryKVVStore::new();
+    let memstore = MemoryKVVStore::new().0;
+    let persister = CloudKVVStore::new(memstore);
+
     let muts: Vec<_> = state
         .iter()
         .map(|(k, (v, vv))| (k.clone(), (*v, vv.clone())))
         .collect();
-    tmp.put_batch_unlogged(Mutations::from_vec(muts))
+    persister
+        .put_batch_unlogged(Mutations::from_vec(muts))
         .map_err(|_| anyhow::anyhow!("could not hydrate MemoryKVVStore"))?;
 
     let st = UNIX_EPOCH + Duration::from_secs(args.timestamp);
     let d = st.duration_since(UNIX_EPOCH).unwrap();
 
-    let persister = Arc::new(tmp);
+    let persister = Arc::new(persister);
     let clock = Arc::new(NowClock::new(d));
     let stf = Arc::new(NowStartingTimeFactory::new(d));
     let (rhb, approver) = builder_inner(
@@ -325,9 +330,6 @@ mod tests {
         use bech32::{self, ToBase32, Variant};
         let inv = bech32::encode(&hrp, u5bytes.to_base32(), Variant::Bech32).unwrap();
         println!("INVOICE {:?}", inv);
-
-        use lightning_invoice::Bolt11Invoice;
-        let _parsed = inv.parse::<Bolt11Invoice>().unwrap();
     }
 
     // cargo test test_args_der --no-default-features --features no-std,persist,broker-test -- --nocapture
@@ -409,6 +411,7 @@ mod tests {
             }
         }
         .0;
+        println!("init");
         let bi1 = Msg::Init(Init {
             server_pubkey: spk.serialize(),
         })

@@ -13,6 +13,7 @@ use lss::init_lss;
 use rocket::tokio::sync::{broadcast, mpsc, oneshot};
 use sphinx_signer::kvv::{CloudKVVStore, FsKVVStore};
 use sphinx_signer::lightning_signer::bitcoin::Network;
+use sphinx_signer::lightning_signer::persist::Persist;
 use sphinx_signer::lightning_signer::wallet::Wallet;
 use sphinx_signer::policy::update_controls;
 use sphinx_signer::Handler;
@@ -99,22 +100,35 @@ async fn rocket() -> _ {
     let initial_velocity = ctrlr_db.read_velocity().ok();
     let ctrlr_db_mutex = Arc::new(Mutex::new(ctrlr_db));
     let mut ctrlr = Controller::new_with_persister(sk, pk, ctrlr_db_mutex.clone());
-    // let node_id = ctrlr.pubkey();
+    let node_id = ctrlr.pubkey();
 
     let seed32: [u8; 32] = seed.try_into().expect("invalid seed");
     let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
 
     let kvv_store = FsKVVStore::new(&store_path, None).0;
     let fs_persister = CloudKVVStore::new(kvv_store);
+
     // FIXME initial allowlist
-    let initial_allowlist = Vec::new();
-    // let initial_allowlist = match fs_persister.get_node_allowlist(&node_id) {
-    //     Ok(al) => al,
-    //     Err(_) => {
-    //         log::warn!("no allowlist found in fs persister!");
-    //         Vec::new()
-    //     }
-    // };
+    // let initial_allowlist = Vec::new();
+    let _ = fs_persister.enter();
+    let initial_allowlist = match fs_persister.get_nodes() {
+        Ok(ns) => {
+            if !ns.is_empty() {
+                match fs_persister.get_node_allowlist(&node_id) {
+                    Ok(al) => al,
+                    Err(_) => {
+                        log::warn!("no allowlist found in fs persister!");
+                        Vec::new()
+                    }
+                }
+            } else {
+                Vec::new()
+            }
+        }
+        Err(_) => Vec::new(),
+    };
+    let _ = fs_persister.prepare();
+    let _ = fs_persister.commit();
 
     // let lss_persister = ThreadMemoPersister {};
     // let persister = Arc::new(BackupPersister::new(fs_persister, lss_persister));

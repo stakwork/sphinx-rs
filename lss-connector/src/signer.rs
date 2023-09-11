@@ -89,15 +89,18 @@ impl LssSigner {
         state: Option<BTreeMap<String, (u64, Vec<u8>)>>,
     ) -> Result<(RootHandler, Vec<u8>)> {
         // let helper = self.helper.lock().unwrap();
+        let has_muts = &c.muts.len() > &0;
         let muts = Mutations::from_vec(c.muts);
-        let success = self.helper.check_hmac(
-            &muts,
-            c.server_hmac
-                .ok_or(anyhow!("build_with_lss: server_hmac is none"))?
-                .to_vec(),
-        );
-        if !success {
-            return Err(anyhow!("invalid server hmac"));
+        if has_muts {
+            let success = self.helper.check_hmac(
+                &muts,
+                c.server_hmac
+                    .ok_or(anyhow!("build_with_lss: server_hmac is none"))?
+                    .to_vec(),
+            );
+            if !success {
+                return Err(anyhow!("invalid server hmac"));
+            }
         }
 
         let mut sta = BTreeMap::new(); // state.unwrap_or_default();
