@@ -124,9 +124,9 @@ pub fn node_keys(net: String, seed: String) -> Result<Keys> {
     })
 }
 
-pub fn mnemonic_from_entropy(seed: String) -> Result<String> {
-    let seed = parse::parse_secret_string(seed)?;
-    let ret = derive::mnemonic_from_entropy(&seed[..]).map_err(|e| SphinxError::BadSecret {
+pub fn mnemonic_from_entropy(entropy: String) -> Result<String> {
+    let entropy = parse::parse_entropy_string(entropy)?;
+    let ret = derive::mnemonic_from_entropy(&entropy[..]).map_err(|e| SphinxError::BadSecret {
         r: format!("{:?}", e),
     })?;
     Ok(ret)
@@ -141,6 +141,14 @@ pub fn entropy_from_mnemonic(mnemonic: String) -> Result<String> {
 
 pub fn mnemonic_to_seed(mnemonic: String) -> Result<String> {
     let m = derive::mnemonic_to_seed(&mnemonic).map_err(|e| SphinxError::BadSecret {
+        r: format!("{:?}", e),
+    })?;
+    Ok(hex::encode(m))
+}
+
+pub fn entropy_to_seed(entropy: String) -> Result<String> {
+    let entropy = parse::parse_entropy_string(entropy)?;
+    let m = derive::entropy_to_seed(&entropy[..]).map_err(|e| SphinxError::BadSecret {
         r: format!("{:?}", e),
     })?;
     Ok(hex::encode(m))

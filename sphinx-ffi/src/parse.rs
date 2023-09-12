@@ -2,6 +2,7 @@ use crate::{Result, SphinxError};
 
 use sphinx_crypter::chacha::{KEY_LEN, NONCE_LEN, PAYLOAD_LEN};
 use sphinx_crypter::ecdh::PUBLIC_KEY_LEN;
+use sphinx_signer::derive::ENTROPY_LEN;
 use std::convert::TryInto;
 
 pub(crate) fn parse_secret_string(sk: String) -> Result<[u8; KEY_LEN]> {
@@ -20,6 +21,24 @@ pub(crate) fn parse_secret_string(sk: String) -> Result<[u8; KEY_LEN]> {
                 r: format!("{:?}", e),
             })?;
     Ok(secret_key)
+}
+
+pub(crate) fn parse_entropy_string(sk: String) -> Result<[u8; ENTROPY_LEN]> {
+    if sk.len() != ENTROPY_LEN * 2 {
+        return Err(SphinxError::BadSecret {
+            r: "bad key length".to_string(),
+        });
+    }
+    let entropy_key_bytes: Vec<u8> = hex::decode(sk).map_err(|e| SphinxError::BadSecret {
+        r: format!("{:?}", e),
+    })?;
+    let entropy: [u8; ENTROPY_LEN] =
+        entropy_key_bytes
+            .try_into()
+            .map_err(|e| SphinxError::BadSecret {
+                r: format!("{:?}", e),
+            })?;
+    Ok(entropy)
 }
 
 pub(crate) fn parse_public_key_string(pk: String) -> Result<[u8; PUBLIC_KEY_LEN]> {

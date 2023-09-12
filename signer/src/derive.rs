@@ -4,6 +4,8 @@ use vls_protocol_signer::lightning_signer::{
     signer::derive::{key_derive, KeyDerivationStyle},
 };
 
+pub const ENTROPY_LEN: usize = 16;
+
 pub fn node_keys(network: &Network, seed: &[u8]) -> (PublicKey, SecretKey) {
     let style = KeyDerivationStyle::Native;
     let deriver = key_derive(style, network.clone());
@@ -23,7 +25,7 @@ pub fn entropy_from_mnemonic(mn: &str) -> anyhow::Result<Vec<u8>> {
     let mn = bip39::Mnemonic::parse_normalized(mn)
         .map_err(|e| anyhow::anyhow!("Mnemonic::parse_normalized failed {:?}", e))?;
     let mut e = mn.to_entropy_array().0.to_vec();
-    e.remove(32);
+    e.resize(ENTROPY_LEN, 0);
     Ok(e)
 }
 
@@ -35,12 +37,20 @@ pub fn mnemonic_to_seed(mn: &str) -> anyhow::Result<Vec<u8>> {
     Ok(e)
 }
 
+pub fn entropy_to_seed(entropy: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let mn = bip39::Mnemonic::from_entropy(entropy)
+        .map_err(|e| anyhow::anyhow!("Mnemonic::from_entropy failed {:?}", e))?;
+    // Do like CLN does, chop off the last 32 bytes
+    let e = mn.to_seed_normalized("")[..32].to_vec();
+    Ok(e)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::derive::*;
 
-    fn entropy() -> [u8; 32] {
-        [1; 32]
+    fn entropy() -> [u8; 16] {
+        [1; 16]
     }
 
     fn seed() -> [u8; 32] {
@@ -51,15 +61,24 @@ mod tests {
     fn test_mnemonic() {
         let entropy = entropy();
         let mn = mnemonic_from_entropy(&entropy).expect("nope");
-        assert_eq!(mn, "absurd amount doctor acoustic avoid letter advice cage absurd amount doctor acoustic avoid letter advice cage absurd amount doctor acoustic avoid letter advice comic");
+        assert_eq!(
+            mn,
+            "absurd amount doctor acoustic avoid letter advice cage absurd amount doctor adjust"
+        );
         let en = entropy_from_mnemonic(&mn).expect("fail");
         assert_eq!(&en[..], &entropy);
     }
 
     #[test]
     fn test_mnemonic_to_seed() {
-        let seed = mnemonic_to_seed("forget parent wage payment cotton excite venue into era crouch because twin bargain flash library fever raise chunk suit evil jar perfect almost supreme").expect("fail");
-        let vector = [0xdf, 0x58, 0x5d, 0x7e, 0xdb, 0xf9, 0x86, 0x3e, 0x42, 0xef, 0xc1, 0xef, 0x00, 0xb1, 0xd1, 0x0d, 0x9c, 0x6b, 0xb7, 0xb3, 0xff, 0xea, 0x27, 0x2a, 0x48, 0x43, 0x0e, 0x8a, 0x3e, 0x4b, 0x60, 0x0b];
+        let seed = mnemonic_to_seed(
+            "absurd amount doctor acoustic avoid letter advice cage absurd amount doctor adjust",
+        )
+        .expect("fail");
+        let vector = [
+            2, 89, 45, 66, 60, 78, 124, 109, 24, 148, 119, 19, 180, 127, 121, 87, 201, 241, 221,
+            208, 161, 150, 214, 73, 215, 119, 205, 145, 70, 156, 15, 179,
+        ];
         assert_eq!(seed, vector);
     }
 

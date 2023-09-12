@@ -30,19 +30,24 @@
 - seed: 32-byte hex
 - returns Keys{secret: String, pubkey: String}
 
-**`mnemonic_from_entropy(seed: String)`**
+**`mnemonic_from_entropy(entropy: String)`**
 
-- seed: 32-byte hex
-- returns a 24-word mnemonic
+- entropy: 16-byte hex
+- returns a 12-word mnemonic
 
 **`entropy_from_mnemonic(mnemonic: String)`**
 
-- mnemonic: 24 words separated by spaces
-- returns 32-byte hex entropy
+- mnemonic: 12 words separated by spaces
+- returns 16-byte hex entropy
 
 **`mnemonic_to_seed(mnemonic: String)`**
 
-- mnemonic: 24 words separated by spaces
+- mnemonic: 12 words separated by spaces
+- returns 32-byte hex seed
+
+**`entropy_to_seed(entropy: String)`**
+
+- entropy: 16-byte hex
 - returns 32-byte hex seed
 
 **`make_auth_token(now: number, secret: String)`**

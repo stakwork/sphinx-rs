@@ -93,7 +93,7 @@ mod tests {
         msgs::write_serial_request_header(&mut &mut buf, &srh)
             .expect("failed to write_serial_request_header");
         msgs::write(&mut &mut buf, ping).expect("failed to serial write");
-        let _srh2 = msgs::read_serial_request_header(&mut buf).expect("read ping header");
+        let _srh2 = msgs::read_serial_request_header(&mut &mut buf).unwrap();
         println!("{:?}", _srh2);
         let parsed_ping: msgs::Ping =
             msgs::read_message(&mut buf).expect("failed to read ping message");

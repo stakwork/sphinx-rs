@@ -51,8 +51,8 @@ pub fn node_keys(net: &str, seed: &str) -> Result<Keys> {
 }
 
 #[wasm_bindgen]
-pub fn mnemonic_from_entropy(seed: &str) -> Result<String> {
-    Ok(cy::mnemonic_from_entropy(seed.to_string())?)
+pub fn mnemonic_from_entropy(entropy: &str) -> Result<String> {
+    Ok(cy::mnemonic_from_entropy(entropy.to_string())?)
 }
 
 #[wasm_bindgen]
@@ -63,6 +63,11 @@ pub fn entropy_from_mnemonic(mnemonic: &str) -> Result<String> {
 #[wasm_bindgen]
 pub fn mnemonic_to_seed(mnemonic: &str) -> Result<String> {
     Ok(cy::mnemonic_to_seed(mnemonic.to_string())?)
+}
+
+#[wasm_bindgen]
+pub fn entropy_to_seed(entropy: &str) -> Result<String> {
+    Ok(cy::entropy_to_seed(entropy.to_string())?)
 }
 
 #[wasm_bindgen]
