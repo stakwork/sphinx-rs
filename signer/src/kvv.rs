@@ -167,7 +167,10 @@ impl KVVStore for FsKVVStore {
             .list(prefix)
             .map_err(|_| Error::Internal("could not list".to_string()))?;
         let mut result = Vec::new();
-        for item in items {
+        for mut item in items {
+            if item.starts_with("/") {
+                item.remove(0);
+            }
             let key = format!("{}/{}", prefix, item);
             log::info!("LIST RES {:?}", key);
             let vv = self
