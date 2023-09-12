@@ -24,22 +24,54 @@ pub fn mnemonic_from_entropy(entropy: &[u8]) -> anyhow::Result<String> {
 pub fn entropy_from_mnemonic(mn: &str) -> anyhow::Result<Vec<u8>> {
     let mn = bip39::Mnemonic::parse_normalized(mn)
         .map_err(|e| anyhow::anyhow!("Mnemonic::parse_normalized failed {:?}", e))?;
-    let mut e = mn.to_entropy_array().0.to_vec();
-    e.resize(ENTROPY_LEN, 0);
+    match mn.word_count() {
+        12 => (),
+        len => {
+            return Err(anyhow::anyhow!(
+                "Mnemonic is length {}, should be 12 words long.",
+                len
+            ))
+        }
+    }
+    let e = mn.to_entropy_array().0.to_vec();
+    if e.len() != 16 {
+        return Err(anyhow::anyhow!("Should never happen, 12 words didn't convert to 16 bytes of entropy. Please try again."));
+    }
     Ok(e)
 }
 
 pub fn mnemonic_to_seed(mn: &str) -> anyhow::Result<Vec<u8>> {
     let mn = bip39::Mnemonic::parse_normalized(mn)
         .map_err(|e| anyhow::anyhow!("Mnemonic::parse_normalized failed {:?}", e))?;
-    // Do like CLN does, chop off the last 32 bytes
+    match mn.word_count() {
+        12 => (),
+        len => {
+            return Err(anyhow::anyhow!(
+                "Mnemonic is length {}, should be 12 words long.",
+                len
+            ))
+        }
+    }
+    // BIP39 seed is 64 bytes. Do like CLN does, chop off the last 32 bytes.
     let e = mn.to_seed_normalized("")[..32].to_vec();
     Ok(e)
 }
 
 pub fn entropy_to_seed(entropy: &[u8]) -> anyhow::Result<Vec<u8>> {
+    match entropy.len() {
+        16 => (),
+        len => {
+            return Err(anyhow::anyhow!(
+                "Entropy is length {}, should be 16 bytes.",
+                len
+            ))
+        }
+    }
     let mn = bip39::Mnemonic::from_entropy(entropy)
         .map_err(|e| anyhow::anyhow!("Mnemonic::from_entropy failed {:?}", e))?;
+    if mn.word_count() != 12 {
+        return Err(anyhow::anyhow!("Should never happen, 16 bytes of entropy didn't convert to 12 words. Please try again."));
+    }
     // Do like CLN does, chop off the last 32 bytes
     let e = mn.to_seed_normalized("")[..32].to_vec();
     Ok(e)
