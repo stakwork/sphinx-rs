@@ -139,6 +139,13 @@ pub fn entropy_from_mnemonic(mnemonic: String) -> Result<String> {
     Ok(hex::encode(m))
 }
 
+pub fn mnemonic_to_seed(mnemonic: String) -> Result<String> {
+    let m = derive::mnemonic_to_seed(&mnemonic).map_err(|e| SphinxError::BadSecret {
+        r: format!("{:?}", e),
+    })?;
+    Ok(hex::encode(m))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
@@ -190,6 +197,14 @@ mod tests {
             keys.secret,
             "66a553b3498d7471709184a01b956e3ad837a29f73c277c90329fc08b7a969b3"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_mnemonic_to_seed() -> Result<()> {
+        let seed = mnemonic_to_seed("forget parent wage payment cotton excite venue into era crouch because twin bargain flash library fever raise chunk suit evil jar perfect almost supreme".to_string()).expect("fail");
+        let vector = "df585d7edbf9863e42efc1ef00b1d10d9c6bb7b3ffea272a48430e8a3e4b600b";
+        assert_eq!(seed, vector);
         Ok(())
     }
 }
