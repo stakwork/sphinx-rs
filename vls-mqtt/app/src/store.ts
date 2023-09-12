@@ -44,7 +44,16 @@ export const allowlist = writable<string[]>([]);
 
 export const cmds = writable<string[]>([]);
 
-export const genSeed = (): string => {
+export const genEntropy = (): string => {
+  return Array.from(
+    window.crypto.getRandomValues(new Uint8Array(16)),
+    (byte) => {
+      return ("0" + (byte & 0xff).toString(16)).slice(-2);
+    }
+  ).join("");
+};
+
+export const gen32Nonce = (): string => {
   return Array.from(
     window.crypto.getRandomValues(new Uint8Array(32)),
     (byte) => {
@@ -53,12 +62,22 @@ export const genSeed = (): string => {
   ).join("");
 };
 
-export const seed = localStorageStore<string>("seed", genSeed());
+export const entropy = localStorageStore<string>("entropy", genEntropy());
 
-export const lss_nonce = writable<string>(genSeed());
+export const seed = derived([loaded, entropy], ([$loaded, $entropy]) => {
+  if (!$loaded) return null;
+  try {
+    return sphinx.entropy_to_seed($entropy);
+  } catch (e) {
+    console.error(e);
+  }
+});
+
+export const lss_nonce = writable<string>(gen32Nonce());
 
 export const keys = derived([loaded, seed], ([$loaded, $seed]) => {
   if (!$loaded) return null;
+  if (!$seed) return null;
   try {
     return sphinx.node_keys("regtest", $seed);
   } catch (e) {

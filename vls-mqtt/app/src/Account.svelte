@@ -4,7 +4,7 @@
     SkeletonText,
     InlineNotification,
   } from "carbon-components-svelte";
-  import { seed, isSigner } from "./store";
+  import { entropy, isSigner } from "./store";
   import { sphinx } from "./wasm";
   import { getNonce } from "./api";
   import { onMount } from "svelte";
@@ -38,7 +38,7 @@
   $: {
     if (show) {
       timeout = setTimeout(() => {
-        const words = sphinx.mnemonic_from_entropy($seed);
+        const words = sphinx.mnemonic_from_entropy($entropy);
         lines = split(words);
       }, 850);
     } else {
@@ -101,7 +101,7 @@
     max-width: 100%;
   }
   .mnemonic {
-    height: 9.5rem;
+    height: 7rem;
     background: #262626;
     color: #a2a2a2;
     border-radius: 1rem;
