@@ -11,6 +11,9 @@ pub mod policy;
 #[cfg(feature = "fspersist")]
 pub mod persist;
 
+#[cfg(feature = "fspersist")]
+pub mod kvv;
+
 pub use lss_connector;
 pub use sphinx_glyph;
 pub use vls_protocol;

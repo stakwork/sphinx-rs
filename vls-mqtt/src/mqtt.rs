@@ -174,6 +174,7 @@ async fn got_msg(
                     // no muts, respond directly back!
                     (topics::VLS_RES.to_string(), vls_bytes, Some(sequence))
                 } else {
+                    println!("THERE ARE MUTATIONS!!!!");
                     // muts! do LSS first!
                     *msgs = Some((vls_bytes, lss_bytes.clone()));
                     (topics::LSS_RES.to_string(), lss_bytes, Some(sequence))
