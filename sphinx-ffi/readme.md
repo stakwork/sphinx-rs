@@ -122,7 +122,7 @@ First, run an example sphinx-swarm with CLN + bitcoind
 **Implementation instructions:**
 
 1. generate your entropy: random 16 bytes
-2. generate your seed from entropy with `seed_to_entropy`
+2. generate your seed from entropy with `entropy_to_seed`
 3. run `node_keys(network, seed)` to get your keys.
 4. connect to the MQTT broker
    - host: `localhost`
