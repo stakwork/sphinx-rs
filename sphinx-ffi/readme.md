@@ -121,19 +121,20 @@ First, run an example sphinx-swarm with CLN + bitcoind
 
 **Implementation instructions:**
 
-1. generate your seed: random 32 bytes
-2. run `node_keys(network, seed)` to get your keys.
-3. connect to the MQTT broker
+1. generate your entropy: random 16 bytes
+2. generate your seed from entropy with `seed_to_entropy`
+3. run `node_keys(network, seed)` to get your keys.
+4. connect to the MQTT broker
    - host: `localhost`
    - port: `1883`
    - clientID: random string
    - username: keys.pubkey
    - password: `make_auth_token(timestamp, keys.secret)`
-4. subscribe to topics:
+5. subscribe to topics:
    - `{CLIENT_ID}/vls`, `{CLIENT_ID}/init-1-msg`, `{CLIENT_ID}/init-2-msg`, `{CLIENT_ID}/lss-msg`
-5. publish to `{CLIENT_ID}/hello` to let the broker know you are ready
-6. make a "sequence" number (starting at null, not zero)
-7. when a MQTT message is received:
+6. publish to `{CLIENT_ID}/hello` to let the broker know you are ready
+7. make a "sequence" number (starting at null, not zero)
+8. when a MQTT message is received:
 
 - load up ALL your stored State into a Map (dictionary or object) and encode with msgpack.
 - `run(topics, args, state, msg, sequence)`
