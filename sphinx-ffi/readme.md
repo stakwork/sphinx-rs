@@ -28,7 +28,7 @@
 
 - net: "regtest", "signet", "testnet", or "bitcoin"
 - seed: 32-byte hex
-- return Keys{secret: String, pubkey: String}
+- returns Keys{secret: String, pubkey: String}
 
 **`mnemonic_from_entropy(seed: String)`**
 
@@ -38,13 +38,18 @@
 **`entropy_from_mnemonic(mnemonic: String)`**
 
 - mnemonic: 24 words separated by spaces
-- return a 32-byte hex seed
+- returns 32-byte hex entropy
+
+**`mnemonic_to_seed(mnemonic: String)`**
+
+- mnemonic: 24 words separated by spaces
+- returns 32-byte hex seed
 
 **`make_auth_token(now: number, secret: String)`**
 
 - now: 10-digit UNIX timestamp
 - secret: 32-byte hex
-- return auth_token string
+- returns auth_token string
 
 ### control messages
 
@@ -53,12 +58,12 @@
 - json: JSON string of the [ControlMessage](https://github.com/stakwork/sphinx-rs/blob/master/glyph/src/types.rs#L7) enum. An object (dictionary) with one key, which is the enum name. The value is the value inside the enum, or `null`. Example: `{Nonce:null}` or `{UpdatePolicy:{msat_per_interval:0,interval:"daily",htlc_limit_msat:0}}`
 - secret: the secret key returned from `node_keys`
 - nonce: A number that you need to persist. For every request it needs to be greater than the last request.
-- return the bytes (hex string) to send to the signer
+- returns the bytes (hex string) to send to the signer
 
 **`parse_response(res: String)`**
 
 - res: a hex string returned from the signer after sending the `build_request`.
-- return a JSON string so you can easily see what's inside
+- returns a JSON string so you can easily see what's inside
 
 ### signer
 

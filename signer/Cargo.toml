@@ -46,4 +46,5 @@ vls-persist = { git = "https://gitlab.com/evanfeenstra1/validating-lightning-sig
 [dev-dependencies]
 simple_logger = "4.2.0"
 bech32 = "0.9.1"
-lightning-invoice = { path = "../../../evanf/rust-lightning/lightning-invoice" }
+lightning-invoice = "0.24.0"
+# lightning-invoice = { path = "../../../evanf/rust-lightning/lightning-invoice" }
