@@ -31,9 +31,9 @@ anyhow = { version = "1", default-features = false }
 fsdb = { git = "https://github.com/Evanfeenstra/fsdb.git", rev = "13f66653ec3c14280fc8ab330108c710c1df3006", optional = true }
 thiserror = "1.0.44"
 # vls
-vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "d7303c26a93d95dc09eb403a221f885b954883ed", default-features = false, features = ["secp-lowmemory"] }
-vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "d7303c26a93d95dc09eb403a221f885b954883ed", default-features = false }
-vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "d7303c26a93d95dc09eb403a221f885b954883ed", default-features = false, features = ["kvv"], optional = true }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "4b2a00975a5c7ccdbcedf6dcf44728b90b296064", default-features = false, features = ["secp-lowmemory"] }
+vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "4b2a00975a5c7ccdbcedf6dcf44728b90b296064", default-features = false }
+vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "4b2a00975a5c7ccdbcedf6dcf44728b90b296064", default-features = false, features = ["kvv"], optional = true }
 # local
 # vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory"] }
 # vls-protocol = { path = "../../vls/vls-protocol" }
