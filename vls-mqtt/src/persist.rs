@@ -31,13 +31,13 @@ impl ControlPersist for ControlPersister {
         Ok(u64::from_be_bytes(r))
     }
     fn set_nonce(&mut self, nonce: u64) -> Result<()> {
-        Ok(self.nonce.put("nonce", nonce.to_be_bytes())?)
+        Ok(self.nonce.put("nonce", &nonce.to_be_bytes())?)
     }
     fn read_config(&self) -> Result<Config> {
         Ok(self.config.get("config")?)
     }
     fn write_config(&mut self, conf: Config) -> Result<()> {
-        Ok(self.config.put("config", conf)?)
+        Ok(self.config.put("config", &conf)?)
     }
     fn remove_config(&mut self) -> Result<()> {
         Ok(self.config.remove("config")?)
@@ -46,7 +46,7 @@ impl ControlPersist for ControlPersister {
         Ok(self.seed.get("seed")?)
     }
     fn write_seed(&mut self, s: [u8; 32]) -> Result<()> {
-        Ok(self.seed.put("seed", s)?)
+        Ok(self.seed.put("seed", &s)?)
     }
     fn remove_seed(&mut self) -> Result<()> {
         Ok(self.seed.remove("seed")?)
@@ -55,13 +55,13 @@ impl ControlPersist for ControlPersister {
         Ok(self.id.get("id")?)
     }
     fn write_id(&mut self, id: String) -> Result<()> {
-        Ok(self.id.put("id", id)?)
+        Ok(self.id.put("id", &id)?)
     }
     fn read_policy(&self) -> Result<Policy> {
         Ok(self.policy.get("policy")?)
     }
     fn write_policy(&mut self, pol: Policy) -> Result<()> {
-        Ok(self.policy.put("policy", pol)?)
+        Ok(self.policy.put("policy", &pol)?)
     }
     fn remove_policy(&mut self) -> Result<()> {
         Ok(self.policy.remove("policy")?)
@@ -70,6 +70,6 @@ impl ControlPersist for ControlPersister {
         Ok(self.velocity.get("velocity")?)
     }
     fn write_velocity(&mut self, v: Velocity) -> Result<()> {
-        Ok(self.velocity.put("velocity", v)?)
+        Ok(self.velocity.put("velocity", &v)?)
     }
 }
