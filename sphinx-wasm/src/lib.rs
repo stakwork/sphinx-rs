@@ -61,6 +61,11 @@ pub fn entropy_from_mnemonic(mnemonic: &str) -> Result<String> {
 }
 
 #[wasm_bindgen]
+pub fn mnemonic_to_seed(mnemonic: &str) -> Result<String> {
+    Ok(cy::mnemonic_to_seed(mnemonic.to_string())?)
+}
+
+#[wasm_bindgen]
 pub fn make_auth_token(ts: u32, secret: &str) -> Result<String> {
     Ok(cy::make_auth_token(ts, secret.to_string())?)
 }
