@@ -45,9 +45,13 @@ namespace sphinxrs {
   [Throws=SphinxError]
   Keys node_keys(string net, string seed);
   [Throws=SphinxError]
-  string mnemonic_from_entropy(string seed);
+  string mnemonic_from_entropy(string entropy);
   [Throws=SphinxError]
   string entropy_from_mnemonic(string mnemonic);
+  [Throws=SphinxError]
+  string mnemonic_to_seed(string mnemonic);
+  [Throws=SphinxError]
+  string entropy_to_seed(string entropy);
   [Throws=SphinxError]
   string build_request(string msg, string secret, u64 nonce);
   [Throws=SphinxError]
