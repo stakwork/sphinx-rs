@@ -18,7 +18,8 @@ rumqttc = { version = "0.21.0", features = ["url"] }
 dotenv = "0.15.0"
 fern = "0.6" 
 chrono = "0.4"
-fsdb = { version = "0.1.11" }
+fsdb = { version = "0.1.15" }
+# fsdb = { path = "../../fsdb" }
 anyhow = "1"
 rand = "0.8.5"
 

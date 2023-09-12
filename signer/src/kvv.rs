@@ -39,7 +39,7 @@ impl FsKVVStore {
         let mut versions = BTreeMap::new();
         let fulllist = bucket.list_all().expect("could not list bucket");
         for path in fulllist {
-            match bucket.get(&path) {
+            match bucket.get_raw(&path) {
                 Ok(item) => {
                     let (version, _) = Self::decode_vv(&item);
                     versions.insert(path, version);
@@ -167,15 +167,16 @@ impl KVVStore for FsKVVStore {
             .list(prefix)
             .map_err(|_| Error::Internal("could not list".to_string()))?;
         let mut result = Vec::new();
-        for mut item in items {
-            if item.starts_with("/") {
-                item.remove(0);
-            }
-            let key = format!("{}/{}", prefix, item);
-            log::info!("LIST RES {:?}", key);
+        for item in items {
+            let sep = if prefix.ends_with("/") {
+                "".to_string()
+            } else {
+                "/".to_string()
+            };
+            let key = format!("{}{}{}", prefix, sep, item);
             let vv = self
                 .db
-                .get(&key)
+                .get_raw(&key)
                 .map_err(|_| Error::Internal("could not get".to_string()))?;
             let (version, value) = Self::decode_vv(&vv);
             result.push(KVV(key, (version, value)));
