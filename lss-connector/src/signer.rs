@@ -82,6 +82,10 @@ impl LssSigner {
         });
         res.to_vec().unwrap()
     }
+    // confirm_put_conflict
+    pub fn confirm_put_conflict(&self) -> Vec<u8> {
+        Response::PutConflictConfirmed.to_vec().unwrap()
+    }
     pub fn build_with_lss(
         &self,
         c: BrokerMutations,
@@ -207,6 +211,9 @@ pub fn handle_lss_msg(
                 }
             }
         }
-        Msg::PutConflict => Err(anyhow!("PutConflict")),
+        Msg::PutConflict => {
+            let v = lss_signer.confirm_put_conflict();
+            Ok((topics::LSS_CONFLICT_RES.to_string(), v))
+        }
     }
 }

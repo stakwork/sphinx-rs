@@ -131,7 +131,11 @@ async fn main_listener(
                     if return_topic == topics::ERROR {
                         let _ = error_tx.send(bytes.clone());
                         let error_msg = String::from_utf8(bytes.clone()).unwrap();
+                        log::error!("ERROR {}", error_msg);
                         if error_msg.starts_with("invalid sequence") {
+                            exit(0);
+                        }
+                        if error_msg.contains("PutConflict") {
                             exit(0);
                         }
                     } else {

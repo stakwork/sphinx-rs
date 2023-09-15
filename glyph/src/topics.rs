@@ -11,5 +11,7 @@ pub const INIT_2_MSG: &str = "init-2-msg";
 pub const INIT_2_RES: &str = "init-2-res";
 pub const LSS_MSG: &str = "lss-msg";
 pub const LSS_RES: &str = "lss-res";
+pub const LSS_CONFLICT: &str = "lss-conflict";
+pub const LSS_CONFLICT_RES: &str = "lss-conflict-res";
 pub const HELLO: &str = "hello";
 pub const BYE: &str = "bye";

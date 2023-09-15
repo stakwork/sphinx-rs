@@ -16,6 +16,7 @@ pub enum Response {
     Init(InitResponse),
     Created(SignerMutations),
     VlsMuts(SignerMutations),
+    PutConflictConfirmed,
 }
 
 pub type Muts = Vec<(String, (u64, Vec<u8>))>;
@@ -112,6 +113,11 @@ pub fn serialize_lssres(res: &Response) -> Result<Vec<u8>> {
             )?;
             Ok(buff.into_vec())
         }
+        Response::PutConflictConfirmed => {
+            rmp::serialize_map_len(&mut buff, 1u32)?;
+            rmp::serialize_field_name(&mut buff, Some("PutConflictConfirmed"))?;
+            Ok(buff.into_vec())
+        }
     }
 }
 
@@ -194,6 +200,7 @@ pub fn deserialize_lssres(b: &[u8]) -> Result<Response> {
         "VlsMuts" => Ok(Response::VlsMuts(
             deserialize_signermuts(&mut bytes).map_err(Error::msg)?,
         )),
+        "PutConflictConfirmed" => Ok(Response::PutConflictConfirmed),
         m => Err(anyhow!("deserialize_lssres: not an lssres variant {:?}", m)),
     }
 }
