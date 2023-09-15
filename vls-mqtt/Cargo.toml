@@ -18,7 +18,7 @@ rumqttc = { version = "0.21.0", features = ["url"] }
 dotenv = "0.15.0"
 fern = "0.6" 
 chrono = "0.4"
-fsdb = { git = "https://github.com/Evanfeenstra/fsdb.git", rev = "634125776c14be45ab0618f2fa2b7f1aff4adb85" }
+fsdb = { git = "https://github.com/Evanfeenstra/fsdb.git", rev = "7d0db454133bf37b16d9cf5500111491e67c81e5" }
 # fsdb = { path = "../../fsdb" }
 anyhow = "1"
 rand = "0.8.5"
