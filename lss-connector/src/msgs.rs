@@ -8,6 +8,7 @@ pub enum Msg {
     Init(Init),
     Created(BrokerMutations),
     Stored(BrokerMutations),
+    PutConflict,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -65,6 +66,11 @@ pub fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
         }
         Msg::Stored(bm) => {
             serialize_muts(&mut buff, "Stored", "server_hmac", bm.server_hmac, &bm.muts)?;
+            Ok(buff.into_vec())
+        }
+        Msg::PutConflict => {
+            rmp::serialize_map_len(&mut buff, 1u32)?;
+            rmp::serialize_field_name(&mut buff, Some("PutConflict"))?;
             Ok(buff.into_vec())
         }
     }
@@ -145,6 +151,7 @@ pub fn deserialize_lssmsg(b: &[u8]) -> Result<Msg> {
         "Stored" => Ok(Msg::Stored(
             deserialize_brokermuts(&mut bytes).map_err(Error::msg)?,
         )),
+        "PutConflict" => Ok(Msg::PutConflict),
         m => Err(anyhow!("deserialize_lssmg: not an lssmsg variant {:?}", m)),
     }
 }

@@ -1,5 +1,5 @@
 use fsdb::{AnyBucket, Fsdb};
-use lightning_signer::persist::Error;
+use lightning_signer::persist::{Error, SignerId};
 use lightning_signer::SendSync;
 use log::error;
 use std::collections::BTreeMap;
@@ -12,6 +12,7 @@ use std::sync::Mutex;
 /// A key-version-value store backed by fsdb
 pub struct FsKVVStore {
     db: AnyBucket<Vec<u8>>,
+    signer_id: [u8; 16],
     versions: Mutex<BTreeMap<String, u64>>,
 }
 
@@ -29,7 +30,7 @@ impl Iterator for Iter {
 impl SendSync for FsKVVStore {}
 
 impl FsKVVStore {
-    pub fn new(path: &str, maxsize: Option<usize>) -> KVVPersister<Self> {
+    pub fn new(path: &str, signer_id: [u8; 16], maxsize: Option<usize>) -> KVVPersister<Self> {
         let db = Fsdb::new(path).expect("could not create db");
         let bucket = db
             .any_bucket::<Vec<u8>>(maxsize)
@@ -50,6 +51,7 @@ impl FsKVVStore {
 
         KVVPersister(Self {
             db: bucket,
+            signer_id,
             versions: Mutex::new(versions),
         })
     }
@@ -93,6 +95,10 @@ impl FsKVVStore {
 
 impl KVVStore for FsKVVStore {
     type Iter = Iter;
+
+    fn signer_id(&self) -> SignerId {
+        self.signer_id
+    }
 
     fn put(&self, key: &str, value: &[u8]) -> Result<(), Error> {
         let v = self

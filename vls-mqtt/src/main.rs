@@ -10,6 +10,7 @@ use dotenv::dotenv;
 use glyph::control::{ControlPersist, Controller};
 use glyph::ser::{serialize_controlresponse, ByteBuf};
 use lss::init_lss;
+use rand::RngCore;
 use rocket::tokio::sync::{broadcast, mpsc, oneshot};
 use sphinx_signer::kvv::{CloudKVVStore, FsKVVStore};
 use sphinx_signer::lightning_signer::bitcoin::Network;
@@ -105,7 +106,12 @@ async fn rocket() -> _ {
     let seed32: [u8; 32] = seed.try_into().expect("invalid seed");
     let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
 
-    let kvv_store = FsKVVStore::new(&store_path, None).0;
+    let mut signer_id = [0u8; 16];
+    rand::thread_rng().fill_bytes(&mut signer_id);
+
+    let client_id = hex::encode(signer_id);
+
+    let kvv_store = FsKVVStore::new(&store_path, signer_id, None).0;
     let fs_persister = CloudKVVStore::new(kvv_store);
 
     // FIXME initial allowlist
@@ -151,7 +157,7 @@ async fn rocket() -> _ {
     let lss_tx_ = lss_tx.clone();
     let error_tx_ = error_tx.clone();
     rocket::tokio::spawn(async move {
-        mqtt::start(vls_tx_, &pk, &sk, error_tx_, lss_tx_)
+        mqtt::start(vls_tx_, &pk, &sk, &client_id, error_tx_, lss_tx_)
             .await
             .expect("mqtt crash");
     });

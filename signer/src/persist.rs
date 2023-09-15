@@ -8,7 +8,7 @@ use lightning_signer::persist::model::{
     ChannelEntry as CoreChannelEntry, NodeEntry as CoreNodeEntry,
 };
 use lightning_signer::persist::ChainTrackerListenerEntry;
-use lightning_signer::persist::Persist;
+use lightning_signer::persist::{Persist, SignerId};
 use lightning_signer::policy::validator::{EnforcementState, ValidatorFactory};
 use lightning_signer::Arc;
 use lightning_signer::SendSync;
@@ -82,6 +82,9 @@ impl FsPersister {
 }
 
 impl Persist for FsPersister {
+    fn signer_id(&self) -> SignerId {
+        [0u8; 16]
+    }
     fn new_node(
         &self,
         node_id: &PublicKey,

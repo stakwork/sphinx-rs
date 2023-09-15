@@ -15,6 +15,7 @@ pub async fn start(
     vls_tx: mpsc::Sender<VlsChanMsg>,
     pubkey: &PublicKey,
     secret: &SecretKey,
+    client_id: &str,
     error_tx: broadcast::Sender<Vec<u8>>,
     lss_tx: mpsc::Sender<LssChanMsg>,
 ) -> Result<(), Box<dyn Error>> {
@@ -26,7 +27,6 @@ pub async fn start(
         let t = Token::new();
         let token = t.sign_to_base64(&secret)?;
 
-        let client_id = random_word(8);
         let broker: String = env::var("BROKER").unwrap_or("localhost:1883".to_string());
 
         println!(".......... start eventloop ..........");
@@ -107,7 +107,7 @@ async fn main_listener(
     mut eventloop: EventLoop,
     client: &AsyncClient,
     error_tx: broadcast::Sender<Vec<u8>>,
-    client_id: String,
+    client_id: &str,
     lss_tx: mpsc::Sender<LssChanMsg>,
 ) {
     // say hello to start
@@ -243,13 +243,12 @@ fn incoming_conn_ack(event: Event) -> Option<()> {
     None
 }
 
-use rand::{distributions::Alphanumeric, Rng};
+// use rand::{distributions::Alphanumeric, Rng};
 
-// use crate::mqtt;
-pub fn random_word(n: usize) -> String {
-    rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(n)
-        .map(char::from)
-        .collect()
-}
+// pub fn random_word(n: usize) -> String {
+//     rand::thread_rng()
+//         .sample_iter(&Alphanumeric)
+//         .take(n)
+//         .map(char::from)
+//         .collect()
+// }

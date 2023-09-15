@@ -207,5 +207,6 @@ pub fn handle_lss_msg(
                 }
             }
         }
+        Msg::PutConflict => Err(anyhow!("PutConflict")),
     }
 }

@@ -99,29 +99,33 @@ impl LssBroker {
     pub async fn handle_bytes(&self, resb: &[u8]) -> Result<Vec<u8>> {
         let res = Response::from_slice(resb)?;
         log::info!("HANDLE LSS {:?}", res);
-        let msg = self.handle(res).await?;
+        let msg = self.handle(res).await;
         log::info!("MSG TO SIGNER: {:?}", msg);
         Ok(msg.to_vec()?)
     }
-    pub async fn handle(&self, res: Response) -> Result<Msg> {
+    pub async fn handle(&self, res: Response) -> Msg {
         match res {
-            Response::Init(_) => Ok(Msg::Created(BrokerMutations {
+            Response::Init(_) => Msg::Created(BrokerMutations {
                 muts: Vec::new(),  // empty
                 server_hmac: None, // empty
-            })),
+            }),
             Response::Created(cm) => {
-                let server_hmac = self.put_muts(cm).await?;
-                Ok(Msg::Created(BrokerMutations {
-                    muts: Vec::new(), // empty
-                    server_hmac,
-                }))
+                match self.put_muts(cm).await {
+                    Ok(server_hmac) => Msg::Created(BrokerMutations {
+                        muts: Vec::new(), // empty
+                        server_hmac,
+                    }),
+                    Err(_) => Msg::PutConflict,
+                }
             }
             Response::VlsMuts(vlsm) => {
-                let server_hmac = self.put_muts(vlsm).await?;
-                Ok(Msg::Stored(BrokerMutations {
-                    muts: Vec::new(), // empty
-                    server_hmac,
-                }))
+                match self.put_muts(vlsm).await {
+                    Ok(server_hmac) => Msg::Stored(BrokerMutations {
+                        muts: Vec::new(), // empty
+                        server_hmac,
+                    }),
+                    Err(_) => Msg::PutConflict,
+                }
             }
         }
     }

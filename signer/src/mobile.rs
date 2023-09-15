@@ -46,6 +46,7 @@ pub struct Args {
     allowlist: Vec<String>,
     timestamp: u64, // number of seconds
     lss_nonce: [u8; 32],
+    signer_id: [u8; 16],
 }
 
 pub type State = BTreeMap<String, (u64, Vec<u8>)>;
@@ -157,7 +158,7 @@ fn root_handler_builder(
 ) -> Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
     use std::time::UNIX_EPOCH;
 
-    let memstore = MemoryKVVStore::new().0;
+    let memstore = MemoryKVVStore::new(args.signer_id).0;
     let persister = CloudKVVStore::new(memstore);
 
     let muts: Vec<_> = state
