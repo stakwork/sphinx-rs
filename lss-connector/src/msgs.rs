@@ -331,6 +331,14 @@ mod tests {
     }
 
     #[test]
+    fn test_msgputconflict_serde() {
+        let test = Msg::PutConflict;
+        let bytes = serialize_lssmsg(&test).unwrap();
+        let object = deserialize_lssmsg(&bytes).unwrap();
+        assert_eq!(test, object);
+    }
+
+    #[test]
     fn test_msgcreated_serde() {
         let muts = vec![
             ("aaaa".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
