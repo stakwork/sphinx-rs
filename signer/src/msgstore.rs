@@ -3,13 +3,13 @@ use lightning_signer::persist::Error;
 use lightning_signer::SendSync;
 use vls_protocol_signer::lightning_signer;
 
-pub struct FsPersister {
+pub struct MsgStore {
     prev_msgs: Bucket<Vec<u8>>,
 }
 
-impl SendSync for FsPersister {}
+impl SendSync for MsgStore {}
 
-impl FsPersister {
+impl MsgStore {
     pub fn new(dir: &str, maxsize: Option<usize>) -> Self {
         let db = Fsdb::new(dir).expect("could not create db");
         Self {
@@ -18,7 +18,7 @@ impl FsPersister {
     }
 }
 
-impl FsPersister {
+impl MsgStore {
     pub fn set_prevs(&self, prev_vls: &Vec<u8>, prev_lss: &Vec<u8>) {
         let _ = self.prev_msgs.put_raw("prev_vls", prev_vls);
         let _ = self.prev_msgs.put_raw("prev_lss", prev_lss);
