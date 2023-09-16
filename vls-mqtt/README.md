@@ -1,6 +1,6 @@
 # Sphinx VLS Signer
 
-cargo run
+cargo run multi
 
 ### clear
 

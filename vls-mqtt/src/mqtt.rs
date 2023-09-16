@@ -135,9 +135,9 @@ async fn main_listener(
                         if error_msg.starts_with("invalid sequence") {
                             exit(0);
                         }
-                        if error_msg.contains("PutConflict") {
-                            exit(0);
-                        }
+                        // if error_msg.contains("PutConflict") {
+                        //     exit(0);
+                        // }
                     } else {
                         if let Some(seq) = sequence {
                             expected_sequence = Some(seq + 1);
@@ -145,6 +145,10 @@ async fn main_listener(
                     }
                     // println!("publish back to broker! {}", &return_topic);
                     publish(client, &client_id, &return_topic, &bytes).await;
+                    if return_topic == topics::LSS_CONFLICT {
+                        log::warn!("LSS PUT CONFLICT... RESTART");
+                        exit(0);
+                    }
                 }
             }
             Err(e) => {

@@ -445,4 +445,12 @@ mod tests {
         let object = deserialize_lssres(&bytes).unwrap();
         assert_eq!(test, object);
     }
+
+    #[test]
+    fn test_resputconflict_serde() {
+        let test = Response::PutConflictConfirmed;
+        let bytes = serialize_lssres(&test).unwrap();
+        let object = deserialize_lssres(&bytes).unwrap();
+        assert_eq!(test, object);
+    }
 }
