@@ -131,7 +131,7 @@ async fn main_listener(
                     }
                     // println!("publish back to broker! {}", &return_topic);
                     publish(client, &client_id, &return_topic, &bytes).await;
-                    if return_topic == topics::LSS_CONFLICT {
+                    if return_topic == topics::LSS_CONFLICT_RES {
                         log::warn!("LSS PUT CONFLICT... RESTART");
                         exit(0);
                     }
