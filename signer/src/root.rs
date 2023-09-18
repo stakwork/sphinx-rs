@@ -145,7 +145,7 @@ fn handle_inner(
         dbid,
     } = read_serial_request_header(&mut cursor)
         .map_err(|e| VlsHandlerError::HeaderRead(format!("{:?}", e)))?;
-    log::info!("sequence: {}", sequence);
+    log::info!("=> handler sequence: {}", sequence);
     if let Some(expected) = expected_sequence {
         if expected != sequence {
             return Err(VlsHandlerError::BadSequence(sequence, expected));

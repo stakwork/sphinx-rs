@@ -18,6 +18,7 @@ pub async fn start(
     client_id: &str,
     error_tx: broadcast::Sender<Vec<u8>>,
     lss_tx: mpsc::Sender<LssChanMsg>,
+    commit_tx: mpsc::Sender<()>,
 ) -> Result<(), Box<dyn Error>> {
     // alternate between "reconnection" and "handler"
     loop {
@@ -64,31 +65,13 @@ pub async fn start(
             }
         };
 
-        let vls_topic = format!("{}/{}", client_id, topics::VLS);
-        client
-            .subscribe(vls_topic, QoS::AtMostOnce)
-            .await
-            .expect("could not subscribe VLS");
-        let ctrl_topic = format!("{}/{}", client_id, topics::CONTROL);
-        client
-            .subscribe(ctrl_topic, QoS::AtMostOnce)
-            .await
-            .expect("could not subscribe CTRL");
-        let lss_topic = format!("{}/{}", client_id, topics::LSS_MSG);
-        client
-            .subscribe(lss_topic, QoS::AtMostOnce)
-            .await
-            .expect("could not subscribe LSS");
-        let init_1_topic = format!("{}/{}", client_id, topics::INIT_1_MSG);
-        client
-            .subscribe(init_1_topic, QoS::AtMostOnce)
-            .await
-            .expect("could not subscribe LSS 1");
-        let init_2_topic = format!("{}/{}", client_id, topics::INIT_2_MSG);
-        client
-            .subscribe(init_2_topic, QoS::AtMostOnce)
-            .await
-            .expect("could not subscribe LSS 2");
+        for t in topics::SIGNER_SUBS {
+            let top = format!("{}/{}", client_id, t);
+            client
+                .subscribe(top, QoS::AtMostOnce)
+                .await
+                .expect("could not subscribe");
+        }
 
         main_listener(
             vls_tx.clone(),
@@ -97,6 +80,7 @@ pub async fn start(
             error_tx.clone(),
             client_id,
             lss_tx.clone(),
+            commit_tx.clone(),
         )
         .await;
     }
@@ -109,6 +93,7 @@ async fn main_listener(
     error_tx: broadcast::Sender<Vec<u8>>,
     client_id: &str,
     lss_tx: mpsc::Sender<LssChanMsg>,
+    commit_tx: mpsc::Sender<()>,
 ) {
     // say hello to start
     publish(client, &client_id, topics::HELLO, &[]).await;
@@ -125,6 +110,7 @@ async fn main_listener(
                         expected_sequence,
                         &vls_tx,
                         &lss_tx,
+                        &commit_tx,
                         &mut msgs,
                     )
                     .await;
@@ -169,6 +155,7 @@ async fn got_msg(
     expected_sequence: Option<u16>,
     vls_tx: &mpsc::Sender<VlsChanMsg>,
     lss_tx: &mpsc::Sender<LssChanMsg>,
+    commit_tx: &mpsc::Sender<()>,
     msgs: &mut Option<(Vec<u8>, Vec<u8>)>,
 ) -> (String, Vec<u8>, Option<u16>) {
     // println!("GOT MSG on {} {:?}", topic, msg_bytes);
@@ -179,10 +166,13 @@ async fn got_msg(
             Ok((vls_bytes, lss_bytes, sequence, cmd)) => {
                 println!("RAN: {:?}", cmd);
                 if lss_bytes.len() == 0 {
+                    // commit immediately if no muts
+                    let _ = commit_tx.send(()).await;
                     // no muts, respond directly back!
                     (topics::VLS_RES.to_string(), vls_bytes, Some(sequence))
                 } else {
                     // muts! do LSS first!
+                    // do not commit until LSS storage is verified...
                     *msgs = Some((vls_bytes, lss_bytes.clone()));
                     (topics::LSS_RES.to_string(), lss_bytes, Some(sequence))
                 }
@@ -199,24 +189,25 @@ async fn got_msg(
     } else if topic.ends_with(topics::LSS_MSG)
         || topic.ends_with(topics::INIT_1_MSG)
         || topic.ends_with(topics::INIT_2_MSG)
+        || topic.ends_with(topics::LSS_CONFLICT)
     {
         let (lss_msg, reply_rx) = LssChanMsg::new(msg_bytes.to_vec(), msgs.clone());
         let _ = lss_tx.send(lss_msg).await;
         match reply_rx.await.unwrap() {
             // these are the vls bytes from before
-            Ok((topic, payload)) => {
-                // println!("got something back from LSS Helper to send on {}", &topic);
+            Ok((ret_topic, payload)) => {
                 *msgs = None;
-                (topic, payload.to_vec(), None)
+                // if it was Ok, hmac was matched for BrokerMutations
+                if topic.ends_with(topics::LSS_MSG) {
+                    let _ = commit_tx.send(()).await;
+                }
+                (ret_topic, payload.to_vec(), None)
             }
-            Err(e) => {
-                println!("LSS ERROR {:?}", e);
-                (
-                    topics::ERROR.to_string(),
-                    e.to_string().as_bytes().to_vec(),
-                    None,
-                )
-            }
+            Err(e) => (
+                topics::ERROR.to_string(),
+                e.to_string().as_bytes().to_vec(),
+                None,
+            ),
         }
     } else {
         log::warn!("unrecognized topic {}", topic);

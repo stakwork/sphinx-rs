@@ -155,11 +155,15 @@ async fn rocket() -> _ {
     let vls_tx_ = vls_tx.clone();
     let (lss_tx, lss_rx) = mpsc::channel::<LssChanMsg>(1000);
     let lss_tx_ = lss_tx.clone();
+    let (commit_tx, mut commit_rx) = mpsc::channel::<()>(1000);
+    let commit_tx_ = commit_tx.clone();
     let error_tx_ = error_tx.clone();
     rocket::tokio::spawn(async move {
-        mqtt::start(vls_tx_, &pk, &sk, &client_id, error_tx_, lss_tx_)
-            .await
-            .expect("mqtt crash");
+        mqtt::start(
+            vls_tx_, &pk, &sk, &client_id, error_tx_, lss_tx_, commit_tx_,
+        )
+        .await
+        .expect("mqtt crash");
     });
 
     // LSS initialization
@@ -176,6 +180,7 @@ async fn rocket() -> _ {
     rocket::tokio::spawn(async move {
         while let Some(msg) = vls_rx.recv().await {
             let s1 = approver.control().get_state();
+            println!("RUN NOW: {:?}", &msg.expected_sequence);
             let res_res =
                 root::handle_with_lss(&rh_, &lss_signer, msg.message, msg.expected_sequence, false)
                     .map_err(Error::msg);
@@ -189,7 +194,17 @@ async fn rocket() -> _ {
                 drop(ctrldb_);
             }
             let _ = msg.reply_tx.send(res_res);
-            rh_.commit();
+        }
+    });
+
+    let rh_ = rh.clone();
+    rocket::tokio::spawn(async move {
+        while let Some(_) = commit_rx.recv().await {
+            log::info!("COMMIT persister!");
+            if let Err(e) = rh_.node().get_persister().commit() {
+                log::error!("Local COMMIT error! {:?}", e);
+                exit(0);
+            }
         }
     });
 

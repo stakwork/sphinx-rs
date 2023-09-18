@@ -25,9 +25,9 @@ anyhow = { version = "1", default-features = false }
 secp256k1 = { version = "0.24.0", default-features = false, features = ["bitcoin_hashes"] }
 # broker libs
 # vls
-lightning-storage-server = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "66b77ac71363ac3ea4504d4fce3f4813a52acd84", optional = true }
-vls-frontend = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "66b77ac71363ac3ea4504d4fce3f4813a52acd84", optional = true }
-vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "66b77ac71363ac3ea4504d4fce3f4813a52acd84", default-features = false, features = ["secp-lowmemory"] }
+lightning-storage-server = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "4fa6a497b6e2a71d6caaad2e3aed116ce1ab1c82", optional = true }
+vls-frontend = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "4fa6a497b6e2a71d6caaad2e3aed116ce1ab1c82", optional = true }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "4fa6a497b6e2a71d6caaad2e3aed116ce1ab1c82", default-features = false, features = ["secp-lowmemory"] }
 # local
 # lightning-storage-server = { path = "../../vls/lightning-storage-server", optional = true }
 # vls-frontend = { path = "../../vls/vls-frontend", optional = true }
