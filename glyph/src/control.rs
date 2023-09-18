@@ -187,8 +187,8 @@ pub trait ControlPersist: Sync + Send {
     fn read_seed(&self) -> Result<[u8; 32]>;
     fn write_seed(&mut self, s: [u8; 32]) -> Result<()>;
     fn remove_seed(&mut self) -> Result<()>;
-    fn read_id(&self) -> Result<String>;
-    fn write_id(&mut self, id: String) -> Result<()>;
+    fn read_id(&self) -> Result<[u8; 16]>;
+    fn write_id(&mut self, id: [u8; 16]) -> Result<()>;
     fn read_policy(&self) -> Result<Policy>;
     fn write_policy(&mut self, s: Policy) -> Result<()>;
     fn remove_policy(&mut self) -> Result<()>;
@@ -223,10 +223,10 @@ impl ControlPersist for DummyPersister {
     fn remove_seed(&mut self) -> Result<()> {
         Ok(())
     }
-    fn read_id(&self) -> Result<String> {
+    fn read_id(&self) -> Result<[u8; 16]> {
         Ok(Default::default())
     }
-    fn write_id(&mut self, _id: String) -> Result<()> {
+    fn write_id(&mut self, _id: [u8; 16]) -> Result<()> {
         Ok(())
     }
     fn read_policy(&self) -> Result<Policy> {
