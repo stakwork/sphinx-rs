@@ -20,6 +20,7 @@ use sphinx_signer::policy::update_controls;
 use sphinx_signer::Handler;
 use sphinx_signer::{self, approver::SphinxApprover, root, sphinx_glyph as glyph, RootHandler};
 use std::env;
+use std::process::exit;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
