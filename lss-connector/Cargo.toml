@@ -25,17 +25,17 @@ anyhow = { version = "1", default-features = false }
 secp256k1 = { version = "0.24.0", default-features = false, features = ["bitcoin_hashes"] }
 # broker libs
 # vls
-# lightning-storage-server = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "4b2a00975a5c7ccdbcedf6dcf44728b90b296064", optional = true }
-# vls-frontend = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "4b2a00975a5c7ccdbcedf6dcf44728b90b296064", optional = true }
-# vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "4b2a00975a5c7ccdbcedf6dcf44728b90b296064", default-features = false, features = ["secp-lowmemory"] }
+lightning-storage-server = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "0370e6a124ac5f64c91b755d7ab1a9e9cc27597d", optional = true }
+vls-frontend = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "0370e6a124ac5f64c91b755d7ab1a9e9cc27597d", optional = true }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "0370e6a124ac5f64c91b755d7ab1a9e9cc27597d", default-features = false, features = ["secp-lowmemory"] }
 # local
 # lightning-storage-server = { path = "../../vls/lightning-storage-server", optional = true }
 # vls-frontend = { path = "../../vls/vls-frontend", optional = true }
 # vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory"] }
 # multi
-lightning-storage-server = { git = "https://gitlab.com/irriden/validating-lightning-signer.git", rev = "ce04684b312c95fa7a62329ff198092a50e9a088", optional = true }
-vls-frontend = { git = "https://gitlab.com/irriden/validating-lightning-signer.git", rev = "ce04684b312c95fa7a62329ff198092a50e9a088", optional = true }
-vls-protocol-signer = { git = "https://gitlab.com/irriden/validating-lightning-signer.git", rev = "ce04684b312c95fa7a62329ff198092a50e9a088", default-features = false, features = ["secp-lowmemory"] }
+# lightning-storage-server = { git = "https://gitlab.com/irriden/validating-lightning-signer.git", rev = "ce04684b312c95fa7a62329ff198092a50e9a088", optional = true }
+# vls-frontend = { git = "https://gitlab.com/irriden/validating-lightning-signer.git", rev = "ce04684b312c95fa7a62329ff198092a50e9a088", optional = true }
+# vls-protocol-signer = { git = "https://gitlab.com/irriden/validating-lightning-signer.git", rev = "ce04684b312c95fa7a62329ff198092a50e9a088", default-features = false, features = ["secp-lowmemory"] }
 
 tokio = { version = "1.27", features = ["macros", "rt-multi-thread"], optional = true }
 

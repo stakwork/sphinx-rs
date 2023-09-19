@@ -10,6 +10,7 @@ use dotenv::dotenv;
 use glyph::control::{ControlPersist, Controller};
 use glyph::ser::{serialize_controlresponse, ByteBuf};
 use lss::init_lss;
+use rand::RngCore;
 use rocket::tokio::sync::{broadcast, mpsc, oneshot};
 use sphinx_signer::kvv::{CloudKVVStore, FsKVVStore};
 use sphinx_signer::lightning_signer::bitcoin::Network;
@@ -19,6 +20,7 @@ use sphinx_signer::policy::update_controls;
 use sphinx_signer::Handler;
 use sphinx_signer::{self, approver::SphinxApprover, root, sphinx_glyph as glyph, RootHandler};
 use std::env;
+use std::process::exit;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -30,7 +32,7 @@ pub const ROOT_STORE: &str = "teststore";
 pub struct VlsChanMsg {
     pub message: Vec<u8>,
     pub expected_sequence: Option<u16>,
-    pub reply_tx: oneshot::Sender<Result<(Vec<u8>, Vec<u8>, u16, String)>>,
+    pub reply_tx: oneshot::Sender<Result<(Vec<u8>, Vec<u8>, u16, String, Option<[u8; 32]>)>>,
 }
 impl VlsChanMsg {
     pub fn new(
@@ -38,7 +40,7 @@ impl VlsChanMsg {
         expected_sequence: Option<u16>,
     ) -> (
         Self,
-        oneshot::Receiver<Result<(Vec<u8>, Vec<u8>, u16, String)>>,
+        oneshot::Receiver<Result<(Vec<u8>, Vec<u8>, u16, String, Option<[u8; 32]>)>>,
     ) {
         let (reply_tx, reply_rx) = oneshot::channel();
         (
@@ -58,14 +60,14 @@ impl VlsChanMsg {
 pub struct LssChanMsg {
     pub message: Vec<u8>,
     // the previous VLS msgs
-    pub previous: Option<(Vec<u8>, Vec<u8>)>,
+    pub previous: Option<(Vec<u8>, [u8; 32])>,
     // topic, payload
     pub reply_tx: oneshot::Sender<Result<(String, Vec<u8>)>>,
 }
 impl LssChanMsg {
     pub fn new(
         message: Vec<u8>,
-        previous: Option<(Vec<u8>, Vec<u8>)>,
+        previous: Option<(Vec<u8>, [u8; 32])>,
     ) -> (Self, oneshot::Receiver<Result<(String, Vec<u8>)>>) {
         let (reply_tx, reply_rx) = oneshot::channel();
         (
@@ -105,7 +107,12 @@ async fn rocket() -> _ {
     let seed32: [u8; 32] = seed.try_into().expect("invalid seed");
     let store_path = env::var("STORE_PATH").unwrap_or(ROOT_STORE.to_string());
 
-    let kvv_store = FsKVVStore::new(&store_path, None).0;
+    let mut signer_id = [0u8; 16];
+    rand::thread_rng().fill_bytes(&mut signer_id);
+
+    let client_id = hex::encode(signer_id);
+
+    let kvv_store = FsKVVStore::new(&store_path, signer_id, None).0;
     let fs_persister = CloudKVVStore::new(kvv_store);
 
     // FIXME initial allowlist
@@ -149,11 +156,15 @@ async fn rocket() -> _ {
     let vls_tx_ = vls_tx.clone();
     let (lss_tx, lss_rx) = mpsc::channel::<LssChanMsg>(1000);
     let lss_tx_ = lss_tx.clone();
+    let (commit_tx, mut commit_rx) = mpsc::channel::<()>(1000);
+    let commit_tx_ = commit_tx.clone();
     let error_tx_ = error_tx.clone();
     rocket::tokio::spawn(async move {
-        mqtt::start(vls_tx_, &pk, &sk, error_tx_, lss_tx_)
-            .await
-            .expect("mqtt crash");
+        mqtt::start(
+            vls_tx_, &pk, &sk, &client_id, error_tx_, lss_tx_, commit_tx_,
+        )
+        .await
+        .expect("mqtt crash");
     });
 
     // LSS initialization
@@ -170,6 +181,7 @@ async fn rocket() -> _ {
     rocket::tokio::spawn(async move {
         while let Some(msg) = vls_rx.recv().await {
             let s1 = approver.control().get_state();
+            println!("RUN NOW: {:?}", &msg.expected_sequence);
             let res_res =
                 root::handle_with_lss(&rh_, &lss_signer, msg.message, msg.expected_sequence, false)
                     .map_err(Error::msg);
@@ -183,7 +195,17 @@ async fn rocket() -> _ {
                 drop(ctrldb_);
             }
             let _ = msg.reply_tx.send(res_res);
-            rh_.commit();
+        }
+    });
+
+    let rh_ = rh.clone();
+    rocket::tokio::spawn(async move {
+        while let Some(_) = commit_rx.recv().await {
+            log::info!("COMMIT persister!");
+            if let Err(e) = rh_.node().get_persister().commit() {
+                log::error!("Local COMMIT error! {:?}", e);
+                exit(0);
+            }
         }
     });
 

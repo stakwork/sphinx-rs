@@ -8,6 +8,7 @@ pub enum Msg {
     Init(Init),
     Created(BrokerMutations),
     Stored(BrokerMutations),
+    PutConflict,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -15,6 +16,7 @@ pub enum Response {
     Init(InitResponse),
     Created(SignerMutations),
     VlsMuts(SignerMutations),
+    PutConflictConfirmed,
 }
 
 pub type Muts = Vec<(String, (u64, Vec<u8>))>;
@@ -67,6 +69,11 @@ pub fn serialize_lssmsg(msg: &Msg) -> Result<Vec<u8>> {
             serialize_muts(&mut buff, "Stored", "server_hmac", bm.server_hmac, &bm.muts)?;
             Ok(buff.into_vec())
         }
+        Msg::PutConflict => {
+            rmp::serialize_map_len(&mut buff, 1u32)?;
+            rmp::serialize_field_name(&mut buff, Some("PutConflict"))?;
+            Ok(buff.into_vec())
+        }
     }
 }
 
@@ -104,6 +111,11 @@ pub fn serialize_lssres(res: &Response) -> Result<Vec<u8>> {
                 Some(sm.client_hmac),
                 &sm.muts,
             )?;
+            Ok(buff.into_vec())
+        }
+        Response::PutConflictConfirmed => {
+            rmp::serialize_map_len(&mut buff, 1u32)?;
+            rmp::serialize_field_name(&mut buff, Some("PutConflictConfirmed"))?;
             Ok(buff.into_vec())
         }
     }
@@ -145,6 +157,7 @@ pub fn deserialize_lssmsg(b: &[u8]) -> Result<Msg> {
         "Stored" => Ok(Msg::Stored(
             deserialize_brokermuts(&mut bytes).map_err(Error::msg)?,
         )),
+        "PutConflict" => Ok(Msg::PutConflict),
         m => Err(anyhow!("deserialize_lssmg: not an lssmsg variant {:?}", m)),
     }
 }
@@ -187,6 +200,7 @@ pub fn deserialize_lssres(b: &[u8]) -> Result<Response> {
         "VlsMuts" => Ok(Response::VlsMuts(
             deserialize_signermuts(&mut bytes).map_err(Error::msg)?,
         )),
+        "PutConflictConfirmed" => Ok(Response::PutConflictConfirmed),
         m => Err(anyhow!("deserialize_lssres: not an lssres variant {:?}", m)),
     }
 }
@@ -324,6 +338,14 @@ mod tests {
     }
 
     #[test]
+    fn test_msgputconflict_serde() {
+        let test = Msg::PutConflict;
+        let bytes = serialize_lssmsg(&test).unwrap();
+        let object = deserialize_lssmsg(&bytes).unwrap();
+        assert_eq!(test, object);
+    }
+
+    #[test]
     fn test_msgcreated_serde() {
         let muts = vec![
             ("aaaa".to_string(), (15, vec![u8::MAX, u8::MAX, u8::MAX])),
@@ -419,6 +441,14 @@ mod tests {
             client_hmac: [u8::MAX; 32],
             muts,
         });
+        let bytes = serialize_lssres(&test).unwrap();
+        let object = deserialize_lssres(&bytes).unwrap();
+        assert_eq!(test, object);
+    }
+
+    #[test]
+    fn test_resputconflict_serde() {
+        let test = Response::PutConflictConfirmed;
         let bytes = serialize_lssres(&test).unwrap();
         let object = deserialize_lssres(&bytes).unwrap();
         assert_eq!(test, object);

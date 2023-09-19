@@ -145,7 +145,7 @@ fn handle_inner(
         dbid,
     } = read_serial_request_header(&mut cursor)
         .map_err(|e| VlsHandlerError::HeaderRead(format!("{:?}", e)))?;
-    log::info!("sequence: {}", sequence);
+    log::info!("=> handler sequence: {}", sequence);
     if let Some(expected) = expected_sequence {
         if expected != sequence {
             return Err(VlsHandlerError::BadSequence(sequence, expected));
@@ -212,22 +212,27 @@ pub fn handle_with_lss(
     bytes: Vec<u8>,
     expected_sequence: Option<u16>,
     do_log: bool,
-) -> Result<(Vec<u8>, Vec<u8>, u16, String), VlsHandlerError> {
+) -> Result<(Vec<u8>, Vec<u8>, u16, String, Option<[u8; 32]>), VlsHandlerError> {
     let (out_bytes, mutations, sequence, cmd) =
         handle_inner(root_handler, bytes, expected_sequence, do_log)?;
+    let mut server_hmac = None;
     let lss_bytes = if mutations.is_empty() {
         Vec::new()
     } else {
         let client_hmac = lss_signer.client_hmac(&mutations);
+        // also make server hmac to store for checking later
+        server_hmac = Some(lss_signer.server_hmac(&mutations));
+
         let lss_msg = LssResponse::VlsMuts(SignerMutations {
             client_hmac,
             muts: mutations.into_inner(),
         });
+
         lss_msg
             .to_vec()
             .map_err(|e| VlsHandlerError::LssWrite(format!("{:?}", e)))?
     };
-    Ok((out_bytes, lss_bytes, sequence, cmd))
+    Ok((out_bytes, lss_bytes, sequence, cmd, server_hmac))
 }
 
 pub fn parse_ping_and_form_response(msg_bytes: Vec<u8>) -> Vec<u8> {

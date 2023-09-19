@@ -1,5 +1,5 @@
-use fsdb::{AnyBucket, Fsdb};
-use lightning_signer::persist::Error;
+use fsdb::{AnyBucket, Bucket, Fsdb};
+use lightning_signer::persist::{Error, SignerId};
 use lightning_signer::SendSync;
 use log::error;
 use std::collections::BTreeMap;
@@ -12,6 +12,8 @@ use std::sync::Mutex;
 /// A key-version-value store backed by fsdb
 pub struct FsKVVStore {
     db: AnyBucket<Vec<u8>>,
+    meta: Bucket<Vec<u8>>,
+    signer_id: [u8; 16],
     versions: Mutex<BTreeMap<String, u64>>,
 }
 
@@ -29,7 +31,7 @@ impl Iterator for Iter {
 impl SendSync for FsKVVStore {}
 
 impl FsKVVStore {
-    pub fn new(path: &str, maxsize: Option<usize>) -> KVVPersister<Self> {
+    pub fn new(path: &str, signer_id: [u8; 16], maxsize: Option<usize>) -> KVVPersister<Self> {
         let db = Fsdb::new(path).expect("could not create db");
         let bucket = db
             .any_bucket::<Vec<u8>>(maxsize)
@@ -48,8 +50,13 @@ impl FsKVVStore {
             }
         }
 
+        let meta = db
+            .bucket::<Vec<u8>>("meta", None)
+            .expect("could not create bucket");
         KVVPersister(Self {
             db: bucket,
+            meta,
+            signer_id,
             versions: Mutex::new(versions),
         })
     }
@@ -93,6 +100,10 @@ impl FsKVVStore {
 
 impl KVVStore for FsKVVStore {
     type Iter = Iter;
+
+    fn signer_id(&self) -> SignerId {
+        self.signer_id
+    }
 
     fn put(&self, key: &str, value: &[u8]) -> Result<(), Error> {
         let v = self
@@ -194,5 +205,26 @@ impl KVVStore for FsKVVStore {
             .db
             .clear()
             .map_err(|_| Error::Internal("could not clear".to_string()))?)
+    }
+}
+
+impl FsKVVStore {
+    pub fn get_raw(&self, key: &str) -> Result<Vec<u8>, Error> {
+        Ok(self
+            .meta
+            .get_raw(key)
+            .map_err(|_| Error::Internal("failed get_raw".to_string()))?)
+    }
+    pub fn set_raw(&self, key: &str, data: &[u8]) -> Result<(), Error> {
+        Ok(self
+            .meta
+            .put_raw(key, data)
+            .map_err(|_| Error::Internal("failed put_raw".to_string()))?)
+    }
+    pub fn delete_raw(&self, key: &str) -> Result<(), Error> {
+        Ok(self
+            .meta
+            .remove(key)
+            .map_err(|_| Error::Internal("failed remove".to_string()))?)
     }
 }

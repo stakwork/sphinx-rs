@@ -96,33 +96,48 @@ impl LssBroker {
             Some(hmac)
         })
     }
-    pub async fn handle_bytes(&self, resb: &[u8]) -> Result<Vec<u8>> {
+    pub async fn handle_bytes(&self, resb: &[u8]) -> Result<(String, Vec<u8>)> {
         let res = Response::from_slice(resb)?;
         log::info!("HANDLE LSS {:?}", res);
-        let msg = self.handle(res).await?;
+        let (topic, msg) = self.handle(res).await;
         log::info!("MSG TO SIGNER: {:?}", msg);
-        Ok(msg.to_vec()?)
+        Ok((topic, msg.to_vec()?))
     }
-    pub async fn handle(&self, res: Response) -> Result<Msg> {
+    pub async fn handle(&self, res: Response) -> (String, Msg) {
+        use sphinx_glyph::topics;
         match res {
-            Response::Init(_) => Ok(Msg::Created(BrokerMutations {
-                muts: Vec::new(),  // empty
-                server_hmac: None, // empty
-            })),
+            Response::Init(_) => (
+                topics::INIT_1_MSG.to_string(),
+                Msg::Created(BrokerMutations {
+                    muts: Vec::new(),  // empty
+                    server_hmac: None, // empty
+                }),
+            ),
             Response::Created(cm) => {
-                let server_hmac = self.put_muts(cm).await?;
-                Ok(Msg::Created(BrokerMutations {
-                    muts: Vec::new(), // empty
-                    server_hmac,
-                }))
+                match self.put_muts(cm).await {
+                    Ok(server_hmac) => (
+                        topics::INIT_2_MSG.to_string(),
+                        Msg::Created(BrokerMutations {
+                            muts: Vec::new(), // empty
+                            server_hmac,
+                        }),
+                    ),
+                    Err(_) => (topics::LSS_CONFLICT.to_string(), Msg::PutConflict),
+                }
             }
             Response::VlsMuts(vlsm) => {
-                let server_hmac = self.put_muts(vlsm).await?;
-                Ok(Msg::Stored(BrokerMutations {
-                    muts: Vec::new(), // empty
-                    server_hmac,
-                }))
+                match self.put_muts(vlsm).await {
+                    Ok(server_hmac) => (
+                        topics::LSS_MSG.to_string(),
+                        Msg::Stored(BrokerMutations {
+                            muts: Vec::new(), // empty
+                            server_hmac,
+                        }),
+                    ),
+                    Err(_) => (topics::LSS_CONFLICT.to_string(), Msg::PutConflict),
+                }
             }
+            Response::PutConflictConfirmed => (topics::LSS_CONFLICT.to_string(), Msg::PutConflict), // ??
         }
     }
 }
