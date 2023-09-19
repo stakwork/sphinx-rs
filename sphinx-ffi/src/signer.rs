@@ -107,7 +107,10 @@ fn run_vls(
     let mut extras = BTreeMap::new();
     let vlsb = ret.vls_bytes.clone().unwrap_or(Vec::new());
     extras.insert(PREV_VLS.to_string(), vlsb);
-    let lssb = ret.lss_bytes.clone().unwrap_or(Vec::new());
+    let lssb = match ret.server_hmac {
+        Some(bs) => bs.to_vec(),
+        None => Vec::new(),
+    };
     extras.insert(PREV_LSS.to_string(), lssb);
     if let Some(vel) = ser_velocity(&ret.velocity)? {
         extras.insert(VELOCITY.to_string(), vel);
