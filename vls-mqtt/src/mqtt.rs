@@ -99,7 +99,7 @@ async fn main_listener(
     publish(client, &client_id, topics::HELLO, &[]).await;
 
     let mut expected_sequence: Option<u16> = None;
-    let mut msgs: Option<(Vec<u8>, Vec<u8>)> = None;
+    let mut msgs: Option<(Vec<u8>, [u8; 32])> = None;
     loop {
         match eventloop.poll().await {
             Ok(event) => {
@@ -156,25 +156,25 @@ async fn got_msg(
     vls_tx: &mpsc::Sender<VlsChanMsg>,
     lss_tx: &mpsc::Sender<LssChanMsg>,
     commit_tx: &mpsc::Sender<()>,
-    msgs: &mut Option<(Vec<u8>, Vec<u8>)>,
+    msgs: &mut Option<(Vec<u8>, [u8; 32])>,
 ) -> (String, Vec<u8>, Option<u16>) {
     // println!("GOT MSG on {} {:?}", topic, msg_bytes);
     if topic.ends_with(topics::VLS) {
         let (vls_msg, reply_rx) = VlsChanMsg::new(msg_bytes.to_vec(), expected_sequence);
         let _ = vls_tx.send(vls_msg).await;
         match reply_rx.await.unwrap() {
-            Ok((vls_bytes, lss_bytes, sequence, cmd)) => {
+            Ok((vls_bytes, lss_bytes, sequence, cmd, server_hmac)) => {
                 println!("RAN: {:?}", cmd);
-                if lss_bytes.len() == 0 {
+                if let Some(shmac) = server_hmac {
+                    // muts! do LSS first!
+                    // do not commit until LSS storage is verified...
+                    *msgs = Some((vls_bytes, shmac));
+                    (topics::LSS_RES.to_string(), lss_bytes, Some(sequence))
+                } else {
                     // commit immediately if no muts
                     let _ = commit_tx.send(()).await;
                     // no muts, respond directly back!
                     (topics::VLS_RES.to_string(), vls_bytes, Some(sequence))
-                } else {
-                    // muts! do LSS first!
-                    // do not commit until LSS storage is verified...
-                    *msgs = Some((vls_bytes, lss_bytes.clone()));
-                    (topics::LSS_RES.to_string(), lss_bytes, Some(sequence))
                 }
             }
             Err(e) => {

@@ -1,4 +1,4 @@
-use fsdb::{AnyBucket, Fsdb};
+use fsdb::{AnyBucket, Bucket, Fsdb};
 use lightning_signer::persist::{Error, SignerId};
 use lightning_signer::SendSync;
 use log::error;
@@ -12,6 +12,7 @@ use std::sync::Mutex;
 /// A key-version-value store backed by fsdb
 pub struct FsKVVStore {
     db: AnyBucket<Vec<u8>>,
+    meta: Bucket<Vec<u8>>,
     signer_id: [u8; 16],
     versions: Mutex<BTreeMap<String, u64>>,
 }
@@ -49,8 +50,12 @@ impl FsKVVStore {
             }
         }
 
+        let meta = db
+            .bucket::<Vec<u8>>("meta", None)
+            .expect("could not create bucket");
         KVVPersister(Self {
             db: bucket,
+            meta,
             signer_id,
             versions: Mutex::new(versions),
         })
@@ -200,5 +205,26 @@ impl KVVStore for FsKVVStore {
             .db
             .clear()
             .map_err(|_| Error::Internal("could not clear".to_string()))?)
+    }
+}
+
+impl FsKVVStore {
+    pub fn get_raw(&self, key: &str) -> Result<Vec<u8>, Error> {
+        Ok(self
+            .meta
+            .get_raw(key)
+            .map_err(|_| Error::Internal("failed get_raw".to_string()))?)
+    }
+    pub fn set_raw(&self, key: &str, data: &[u8]) -> Result<(), Error> {
+        Ok(self
+            .meta
+            .put_raw(key, data)
+            .map_err(|_| Error::Internal("failed put_raw".to_string()))?)
+    }
+    pub fn delete_raw(&self, key: &str) -> Result<(), Error> {
+        Ok(self
+            .meta
+            .remove(key)
+            .map_err(|_| Error::Internal("failed remove".to_string()))?)
     }
 }

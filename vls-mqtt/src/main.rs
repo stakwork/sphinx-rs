@@ -32,7 +32,7 @@ pub const ROOT_STORE: &str = "teststore";
 pub struct VlsChanMsg {
     pub message: Vec<u8>,
     pub expected_sequence: Option<u16>,
-    pub reply_tx: oneshot::Sender<Result<(Vec<u8>, Vec<u8>, u16, String)>>,
+    pub reply_tx: oneshot::Sender<Result<(Vec<u8>, Vec<u8>, u16, String, Option<[u8; 32]>)>>,
 }
 impl VlsChanMsg {
     pub fn new(
@@ -40,7 +40,7 @@ impl VlsChanMsg {
         expected_sequence: Option<u16>,
     ) -> (
         Self,
-        oneshot::Receiver<Result<(Vec<u8>, Vec<u8>, u16, String)>>,
+        oneshot::Receiver<Result<(Vec<u8>, Vec<u8>, u16, String, Option<[u8; 32]>)>>,
     ) {
         let (reply_tx, reply_rx) = oneshot::channel();
         (
@@ -60,14 +60,14 @@ impl VlsChanMsg {
 pub struct LssChanMsg {
     pub message: Vec<u8>,
     // the previous VLS msgs
-    pub previous: Option<(Vec<u8>, Vec<u8>)>,
+    pub previous: Option<(Vec<u8>, [u8; 32])>,
     // topic, payload
     pub reply_tx: oneshot::Sender<Result<(String, Vec<u8>)>>,
 }
 impl LssChanMsg {
     pub fn new(
         message: Vec<u8>,
-        previous: Option<(Vec<u8>, Vec<u8>)>,
+        previous: Option<(Vec<u8>, [u8; 32])>,
     ) -> (Self, oneshot::Receiver<Result<(String, Vec<u8>)>>) {
         let (reply_tx, reply_rx) = oneshot::channel();
         (

@@ -165,7 +165,7 @@ impl LssSigner {
 // return the return_topic and bytes
 pub fn handle_lss_msg(
     msg: &[u8],
-    previous: Option<(Vec<u8>, Vec<u8>)>,
+    previous: Option<(Vec<u8>, [u8; 32])>,
     lss_signer: &LssSigner,
 ) -> Result<(String, Vec<u8>)> {
     use sphinx_glyph::topics;
@@ -190,25 +190,17 @@ pub fn handle_lss_msg(
         }
         Msg::Stored(bm) => {
             let previous = previous.ok_or(anyhow!("should be previous msg bytes"))?;
-            // get the previous lss msg (where i sent signer muts)
-            let prev_lssmsg = Response::from_slice(&previous.1)?;
-            // println!("previous lss res: {:?}", prev_lssmsg);
-            let sm = prev_lssmsg.into_vls_muts()?;
-            if sm.muts.is_empty() {
-                // empty muts? dont need to check server hmac
+            let shmac: [u8; 32] = bm
+                .server_hmac
+                .ok_or(anyhow!("muts are not empty, but server_hmac is none"))?;
+            // check the original server_hmac
+            let server_hmac = previous.1;
+            // send back the original VLS response finally
+            if server_hmac == shmac {
+                println!("HMACS MATCH!!!!!!!!!!!");
                 Ok((topics::VLS_RES.to_string(), previous.0))
             } else {
-                let shmac: [u8; 32] = bm
-                    .server_hmac
-                    .ok_or(anyhow!("muts are not empty, but server_hmac is none"))?;
-                // check the original muts
-                let server_hmac = lss_signer.server_hmac(&Mutations::from_vec(sm.muts));
-                // send back the original VLS response finally
-                if server_hmac == shmac {
-                    Ok((topics::VLS_RES.to_string(), previous.0))
-                } else {
-                    Err(anyhow!("Invalid server hmac"))
-                }
+                Err(anyhow!("Invalid server hmac"))
             }
         }
         Msg::PutConflict => {

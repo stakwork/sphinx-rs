@@ -6,7 +6,7 @@ pub struct ControlPersister {
     nonce: Bucket<[u8; 8]>,
     config: Bucket<Config>,
     seed: Bucket<[u8; 32]>,
-    id: Bucket<String>,
+    id: Bucket<[u8; 16]>,
     policy: Bucket<Policy>,
     velocity: Bucket<Velocity>,
 }
@@ -51,10 +51,10 @@ impl ControlPersist for ControlPersister {
     fn remove_seed(&mut self) -> Result<()> {
         Ok(self.seed.remove("seed")?)
     }
-    fn read_id(&self) -> Result<String> {
+    fn read_id(&self) -> Result<[u8; 16]> {
         Ok(self.id.get("id")?)
     }
-    fn write_id(&mut self, id: String) -> Result<()> {
+    fn write_id(&mut self, id: [u8; 16]) -> Result<()> {
         Ok(self.id.put("id", &id)?)
     }
     fn read_policy(&self) -> Result<Policy> {

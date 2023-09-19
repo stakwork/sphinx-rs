@@ -114,7 +114,7 @@ pub fn run_vls(
 ) -> Result<RunReturn> {
     let (_res, rh, approver, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2, velocity)?;
     let s1 = approver.control().get_state();
-    let (vls_res, lss_res, sequence, cmd) =
+    let (vls_res, lss_res, sequence, cmd, server_hmac) =
         handle_with_lss(&rh, &lss_signer, vls_msg.to_vec(), expected_sequence, true)
             .map_err(Error::msg)?;
     let mut ret = if lss_res.is_empty() {
@@ -139,9 +139,11 @@ pub fn run_lss(
     previous_vls: &[u8],
     previous_lss: &[u8],
 ) -> Result<RunReturn> {
+    use std::convert::TryInto;
     let (_res, _rh, _approver, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2, None)?;
 
-    let prev = (previous_vls.to_vec(), previous_lss.to_vec());
+    let server_hmac: [u8; 32] = previous_lss.try_into()?;
+    let prev = (previous_vls.to_vec(), server_hmac);
     let (topic, res) = handle_lss_msg(&lss_msg, Some(prev), &lss_signer)?;
     let ret = if &topic == topics::VLS_RES {
         RunReturn::new_vls(&topic, res, u16::default(), "VLS".to_string())
