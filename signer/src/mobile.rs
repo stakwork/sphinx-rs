@@ -59,6 +59,7 @@ pub struct RunReturn {
     pub sequence: u16,
     pub cmd: String,
     pub velocity: Option<Velocity>,
+    pub server_hmac: Option<[u8; 32]>,
 }
 
 pub fn run_init_1(
@@ -120,7 +121,14 @@ pub fn run_vls(
     let mut ret = if lss_res.is_empty() {
         RunReturn::new_vls(topics::VLS_RES, vls_res, sequence, cmd)
     } else {
-        RunReturn::new(topics::LSS_RES, vls_res, lss_res, sequence, cmd)
+        RunReturn::new(
+            topics::LSS_RES,
+            vls_res,
+            lss_res,
+            sequence,
+            cmd,
+            server_hmac,
+        )
     };
     let s2 = approver.control().get_state();
     if s1 != s2 {
@@ -142,6 +150,7 @@ pub fn run_lss(
     use std::convert::TryInto;
     let (_res, _rh, _approver, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2, None)?;
 
+    println!("PREV LSS {:?}", previous_lss);
     let server_hmac: [u8; 32] = previous_lss.try_into()?;
     let prev = (previous_vls.to_vec(), server_hmac);
     let (topic, res) = handle_lss_msg(&lss_msg, Some(prev), &lss_signer)?;
@@ -201,6 +210,7 @@ impl RunReturn {
         lss_bytes: Vec<u8>,
         sequence: u16,
         cmd: String,
+        server_hmac: Option<[u8; 32]>,
     ) -> Self {
         Self {
             topic: topic.to_string(),
@@ -209,6 +219,7 @@ impl RunReturn {
             sequence,
             cmd,
             velocity: None,
+            server_hmac,
         }
     }
     pub fn new_vls(topic: &str, vls_bytes: Vec<u8>, sequence: u16, cmd: String) -> Self {
@@ -219,6 +230,7 @@ impl RunReturn {
             sequence,
             cmd,
             velocity: None,
+            server_hmac: None,
         }
     }
     pub fn new_lss(topic: &str, lss_bytes: Vec<u8>, cmd: String) -> Self {
@@ -229,6 +241,7 @@ impl RunReturn {
             sequence: u16::default(),
             cmd,
             velocity: None,
+            server_hmac: None,
         }
     }
     pub fn set_velocity(&mut self, velocity: Velocity) {
@@ -379,6 +392,7 @@ mod tests {
             allowlist: vec![],
             timestamp: ts.as_secs(),
             lss_nonce: [32; 32],
+            signer_id: [9; 16],
         }
     }
 
@@ -439,7 +453,7 @@ mod tests {
             state.insert(lss_key, version_value);
         }
 
-        lss_broker.handle(Response::Created(si2)).await?;
+        lss_broker.handle(Response::Created(si2)).await;
 
         let mut expected_sequence = 0;
         for m in msgs().into_iter() {
@@ -456,13 +470,17 @@ mod tests {
             println!("===> SEQ {:?}", rr.sequence);
             // std::thread::sleep(std::time::Duration::from_millis(999));
             if rr.topic == topics::LSS_RES && rr.lss_bytes.is_some() {
+                if !rr.server_hmac.is_some() {
+                    panic!("SERVER HMAC REQUIRED IF LSS BYTES");
+                }
+
                 let lss_res = Response::from_slice(&rr.lss_bytes.clone().unwrap())?;
                 let vls_muts = lss_res.clone().into_vls_muts()?;
                 for (lss_key, version_value) in vls_muts.muts.into_iter() {
                     state.insert(lss_key, version_value);
                 }
 
-                let lss_msg = lss_broker.handle(lss_res).await?;
+                let (_topic, lss_msg) = lss_broker.handle(lss_res).await;
                 let lss_msg_bytes = lss_msg.to_vec()?;
                 let _lss_rr = run_lss(
                     args.clone(),
@@ -471,7 +489,7 @@ mod tests {
                     &bi2,
                     &lss_msg_bytes,
                     &rr.vls_bytes.unwrap(),
-                    &rr.lss_bytes.unwrap(),
+                    &rr.server_hmac.unwrap(),
                 )?;
                 // println!("lss rr {:?}", lss_rr);
             }

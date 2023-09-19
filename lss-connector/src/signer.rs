@@ -197,7 +197,6 @@ pub fn handle_lss_msg(
             let server_hmac = previous.1;
             // send back the original VLS response finally
             if server_hmac == shmac {
-                println!("HMACS MATCH!!!!!!!!!!!");
                 Ok((topics::VLS_RES.to_string(), previous.0))
             } else {
                 Err(anyhow!("Invalid server hmac"))
