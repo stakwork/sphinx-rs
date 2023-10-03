@@ -65,10 +65,10 @@ impl FsKVVStore {
         let value = vv[8..].to_vec();
         (version, value)
     }
-    fn encode_vv(version: u64, value: Vec<u8>) -> Vec<u8> {
+    fn encode_vv(version: u64, value: &[u8]) -> Vec<u8> {
         let mut vv = Vec::with_capacity(value.len() + 8);
         vv.extend_from_slice(&version.to_be_bytes());
-        vv.extend_from_slice(&value);
+        vv.extend_from_slice(value);
         vv
     }
     fn check_version(
@@ -76,7 +76,7 @@ impl FsKVVStore {
         key: &str,
         version: u64,
         prev: u64,
-        value: Vec<u8>,
+        value: &[u8],
     ) -> Result<Vec<u8>, Error> {
         let vv = Self::encode_vv(version, value);
         if version < prev {
@@ -119,8 +119,8 @@ impl KVVStore for FsKVVStore {
     fn put_with_version(&self, key: &str, version: u64, value: Vec<u8>) -> Result<(), Error> {
         let mut vers = self.versions.lock().unwrap();
         let vv = match vers.get(key) {
-            Some(prev) => self.check_version(key, version, *prev, value)?,
-            None => Self::encode_vv(version, value),
+            Some(prev) => self.check_version(key, version, *prev, &value)?,
+            None => Self::encode_vv(version, &value),
         };
         vers.insert(key.to_string(), version);
         self.db
@@ -136,7 +136,7 @@ impl KVVStore for FsKVVStore {
         for kvv in kvvs.into_iter() {
             let key = kvv.0.clone();
             let ver = kvv.1 .0;
-            let val = kvv.1 .1;
+            let val = &kvv.1 .1;
             match vers.get(&key) {
                 Some(prev) => match self.check_version(&key, ver, *prev, val) {
                     Ok(vv) => staged_vvs.push((key.clone(), ver, vv)),
