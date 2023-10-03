@@ -65,10 +65,10 @@ impl FsKVVStore {
         let value = vv[8..].to_vec();
         (version, value)
     }
-    fn encode_vv(version: u64, value: &[u8]) -> Vec<u8> {
+    fn encode_vv(version: u64, value: Vec<u8>) -> Vec<u8> {
         let mut vv = Vec::with_capacity(value.len() + 8);
         vv.extend_from_slice(&version.to_be_bytes());
-        vv.extend_from_slice(value);
+        vv.extend_from_slice(&value);
         vv
     }
     fn check_version(
@@ -76,7 +76,7 @@ impl FsKVVStore {
         key: &str,
         version: u64,
         prev: u64,
-        value: &[u8],
+        value: Vec<u8>,
     ) -> Result<Vec<u8>, Error> {
         let vv = Self::encode_vv(version, value);
         if version < prev {
@@ -105,7 +105,7 @@ impl KVVStore for FsKVVStore {
         self.signer_id
     }
 
-    fn put(&self, key: &str, value: &[u8]) -> Result<(), Error> {
+    fn put(&self, key: &str, value: Vec<u8>) -> Result<(), Error> {
         let v = self
             .versions
             .lock()
@@ -116,7 +116,7 @@ impl KVVStore for FsKVVStore {
         self.put_with_version(key, v, value)
     }
 
-    fn put_with_version(&self, key: &str, version: u64, value: &[u8]) -> Result<(), Error> {
+    fn put_with_version(&self, key: &str, version: u64, value: Vec<u8>) -> Result<(), Error> {
         let mut vers = self.versions.lock().unwrap();
         let vv = match vers.get(key) {
             Some(prev) => self.check_version(key, version, *prev, value)?,
@@ -128,7 +128,7 @@ impl KVVStore for FsKVVStore {
             .map_err(|_| Error::Internal("could not put".to_string()))?;
         Ok(())
     }
-    fn put_batch(&self, kvvs: &[&KVV]) -> Result<(), Error> {
+    fn put_batch(&self, kvvs: Vec<KVV>) -> Result<(), Error> {
         let mut found_version_mismatch = false;
         let mut staged_vvs: Vec<(String, u64, Vec<u8>)> = Vec::new();
 
@@ -136,7 +136,7 @@ impl KVVStore for FsKVVStore {
         for kvv in kvvs.into_iter() {
             let key = kvv.0.clone();
             let ver = kvv.1 .0;
-            let val = &kvv.1 .1;
+            let val = kvv.1 .1;
             match vers.get(&key) {
                 Some(prev) => match self.check_version(&key, ver, *prev, val) {
                     Ok(vv) => staged_vvs.push((key.clone(), ver, vv)),
