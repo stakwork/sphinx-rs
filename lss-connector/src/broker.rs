@@ -98,7 +98,7 @@ impl LssBroker {
     }
     pub async fn handle_bytes(&self, resb: &[u8]) -> Result<(String, Vec<u8>)> {
         let res = Response::from_slice(resb)?;
-        log::info!("HANDLE LSS {:?}", res);
+        log::info!("HANDLE LSS {}", res);
         let (topic, msg) = self.handle(res).await;
         log::info!("MSG TO SIGNER: {:?}", msg);
         Ok((topic, msg.to_vec()?))
