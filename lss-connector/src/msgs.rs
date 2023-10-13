@@ -11,6 +11,17 @@ pub enum Msg {
     PutConflict,
 }
 
+impl std::fmt::Display for Msg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Msg::Init(_) => write!(f, "Init"),
+            Msg::Created(_) => write!(f, "Created"),
+            Msg::Stored(_) => write!(f, "Stored"),
+            Msg::PutConflict => write!(f, "PutConflict"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Response {
     Init(InitResponse),
