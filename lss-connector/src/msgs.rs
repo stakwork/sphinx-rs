@@ -19,6 +19,17 @@ pub enum Response {
     PutConflictConfirmed,
 }
 
+impl std::fmt::Display for Response {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Response::Init(_) => write!(f, "Init"),
+            Response::Created(_) => write!(f, "Created"),
+            Response::VlsMuts(_) => write!(f, "VlsMuts"),
+            Response::PutConflictConfirmed => write!(f, "PutConflictConfirmed"),
+        }
+    }
+}
+
 pub type Muts = Vec<(String, (u64, Vec<u8>))>;
 
 #[derive(Debug, Clone, PartialEq)]
