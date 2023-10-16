@@ -1,10 +1,13 @@
 mod control;
+mod onion;
 mod parse;
 mod signer;
 
 pub use control::*;
 
 pub use signer::*;
+
+pub use onion::*;
 
 use sphinx_crypter::chacha::{decrypt as chacha_decrypt, encrypt as chacha_encrypt};
 use sphinx_crypter::ecdh::derive_shared_secret_from_slice;

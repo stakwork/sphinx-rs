@@ -15,10 +15,14 @@ std = ["sphinx-signer/std", "sphinx-glyph/std"]
 no-std = ["sphinx-signer/no-std", "sphinx-glyph/no-std"]
 wasm = []
 
+[patch.crates-io]
+lightning = { git = "https://github.com/Evanfeenstra/rust-lightning", rev = "3f562dd5c6feb8413cf9a1ac02caef2b8ef59a84" }
+
 [dependencies]
 sphinx-crypter = { path = "../crypter" }
 sphinx-signer = { path = "../signer", default-features = false, features = ["persist", "no-native"] }
 sphinx-glyph = { path = "../glyph", default-features = false }
+sphinx = { git = "https://github.com/stakwork/sphinx", rev = "ae357a141b4f8027517ac15266182a7a1b4ddd74" }
 uniffi = { version = "0.24.1", optional = true }
 hex = { version = "0.4.3", default-features = false }
 thiserror = "1.0.31"

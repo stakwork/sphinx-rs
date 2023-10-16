@@ -60,4 +60,13 @@ namespace sphinxrs {
   string make_auth_token(u32 ts, string secret);
   [Throws=SphinxError]
   VlsResponse run(string topic, string args, bytes state, bytes msg1, u16? expected_sequence);
+  string sha_256(bytes msg);
+  [Throws=SphinxError]
+  bytes create_onion(string seed, string time, string hops, bytes payload);
+  [Throws=SphinxError]
+  bytes create_keysend(string seed, string time, string hops, u64 msat, string rhash, bytes payload, u32 curr_height, string preimage);
+  [Throws=SphinxError]
+  bytes peel_onion(string seed, string time, bytes payload);
+  [Throws=SphinxError]
+  bytes peel_payment(string seed, string time, bytes payload, string preimage);
 };
