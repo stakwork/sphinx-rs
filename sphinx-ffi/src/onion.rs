@@ -6,6 +6,17 @@ pub fn sha_256(msg: Vec<u8>) -> String {
     hex::encode(sphinx::sha_256(&msg))
 }
 
+pub fn sign_ms(seed: String, time: String) -> Result<String> {
+    let km = make_keys_manager(&seed, &time)?;
+    let sig =
+        sphinx::sig::sign_message(time.as_bytes(), &km.get_node_secret_key()).map_err(|_| {
+            SphinxError::BadCiper {
+                r: "sign failed".to_string(),
+            }
+        })?;
+    Ok(hex::encode(sig))
+}
+
 pub fn create_onion(seed: String, time: String, hops: String, payload: Vec<u8>) -> Result<Vec<u8>> {
     let km = make_keys_manager(&seed, &time)?;
     let hops = parse_hops(&hops)?;
