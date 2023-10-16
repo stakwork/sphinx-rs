@@ -105,7 +105,7 @@ impl KVVStore for FsKVVStore {
         self.signer_id
     }
 
-    fn put(&self, key: &str, value: &[u8]) -> Result<(), Error> {
+    fn put(&self, key: &str, value: Vec<u8>) -> Result<(), Error> {
         let v = self
             .versions
             .lock()
@@ -116,11 +116,11 @@ impl KVVStore for FsKVVStore {
         self.put_with_version(key, v, value)
     }
 
-    fn put_with_version(&self, key: &str, version: u64, value: &[u8]) -> Result<(), Error> {
+    fn put_with_version(&self, key: &str, version: u64, value: Vec<u8>) -> Result<(), Error> {
         let mut vers = self.versions.lock().unwrap();
         let vv = match vers.get(key) {
-            Some(prev) => self.check_version(key, version, *prev, value)?,
-            None => Self::encode_vv(version, value),
+            Some(prev) => self.check_version(key, version, *prev, &value)?,
+            None => Self::encode_vv(version, &value),
         };
         vers.insert(key.to_string(), version);
         self.db
@@ -128,7 +128,7 @@ impl KVVStore for FsKVVStore {
             .map_err(|_| Error::Internal("could not put".to_string()))?;
         Ok(())
     }
-    fn put_batch(&self, kvvs: &[&KVV]) -> Result<(), Error> {
+    fn put_batch(&self, kvvs: Vec<KVV>) -> Result<(), Error> {
         let mut found_version_mismatch = false;
         let mut staged_vvs: Vec<(String, u64, Vec<u8>)> = Vec::new();
 
