@@ -1,3 +1,11 @@
+### sign a timestamp (to connect to MQTT)
+
+**`sign_msg(seed: String, time: String)`**
+
+- seed: 32-byte hex
+- time: 13-digit timestamp (milliseconds)
+- returns hex-encoded signature
+
 ### onion messages
 
 **`create_onion(seed: String, time: String, hops: String, payload: Bytes)`**
