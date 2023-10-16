@@ -62,6 +62,15 @@ export const gen32Nonce = (): string => {
   ).join("");
 };
 
+export const gen16Id = (): string => {
+  return Array.from(
+    window.crypto.getRandomValues(new Uint8Array(16)),
+    (byte) => {
+      return ("0" + (byte & 0xff).toString(16)).slice(-2);
+    }
+  ).join("");
+};
+
 export const entropy = localStorageStore<string>("entropy", genEntropy());
 
 export const seed = derived([loaded, entropy], ([$loaded, $entropy]) => {
@@ -74,6 +83,8 @@ export const seed = derived([loaded, entropy], ([$loaded, $entropy]) => {
 });
 
 export const lss_nonce = writable<string>(gen32Nonce());
+
+export const signer_id = writable<string>(gen16Id());
 
 export const keys = derived([loaded, seed], ([$loaded, $seed]) => {
   if (!$loaded) return null;

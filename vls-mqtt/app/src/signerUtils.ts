@@ -1,6 +1,13 @@
 import * as localforage from "localforage";
 import * as msgpack from "@msgpack/msgpack";
-import { type Policy, seed, lss_nonce, policy, allowlist } from "./store";
+import {
+  type Policy,
+  seed,
+  lss_nonce,
+  signer_id,
+  policy,
+  allowlist,
+} from "./store";
 import { get } from "svelte/store";
 
 // store state mutations in IndexedDB
@@ -19,6 +26,7 @@ export interface Args {
   allowlist: string[];
   timestamp: number; // unix ts in seconds
   lss_nonce: Uint8Array;
+  signer_id: Uint8Array;
 }
 
 export enum Topics {
@@ -87,6 +95,7 @@ function makeArgs(): Args {
     allowlist: get(allowlist),
     timestamp: now(),
     lss_nonce: fromHexString(get(lss_nonce)),
+    signer_id: fromHexString(get(signer_id)),
   };
 }
 
