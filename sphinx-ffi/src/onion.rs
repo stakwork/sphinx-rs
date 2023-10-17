@@ -29,8 +29,8 @@ pub fn pubkey_from_seed(seed: String, time: String, network: String) -> Result<S
 pub fn create_onion(
     seed: String,
     time: String,
-    hops: String,
     network: String,
+    hops: String,
     payload: Vec<u8>,
 ) -> Result<Vec<u8>> {
     let km = make_keys_manager(&seed, &time, &network)?;
