@@ -101,6 +101,8 @@ RustBuffer uniffi_sphinxrs_fn_func_peel_payment(RustBuffer seed, RustBuffer time
 );
 RustBuffer uniffi_sphinxrs_fn_func_sign_ms(RustBuffer seed, RustBuffer time, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_pubkey_from_seed(RustBuffer seed, RustBuffer time, RustCallStatus *_Nonnull out_status
+);
 RustBuffer ffi_sphinxrs_rustbuffer_alloc(int32_t size, RustCallStatus *_Nonnull out_status
 );
 RustBuffer ffi_sphinxrs_rustbuffer_from_bytes(ForeignBytes bytes, RustCallStatus *_Nonnull out_status
@@ -164,6 +166,9 @@ uint16_t uniffi_sphinxrs_checksum_func_peel_payment(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_sign_ms(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_pubkey_from_seed(void
     
 );
 uint32_t ffi_sphinxrs_uniffi_contract_version(void

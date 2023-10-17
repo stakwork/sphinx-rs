@@ -71,4 +71,6 @@ namespace sphinxrs {
   bytes peel_payment(string seed, string time, bytes payload, string preimage);
   [Throws=SphinxError]
   string sign_ms(string seed, string time);
+  [Throws=SphinxError]
+  string pubkey_from_seed(string seed, string time);
 };

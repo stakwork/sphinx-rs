@@ -942,6 +942,16 @@ public func `signMs`(`seed`: String, `time`: String) throws -> String {
     )
 }
 
+public func `pubkeyFromSeed`(`seed`: String, `time`: String) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_pubkey_from_seed(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`time`),$0)
+}
+    )
+}
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch
@@ -1012,6 +1022,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_sign_ms() != 65056) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_pubkey_from_seed() != 40652) {
         return InitializationResult.apiChecksumMismatch
     }
 

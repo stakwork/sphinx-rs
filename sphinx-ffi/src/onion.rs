@@ -17,6 +17,13 @@ pub fn sign_ms(seed: String, time: String) -> Result<String> {
     Ok(hex::encode(sig))
 }
 
+pub fn pubkey_from_seed(seed: String, time: String) -> Result<String> {
+    let km = make_keys_manager(&seed, &time)?;
+    let secp_ctx = sphinx::Secp256k1::new();
+    let pubkey = PublicKey::from_secret_key(&secp_ctx, &km.get_node_secret_key());
+    Ok(hex::encode(pubkey.serialize()))
+}
+
 pub fn create_onion(seed: String, time: String, hops: String, payload: Vec<u8>) -> Result<Vec<u8>> {
     let km = make_keys_manager(&seed, &time)?;
     let hops = parse_hops(&hops)?;
