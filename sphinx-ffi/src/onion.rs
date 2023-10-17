@@ -1,44 +1,58 @@
 use crate::{Result, SphinxError};
-use sphinx::{KeysManager, PublicKey, Secp256k1};
+use sphinx::{
+    KeyDerivationStyle, MyKeysManager, Network, NowStartingTimeFactory, PublicKey, Secp256k1,
+};
 use std::convert::TryInto;
+use std::str::FromStr;
 
 pub fn sha_256(msg: Vec<u8>) -> String {
     hex::encode(sphinx::sha_256(&msg))
 }
 
-pub fn sign_ms(seed: String, time: String) -> Result<String> {
-    let km = make_keys_manager(&seed, &time)?;
-    let sig =
-        sphinx::sig::sign_message(time.as_bytes(), &km.get_node_secret_key()).map_err(|_| {
-            SphinxError::BadCiper {
-                r: "sign failed".to_string(),
-            }
-        })?;
+pub fn sign_ms(seed: String, time: String, network: String) -> Result<String> {
+    let km = make_keys_manager(&seed, &time, &network)?;
+    let sig = sphinx::sig::sign_message(time.as_bytes(), &km.get_node_secret()).map_err(|_| {
+        SphinxError::BadCiper {
+            r: "sign failed".to_string(),
+        }
+    })?;
     Ok(hex::encode(sig))
 }
 
-pub fn pubkey_from_seed(seed: String, time: String) -> Result<String> {
-    let km = make_keys_manager(&seed, &time)?;
+pub fn pubkey_from_seed(seed: String, time: String, network: String) -> Result<String> {
+    let km = make_keys_manager(&seed, &time, &network)?;
     let secp_ctx = sphinx::Secp256k1::new();
-    let pubkey = PublicKey::from_secret_key(&secp_ctx, &km.get_node_secret_key());
+    let pubkey = PublicKey::from_secret_key(&secp_ctx, &km.get_node_secret());
     Ok(hex::encode(pubkey.serialize()))
 }
 
-pub fn create_onion(seed: String, time: String, hops: String, payload: Vec<u8>) -> Result<Vec<u8>> {
-    let km = make_keys_manager(&seed, &time)?;
+pub fn create_onion(
+    seed: String,
+    time: String,
+    hops: String,
+    network: String,
+    payload: Vec<u8>,
+) -> Result<Vec<u8>> {
+    let km = make_keys_manager(&seed, &time, &network)?;
     let hops = parse_hops(&hops)?;
     let (_, data) = run_create_onion_bytes(&km, hops, &payload)?;
     Ok(data)
 }
 
-pub fn peel_onion(seed: String, time: String, payload: Vec<u8>) -> Result<Vec<u8>> {
-    let km = make_keys_manager(&seed, &time)?;
+pub fn peel_onion(
+    seed: String,
+    time: String,
+    network: String,
+    payload: Vec<u8>,
+) -> Result<Vec<u8>> {
+    let km = make_keys_manager(&seed, &time, &network)?;
     Ok(run_peel_onion_bytes(&km, &payload)?)
 }
 
 pub fn create_keysend(
     seed: String,
     time: String,
+    network: String,
     hops: String,
     msat: u64,
     rhash: String,
@@ -46,7 +60,7 @@ pub fn create_keysend(
     curr_height: u32,
     preimage: String,
 ) -> Result<Vec<u8>> {
-    let km = make_keys_manager(&seed, &time)?;
+    let km = make_keys_manager(&seed, &time, &network)?;
     let hops = parse_hops(&hops)?;
     let payment_hash = parse_hash(&rhash)?;
     let preimage = parse_preimage(&preimage)?;
@@ -65,19 +79,25 @@ pub fn create_keysend(
 pub fn peel_payment(
     seed: String,
     time: String,
+    network: String,
     payload: Vec<u8>,
     rhash: String,
 ) -> Result<Vec<u8>> {
-    let km = make_keys_manager(&seed, &time)?;
+    let km = make_keys_manager(&seed, &time, &network)?;
     let payment_hash = parse_hash(&rhash)?;
     Ok(run_peel_payment_bytes(&km, &payload, payment_hash)?)
 }
 
-fn make_keys_manager(seed: &str, time: &str) -> Result<KeysManager> {
+fn make_keys_manager(seed: &str, time: &str, network: &str) -> Result<MyKeysManager> {
     let seed = parse_seed(seed)?;
     let ts = parse_u64(time)?;
     let time = std::time::Duration::from_millis(ts);
-    Ok(KeysManager::new(&seed, time.as_secs(), time.subsec_nanos()))
+    let nstf = NowStartingTimeFactory::new(time);
+    let net = Network::from_str(network).map_err(|_| SphinxError::BadArgs {
+        r: "invalid network".to_string(),
+    })?;
+    let style = KeyDerivationStyle::Native;
+    Ok(MyKeysManager::new(style, &seed, net, &nstf))
 }
 
 fn parse_u64(time: &str) -> Result<u64> {
@@ -119,7 +139,7 @@ fn parse_hops(hops: &str) -> Result<Vec<sphinx::Hop>> {
 }
 
 fn run_create_onion_bytes(
-    km: &KeysManager,
+    km: &MyKeysManager,
     hops: Vec<sphinx::Hop>,
     pld: &[u8],
 ) -> Result<(PublicKey, Vec<u8>)> {
@@ -131,7 +151,7 @@ fn run_create_onion_bytes(
 }
 
 fn run_create_keysend_bytes(
-    km: &KeysManager,
+    km: &MyKeysManager,
     hops: Vec<sphinx::Hop>,
     value: u64,
     rhash: [u8; 32],
@@ -153,7 +173,7 @@ fn run_create_keysend_bytes(
     })?)
 }
 
-fn run_peel_onion_bytes(km: &KeysManager, pld: &[u8]) -> Result<Vec<u8>> {
+fn run_peel_onion_bytes(km: &MyKeysManager, pld: &[u8]) -> Result<Vec<u8>> {
     Ok(
         sphinx::peel_onion_to_bytes(km, pld).map_err(|e| SphinxError::Decrypt {
             r: format!("{:?}", e),
@@ -161,7 +181,7 @@ fn run_peel_onion_bytes(km: &KeysManager, pld: &[u8]) -> Result<Vec<u8>> {
     )
 }
 
-fn run_peel_payment_bytes(km: &KeysManager, pld: &[u8], rhash: [u8; 32]) -> Result<Vec<u8>> {
+fn run_peel_payment_bytes(km: &MyKeysManager, pld: &[u8], rhash: [u8; 32]) -> Result<Vec<u8>> {
     Ok(
         sphinx::peel_payment_onion_to_bytes(km, pld, rhash).map_err(|e| SphinxError::Decrypt {
             r: format!("{:?}", e),

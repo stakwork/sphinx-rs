@@ -62,15 +62,15 @@ namespace sphinxrs {
   VlsResponse run(string topic, string args, bytes state, bytes msg1, u16? expected_sequence);
   string sha_256(bytes msg);
   [Throws=SphinxError]
-  bytes create_onion(string seed, string time, string hops, bytes payload);
+  bytes create_onion(string seed, string time, string network, string hops, bytes payload);
   [Throws=SphinxError]
-  bytes create_keysend(string seed, string time, string hops, u64 msat, string rhash, bytes payload, u32 curr_height, string preimage);
+  bytes create_keysend(string seed, string time, string network, string hops, u64 msat, string rhash, bytes payload, u32 curr_height, string preimage);
   [Throws=SphinxError]
-  bytes peel_onion(string seed, string time, bytes payload);
+  bytes peel_onion(string seed, string time, string network, bytes payload);
   [Throws=SphinxError]
-  bytes peel_payment(string seed, string time, bytes payload, string preimage);
+  bytes peel_payment(string seed, string time, string network, bytes payload, string preimage);
   [Throws=SphinxError]
-  string sign_ms(string seed, string time);
+  string sign_ms(string seed, string time, string network);
   [Throws=SphinxError]
-  string pubkey_from_seed(string seed, string time);
+  string pubkey_from_seed(string seed, string time, string network);
 };
