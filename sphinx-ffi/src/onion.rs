@@ -22,7 +22,7 @@ pub fn sign_ms(seed: String, time: String, network: String) -> Result<String> {
 pub fn pubkey_from_seed(seed: String, time: String, network: String) -> Result<String> {
     let km = make_keys_manager(&seed, &time, &network)?;
     let secp_ctx = sphinx::Secp256k1::new();
-    let pubkey = PublicKey::from_secret_key(&secp_ctx, &km.get_node_secret());
+    let pubkey = km.get_node_pubkey();
     Ok(hex::encode(pubkey.serialize()))
 }
 

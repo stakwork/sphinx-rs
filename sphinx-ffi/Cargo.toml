@@ -22,7 +22,7 @@ lightning = { git = "https://github.com/Evanfeenstra/rust-lightning", rev = "3f5
 sphinx-crypter = { path = "../crypter" }
 sphinx-signer = { path = "../signer", default-features = false, features = ["persist", "no-native"] }
 sphinx-glyph = { path = "../glyph", default-features = false }
-sphinx = { git = "https://github.com/stakwork/sphinx", rev = "68a33f994c0e31e58fe12ffeec93eb1baabf77af" }
+sphinx = { git = "https://github.com/stakwork/sphinx", rev = "2cf75b38e1edf52d4203255ab3ea858d5fbec1a2" }
 uniffi = { version = "0.24.1", optional = true }
 hex = { version = "0.4.3", default-features = false }
 thiserror = "1.0.31"
