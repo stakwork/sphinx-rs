@@ -25,17 +25,13 @@ anyhow = { version = "1", default-features = false }
 secp256k1 = { version = "0.24.0", default-features = false, features = ["bitcoin_hashes"] }
 # broker libs
 # vls
-lightning-storage-server = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "186e4b93161134fbdd7ec7fbd034a754e380ffa5", optional = true }
-vls-frontend = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "186e4b93161134fbdd7ec7fbd034a754e380ffa5", optional = true }
-vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "186e4b93161134fbdd7ec7fbd034a754e380ffa5", default-features = false, features = ["secp-lowmemory", "tracker_size_workaround"] }
+lightning-storage-server = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "19447b1e5d2956aa72aeca4229da7a96c5eaf208", optional = true }
+vls-frontend = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "19447b1e5d2956aa72aeca4229da7a96c5eaf208", optional = true }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "19447b1e5d2956aa72aeca4229da7a96c5eaf208", default-features = false, features = ["secp-lowmemory", "tracker_size_workaround"] }
 # local
 # lightning-storage-server = { path = "../../vls/lightning-storage-server", optional = true }
 # vls-frontend = { path = "../../vls/vls-frontend", optional = true }
-# vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory"] }
-# multi
-# lightning-storage-server = { git = "https://gitlab.com/irriden/validating-lightning-signer.git", rev = "ce04684b312c95fa7a62329ff198092a50e9a088", optional = true }
-# vls-frontend = { git = "https://gitlab.com/irriden/validating-lightning-signer.git", rev = "ce04684b312c95fa7a62329ff198092a50e9a088", optional = true }
-# vls-protocol-signer = { git = "https://gitlab.com/irriden/validating-lightning-signer.git", rev = "ce04684b312c95fa7a62329ff198092a50e9a088", default-features = false, features = ["secp-lowmemory"] }
+# vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory", "tracker_size_workaround"] }
 
 tokio = { version = "1.27", features = ["macros", "rt-multi-thread"], optional = true }
 

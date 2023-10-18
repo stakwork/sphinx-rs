@@ -32,17 +32,13 @@ fsdb = { git = "https://github.com/Evanfeenstra/fsdb.git", rev = "7d0db454133bf3
 # fsdb = { path = "../../fsdb", optional = true }
 thiserror = "1.0.44"
 # vls
-vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "186e4b93161134fbdd7ec7fbd034a754e380ffa5", default-features = false, features = ["secp-lowmemory", "tracker_size_workaround"] }
-vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "186e4b93161134fbdd7ec7fbd034a754e380ffa5", default-features = false }
-vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "186e4b93161134fbdd7ec7fbd034a754e380ffa5", default-features = false, features = ["kvv"], optional = true }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "19447b1e5d2956aa72aeca4229da7a96c5eaf208", default-features = false, features = ["secp-lowmemory", "tracker_size_workaround"] }
+vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "19447b1e5d2956aa72aeca4229da7a96c5eaf208", default-features = false }
+vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "19447b1e5d2956aa72aeca4229da7a96c5eaf208", default-features = false, features = ["kvv"], optional = true }
 # local
-# vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory"] }
-# vls-protocol = { path = "../../vls/vls-protocol" }
+# vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory", "tracker_size_workaround"] }
+# vls-protocol = { path = "../../vls/vls-protocol", default-features = false }
 # vls-persist = { path = "../../vls/vls-persist", default-features = false, features = ["kvv"], optional = true }
-# multi
-# vls-protocol-signer = { git = "https://gitlab.com/irriden/validating-lightning-signer.git", rev = "ce04684b312c95fa7a62329ff198092a50e9a088", default-features = false, features = ["secp-lowmemory"] }
-# vls-protocol = { git = "https://gitlab.com/irriden/validating-lightning-signer.git", rev = "ce04684b312c95fa7a62329ff198092a50e9a088", default-features = false }
-# vls-persist = { git = "https://gitlab.com/irriden/validating-lightning-signer.git", rev = "ce04684b312c95fa7a62329ff198092a50e9a088", default-features = false, features = ["kvv"], optional = true }
 
 [dev-dependencies]
 simple_logger = "4.2.0"
