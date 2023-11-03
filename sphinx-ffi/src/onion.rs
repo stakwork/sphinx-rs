@@ -1,7 +1,6 @@
 use crate::{Result, SphinxError};
-use sphinx::{
-    KeyDerivationStyle, MyKeysManager, Network, NowStartingTimeFactory, PublicKey, Secp256k1,
-};
+use sphinx::bip32::XKey;
+use sphinx::{KeyDerivationStyle, MyKeysManager, Network, NowStartingTimeFactory, PublicKey};
 use std::convert::TryInto;
 use std::str::FromStr;
 
@@ -9,8 +8,14 @@ pub fn sha_256(msg: Vec<u8>) -> String {
     hex::encode(sphinx::sha_256(&msg))
 }
 
-pub fn sign_ms(seed: String, time: String, network: String) -> Result<String> {
-    let km = make_keys_manager(&seed, &time, &network)?;
+pub fn xpub_from_seed(seed: String, time: String, net: String) -> Result<String> {
+    let km = make_keys_manager(&seed, Some(-1), &time, &net)?;
+    let xpub = km.root_xpub();
+    Ok(xpub.to_string())
+}
+
+pub fn root_sign_ms(seed: String, time: String, net: String) -> Result<String> {
+    let km = make_keys_manager(&seed, Some(-1), &time, &net)?;
     let sig = sphinx::sig::sign_message(time.as_bytes(), &km.get_node_secret()).map_err(|_| {
         SphinxError::BadCiper {
             r: "sign failed".to_string(),
@@ -19,21 +24,34 @@ pub fn sign_ms(seed: String, time: String, network: String) -> Result<String> {
     Ok(hex::encode(sig))
 }
 
-pub fn pubkey_from_seed(seed: String, time: String, network: String) -> Result<String> {
-    let km = make_keys_manager(&seed, &time, &network)?;
-    let secp_ctx = sphinx::Secp256k1::new();
+pub fn sign_ms(seed: String, idx: u32, time: String, network: String) -> Result<String> {
+    let idx = idx_to_idx(idx)?;
+    let km = make_keys_manager(&seed, idx, &time, &network)?;
+    let sig = sphinx::sig::sign_message(time.as_bytes(), &km.get_node_secret()).map_err(|_| {
+        SphinxError::BadCiper {
+            r: "sign failed".to_string(),
+        }
+    })?;
+    Ok(hex::encode(sig))
+}
+
+pub fn pubkey_from_seed(seed: String, idx: u32, time: String, network: String) -> Result<String> {
+    let idx = idx_to_idx(idx)?;
+    let km = make_keys_manager(&seed, idx, &time, &network)?;
     let pubkey = km.get_node_pubkey();
     Ok(hex::encode(pubkey.serialize()))
 }
 
 pub fn create_onion(
     seed: String,
+    idx: u32,
     time: String,
     network: String,
     hops: String,
     payload: Vec<u8>,
 ) -> Result<Vec<u8>> {
-    let km = make_keys_manager(&seed, &time, &network)?;
+    let idx = idx_to_idx(idx)?;
+    let km = make_keys_manager(&seed, idx, &time, &network)?;
     let hops = parse_hops(&hops)?;
     let (_, data) = run_create_onion_bytes(&km, hops, &payload)?;
     Ok(data)
@@ -41,16 +59,19 @@ pub fn create_onion(
 
 pub fn peel_onion(
     seed: String,
+    idx: u32,
     time: String,
     network: String,
     payload: Vec<u8>,
 ) -> Result<Vec<u8>> {
-    let km = make_keys_manager(&seed, &time, &network)?;
+    let idx = idx_to_idx(idx)?;
+    let km = make_keys_manager(&seed, idx, &time, &network)?;
     Ok(run_peel_onion_bytes(&km, &payload)?)
 }
 
 pub fn create_keysend(
     seed: String,
+    idx: u32,
     time: String,
     network: String,
     hops: String,
@@ -60,7 +81,8 @@ pub fn create_keysend(
     curr_height: u32,
     preimage: String,
 ) -> Result<Vec<u8>> {
-    let km = make_keys_manager(&seed, &time, &network)?;
+    let idx = idx_to_idx(idx)?;
+    let km = make_keys_manager(&seed, idx, &time, &network)?;
     let hops = parse_hops(&hops)?;
     let payment_hash = parse_hash(&rhash)?;
     let preimage = parse_preimage(&preimage)?;
@@ -78,17 +100,32 @@ pub fn create_keysend(
 
 pub fn peel_payment(
     seed: String,
+    idx: u32,
     time: String,
     network: String,
     payload: Vec<u8>,
     rhash: String,
 ) -> Result<Vec<u8>> {
-    let km = make_keys_manager(&seed, &time, &network)?;
+    let idx = idx_to_idx(idx)?;
+    let km = make_keys_manager(&seed, idx, &time, &network)?;
     let payment_hash = parse_hash(&rhash)?;
     Ok(run_peel_payment_bytes(&km, &payload, payment_hash)?)
 }
 
-fn make_keys_manager(seed: &str, time: &str, network: &str) -> Result<MyKeysManager> {
+fn idx_to_idx(idx: u32) -> Result<Option<isize>> {
+    Ok(Some(idx.try_into().map_err(|_| {
+        SphinxError::BadChildIndex {
+            r: "infallible".to_string(),
+        }
+    })?))
+}
+
+fn make_keys_manager(
+    seed: &str,
+    idx: Option<isize>,
+    time: &str,
+    network: &str,
+) -> Result<MyKeysManager> {
     let seed = parse_seed(seed)?;
     let ts = parse_u64(time)?;
     let time = std::time::Duration::from_millis(ts);
@@ -97,7 +134,11 @@ fn make_keys_manager(seed: &str, time: &str, network: &str) -> Result<MyKeysMana
         r: "invalid network".to_string(),
     })?;
     let style = KeyDerivationStyle::Native;
-    Ok(MyKeysManager::new(style, &seed, net, &nstf))
+    let mut mkm = MyKeysManager::new(style, &seed, net, &nstf);
+    if let Some(cidx) = idx {
+        mkm.set_current_signing_child_index(cidx);
+    }
+    Ok(mkm)
 }
 
 fn parse_u64(time: &str) -> Result<u64> {

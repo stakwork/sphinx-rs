@@ -91,17 +91,21 @@ RustBuffer uniffi_sphinxrs_fn_func_run(RustBuffer topic, RustBuffer args, RustBu
 );
 RustBuffer uniffi_sphinxrs_fn_func_sha_256(RustBuffer msg, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_create_onion(RustBuffer seed, RustBuffer time, RustBuffer network, RustBuffer hops, RustBuffer payload, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_sphinxrs_fn_func_create_onion(RustBuffer seed, uint32_t idx, RustBuffer time, RustBuffer network, RustBuffer hops, RustBuffer payload, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_create_keysend(RustBuffer seed, RustBuffer time, RustBuffer network, RustBuffer hops, uint64_t msat, RustBuffer rhash, RustBuffer payload, uint32_t curr_height, RustBuffer preimage, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_sphinxrs_fn_func_create_keysend(RustBuffer seed, uint32_t idx, RustBuffer time, RustBuffer network, RustBuffer hops, uint64_t msat, RustBuffer rhash, RustBuffer payload, uint32_t curr_height, RustBuffer preimage, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_peel_onion(RustBuffer seed, RustBuffer time, RustBuffer network, RustBuffer payload, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_sphinxrs_fn_func_peel_onion(RustBuffer seed, uint32_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_peel_payment(RustBuffer seed, RustBuffer time, RustBuffer network, RustBuffer payload, RustBuffer preimage, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_sphinxrs_fn_func_peel_payment(RustBuffer seed, uint32_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustBuffer preimage, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_sign_ms(RustBuffer seed, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_sphinxrs_fn_func_sign_ms(RustBuffer seed, uint32_t idx, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_pubkey_from_seed(RustBuffer seed, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_sphinxrs_fn_func_pubkey_from_seed(RustBuffer seed, uint32_t idx, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_root_sign_ms(RustBuffer seed, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_xpub_from_seed(RustBuffer seed, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
 );
 RustBuffer ffi_sphinxrs_rustbuffer_alloc(int32_t size, RustCallStatus *_Nonnull out_status
 );
@@ -169,6 +173,12 @@ uint16_t uniffi_sphinxrs_checksum_func_sign_ms(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_pubkey_from_seed(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_root_sign_ms(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_xpub_from_seed(void
     
 );
 uint32_t ffi_sphinxrs_uniffi_contract_version(void
