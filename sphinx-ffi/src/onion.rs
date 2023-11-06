@@ -1,6 +1,6 @@
 use crate::{Result, SphinxError};
 use sphinx::bip32::XKey;
-use sphinx::{KeyDerivationStyle, MyKeysManager, Network, NowStartingTimeFactory, PublicKey};
+use sphinx::{make_signer, MyKeysManager, Network, PublicKey};
 use std::convert::TryInto;
 use std::str::FromStr;
 
@@ -57,6 +57,23 @@ pub fn create_onion(
     Ok(data)
 }
 
+pub fn create_onion_msg(
+    seed: String,
+    idx: u32,
+    time: String,
+    network: String,
+    hops: String,
+    msg_json: String,
+) -> Result<Vec<u8>> {
+    let idx = idx_to_idx(idx)?;
+    let km = make_keys_manager(&seed, idx, &time, &network)?;
+    let hops = parse_hops(&hops)?;
+    let payload = sphinx::msg::create_sphinx_msg_from_json(&km, &msg_json)
+        .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
+    let (_, data) = run_create_onion_bytes(&km, hops, &payload)?;
+    Ok(data)
+}
+
 pub fn peel_onion(
     seed: String,
     idx: u32,
@@ -67,6 +84,21 @@ pub fn peel_onion(
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
     Ok(run_peel_onion_bytes(&km, &payload)?)
+}
+
+pub fn peel_onion_msg(
+    seed: String,
+    idx: u32,
+    time: String,
+    network: String,
+    payload: Vec<u8>,
+) -> Result<String> {
+    let idx = idx_to_idx(idx)?;
+    let km = make_keys_manager(&seed, idx, &time, &network)?;
+    let bytes = run_peel_onion_bytes(&km, &payload)?;
+    let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes, None)
+        .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
+    Ok(msg)
 }
 
 pub fn create_keysend(
@@ -128,16 +160,10 @@ fn make_keys_manager(
 ) -> Result<MyKeysManager> {
     let seed = parse_seed(seed)?;
     let ts = parse_u64(time)?;
-    let time = std::time::Duration::from_millis(ts);
-    let nstf = NowStartingTimeFactory::new(time);
     let net = Network::from_str(network).map_err(|_| SphinxError::BadArgs {
         r: "invalid network".to_string(),
     })?;
-    let style = KeyDerivationStyle::Native;
-    let mut mkm = MyKeysManager::new(style, &seed, net, &nstf);
-    if let Some(cidx) = idx {
-        mkm.set_current_signing_child_index(cidx);
-    }
+    let mut mkm = make_signer(&seed, idx, ts, net);
     Ok(mkm)
 }
 

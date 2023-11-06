@@ -542,6 +542,7 @@ public enum SphinxError {
     case LssFailed(`r`: String)
     case VlsFailed(`r`: String)
     case BadChildIndex(`r`: String)
+    case BadMsg(`r`: String)
 
     fileprivate static func uniffiErrorHandler(_ error: RustBuffer) throws -> Error {
         return try FfiConverterTypeSphinxError.lift(error)
@@ -614,6 +615,9 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
             `r`: try FfiConverterString.read(from: &buf)
             )
         case 19: return .BadChildIndex(
+            `r`: try FfiConverterString.read(from: &buf)
+            )
+        case 20: return .BadMsg(
             `r`: try FfiConverterString.read(from: &buf)
             )
 
@@ -720,6 +724,11 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
         
         case let .BadChildIndex(`r`):
             writeInt(&buf, Int32(19))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .BadMsg(`r`):
+            writeInt(&buf, Int32(20))
             FfiConverterString.write(`r`, into: &buf)
             
         }
@@ -904,6 +913,20 @@ public func `createOnion`(`seed`: String, `idx`: UInt32, `time`: String, `networ
     )
 }
 
+public func `createOnionMsg`(`seed`: String, `idx`: UInt32, `time`: String, `network`: String, `hops`: String, `json`: String) throws -> Data {
+    return try  FfiConverterData.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_create_onion_msg(
+        FfiConverterString.lower(`seed`),
+        FfiConverterUInt32.lower(`idx`),
+        FfiConverterString.lower(`time`),
+        FfiConverterString.lower(`network`),
+        FfiConverterString.lower(`hops`),
+        FfiConverterString.lower(`json`),$0)
+}
+    )
+}
+
 public func `createKeysend`(`seed`: String, `idx`: UInt32, `time`: String, `network`: String, `hops`: String, `msat`: UInt64, `rhash`: String, `payload`: Data, `currHeight`: UInt32, `preimage`: String) throws -> Data {
     return try  FfiConverterData.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
@@ -926,6 +949,19 @@ public func `peelOnion`(`seed`: String, `idx`: UInt32, `time`: String, `network`
     return try  FfiConverterData.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_peel_onion(
+        FfiConverterString.lower(`seed`),
+        FfiConverterUInt32.lower(`idx`),
+        FfiConverterString.lower(`time`),
+        FfiConverterString.lower(`network`),
+        FfiConverterData.lower(`payload`),$0)
+}
+    )
+}
+
+public func `peelOnionMsg`(`seed`: String, `idx`: UInt32, `time`: String, `network`: String, `payload`: Data) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_peel_onion_msg(
         FfiConverterString.lower(`seed`),
         FfiConverterUInt32.lower(`idx`),
         FfiConverterString.lower(`time`),
@@ -1055,10 +1091,16 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_create_onion() != 65256) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_sphinxrs_checksum_func_create_onion_msg() != 56460) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_sphinxrs_checksum_func_create_keysend() != 11970) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_peel_onion() != 38236) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_peel_onion_msg() != 57967) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_peel_payment() != 55979) {

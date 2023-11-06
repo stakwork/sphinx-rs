@@ -19,6 +19,7 @@ interface SphinxError {
   LssFailed(string r);
   VlsFailed(string r);
   BadChildIndex(string r);
+  BadMsg(string r);
 };
 
 dictionary Keys {
@@ -65,9 +66,13 @@ namespace sphinxrs {
   [Throws=SphinxError]
   bytes create_onion(string seed, u32 idx, string time, string network, string hops, bytes payload);
   [Throws=SphinxError]
+  bytes create_onion_msg(string seed, u32 idx, string time, string network, string hops, string json);
+  [Throws=SphinxError]
   bytes create_keysend(string seed, u32 idx, string time, string network, string hops, u64 msat, string rhash, bytes payload, u32 curr_height, string preimage);
   [Throws=SphinxError]
   bytes peel_onion(string seed, u32 idx, string time, string network, bytes payload);
+  [Throws=SphinxError]
+  string peel_onion_msg(string seed, u32 idx, string time, string network, bytes payload);
   [Throws=SphinxError]
   bytes peel_payment(string seed, u32 idx, string time, string network, bytes payload, string preimage);
   [Throws=SphinxError]

@@ -60,6 +60,8 @@ pub enum SphinxError {
     VlsFailed { r: String },
     #[error("Bad Child Index: {r}")]
     BadChildIndex { r: String },
+    #[error("Bad Msg: {r}")]
+    BadMsg { r: String },
 }
 
 pub fn pubkey_from_secret_key(my_secret_key: String) -> Result<String> {
