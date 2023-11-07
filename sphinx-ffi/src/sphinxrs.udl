@@ -70,11 +70,15 @@ namespace sphinxrs {
   [Throws=SphinxError]
   bytes create_keysend(string seed, u32 idx, string time, string network, string hops, u64 msat, string rhash, bytes payload, u32 curr_height, string preimage);
   [Throws=SphinxError]
+  bytes create_keysend_msg(string seed, u32 idx, string time, string network, string hops, u64 msat, string rhash, string msg_json, u32 curr_height, string preimage);
+  [Throws=SphinxError]
   bytes peel_onion(string seed, u32 idx, string time, string network, bytes payload);
   [Throws=SphinxError]
   string peel_onion_msg(string seed, u32 idx, string time, string network, bytes payload);
   [Throws=SphinxError]
-  bytes peel_payment(string seed, u32 idx, string time, string network, bytes payload, string preimage);
+  bytes peel_payment(string seed, u32 idx, string time, string network, bytes payload, string rhash);
+  [Throws=SphinxError]
+  string peel_payment_msg(string seed, u32 idx, string time, string network, bytes payload, string rhash);
   [Throws=SphinxError]
   string sign_ms(string seed, u32 idx, string time, string network);
   [Throws=SphinxError]

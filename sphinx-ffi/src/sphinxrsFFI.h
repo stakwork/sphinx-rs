@@ -97,11 +97,15 @@ RustBuffer uniffi_sphinxrs_fn_func_create_onion_msg(RustBuffer seed, uint32_t id
 );
 RustBuffer uniffi_sphinxrs_fn_func_create_keysend(RustBuffer seed, uint32_t idx, RustBuffer time, RustBuffer network, RustBuffer hops, uint64_t msat, RustBuffer rhash, RustBuffer payload, uint32_t curr_height, RustBuffer preimage, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_create_keysend_msg(RustBuffer seed, uint32_t idx, RustBuffer time, RustBuffer network, RustBuffer hops, uint64_t msat, RustBuffer rhash, RustBuffer msg_json, uint32_t curr_height, RustBuffer preimage, RustCallStatus *_Nonnull out_status
+);
 RustBuffer uniffi_sphinxrs_fn_func_peel_onion(RustBuffer seed, uint32_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_peel_onion_msg(RustBuffer seed, uint32_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_peel_payment(RustBuffer seed, uint32_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustBuffer preimage, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_sphinxrs_fn_func_peel_payment(RustBuffer seed, uint32_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustBuffer rhash, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_peel_payment_msg(RustBuffer seed, uint32_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustBuffer rhash, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_sign_ms(RustBuffer seed, uint32_t idx, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
 );
@@ -170,6 +174,9 @@ uint16_t uniffi_sphinxrs_checksum_func_create_onion_msg(void
 uint16_t uniffi_sphinxrs_checksum_func_create_keysend(void
     
 );
+uint16_t uniffi_sphinxrs_checksum_func_create_keysend_msg(void
+    
+);
 uint16_t uniffi_sphinxrs_checksum_func_peel_onion(void
     
 );
@@ -177,6 +184,9 @@ uint16_t uniffi_sphinxrs_checksum_func_peel_onion_msg(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_peel_payment(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_peel_payment_msg(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_sign_ms(void

@@ -42,6 +42,12 @@ pub fn pubkey_from_seed(seed: String, idx: u32, time: String, network: String) -
     Ok(hex::encode(pubkey.serialize()))
 }
 
+fn create_onion_inner(km: &MyKeysManager, hops: String, payload: Vec<u8>) -> Result<Vec<u8>> {
+    let hops = parse_hops(&hops)?;
+    let (_, data) = run_create_onion_bytes(&km, hops, &payload)?;
+    Ok(data)
+}
+
 pub fn create_onion(
     seed: String,
     idx: u32,
@@ -52,8 +58,7 @@ pub fn create_onion(
 ) -> Result<Vec<u8>> {
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
-    let hops = parse_hops(&hops)?;
-    let (_, data) = run_create_onion_bytes(&km, hops, &payload)?;
+    let data = create_onion_inner(&km, hops, payload)?;
     Ok(data)
 }
 
@@ -67,10 +72,9 @@ pub fn create_onion_msg(
 ) -> Result<Vec<u8>> {
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
-    let hops = parse_hops(&hops)?;
     let payload = sphinx::msg::create_sphinx_msg_from_json(&km, &msg_json)
         .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
-    let (_, data) = run_create_onion_bytes(&km, hops, &payload)?;
+    let data = create_onion_inner(&km, hops, payload)?;
     Ok(data)
 }
 
@@ -83,7 +87,7 @@ pub fn peel_onion(
 ) -> Result<Vec<u8>> {
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
-    Ok(run_peel_onion_bytes(&km, &payload)?)
+    Ok(run_peel_onion_to_bytes(&km, &payload)?)
 }
 
 pub fn peel_onion_msg(
@@ -95,10 +99,26 @@ pub fn peel_onion_msg(
 ) -> Result<String> {
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
-    let bytes = run_peel_onion_bytes(&km, &payload)?;
+    let bytes = run_peel_received_onion_to_bytes(&km, &payload)?;
     let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes, None)
         .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
     Ok(msg)
+}
+
+pub fn create_keysend_inner(
+    km: &MyKeysManager,
+    hops: String,
+    msat: u64,
+    rhash: String,
+    payload: Vec<u8>,
+    curr_height: u32,
+    preimage: String,
+) -> Result<Vec<u8>> {
+    let hops = parse_hops(&hops)?;
+    let ph = parse_hash(&rhash)?;
+    let prmg = parse_preimage(&preimage)?;
+    let data = run_create_keysend_bytes(km, hops, msat, ph, &payload, curr_height, prmg)?;
+    Ok(data.to_vec())
 }
 
 pub fn create_keysend(
@@ -115,18 +135,27 @@ pub fn create_keysend(
 ) -> Result<Vec<u8>> {
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
-    let hops = parse_hops(&hops)?;
-    let payment_hash = parse_hash(&rhash)?;
-    let preimage = parse_preimage(&preimage)?;
-    let data = run_create_keysend_bytes(
-        &km,
-        hops,
-        msat,
-        payment_hash,
-        &payload,
-        curr_height,
-        preimage,
-    )?;
+    let data = create_keysend_inner(&km, hops, msat, rhash, payload, curr_height, preimage)?;
+    Ok(data.to_vec())
+}
+
+pub fn create_keysend_msg(
+    seed: String,
+    idx: u32,
+    time: String,
+    network: String,
+    hops: String,
+    msat: u64,
+    rhash: String,
+    msg_json: String,
+    curr_height: u32,
+    preimage: String,
+) -> Result<Vec<u8>> {
+    let idx = idx_to_idx(idx)?;
+    let km = make_keys_manager(&seed, idx, &time, &network)?;
+    let payload = sphinx::msg::create_sphinx_msg_from_json(&km, &msg_json)
+        .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
+    let data = create_keysend_inner(&km, hops, msat, rhash, payload, curr_height, preimage)?;
     Ok(data.to_vec())
 }
 
@@ -141,7 +170,24 @@ pub fn peel_payment(
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
     let payment_hash = parse_hash(&rhash)?;
-    Ok(run_peel_payment_bytes(&km, &payload, payment_hash)?)
+    Ok(run_peel_payment_to_bytes(&km, &payload, payment_hash)?)
+}
+
+pub fn peel_payment_msg(
+    seed: String,
+    idx: u32,
+    time: String,
+    network: String,
+    payload: Vec<u8>,
+    rhash: String,
+) -> Result<String> {
+    let idx = idx_to_idx(idx)?;
+    let km = make_keys_manager(&seed, idx, &time, &network)?;
+    let payment_hash = parse_hash(&rhash)?;
+    let (_amt, _preimage, bytes) = run_peel_received_payment_to_bytes(&km, &payload, payment_hash)?;
+    let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes, None)
+        .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
+    Ok(msg)
 }
 
 fn idx_to_idx(idx: u32) -> Result<Option<isize>> {
@@ -240,7 +286,7 @@ fn run_create_keysend_bytes(
     })?)
 }
 
-fn run_peel_onion_bytes(km: &MyKeysManager, pld: &[u8]) -> Result<Vec<u8>> {
+fn run_peel_onion_to_bytes(km: &MyKeysManager, pld: &[u8]) -> Result<Vec<u8>> {
     Ok(
         sphinx::peel_onion_to_bytes(km, pld).map_err(|e| SphinxError::Decrypt {
             r: format!("{:?}", e),
@@ -248,9 +294,29 @@ fn run_peel_onion_bytes(km: &MyKeysManager, pld: &[u8]) -> Result<Vec<u8>> {
     )
 }
 
-fn run_peel_payment_bytes(km: &MyKeysManager, pld: &[u8], rhash: [u8; 32]) -> Result<Vec<u8>> {
+fn run_peel_received_onion_to_bytes(km: &MyKeysManager, pld: &[u8]) -> Result<Vec<u8>> {
+    Ok(
+        sphinx::peel_received_onion(km, pld).map_err(|e| SphinxError::Decrypt {
+            r: format!("{:?}", e),
+        })?,
+    )
+}
+
+fn run_peel_payment_to_bytes(km: &MyKeysManager, pld: &[u8], rhash: [u8; 32]) -> Result<Vec<u8>> {
     Ok(
         sphinx::peel_payment_onion_to_bytes(km, pld, rhash).map_err(|e| SphinxError::Decrypt {
+            r: format!("{:?}", e),
+        })?,
+    )
+}
+
+fn run_peel_received_payment_to_bytes(
+    km: &MyKeysManager,
+    pld: &[u8],
+    rhash: [u8; 32],
+) -> Result<(u64, String, Vec<u8>)> {
+    Ok(
+        sphinx::peel_received_payment(km, pld, rhash).map_err(|e| SphinxError::Decrypt {
             r: format!("{:?}", e),
         })?,
     )
