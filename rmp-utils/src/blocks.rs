@@ -80,11 +80,7 @@ pub fn deserialize_variant(bytes: &mut Bytes) -> Result<String> {
     Ok(object)
 }
 
-pub fn serialize_string(
-    buff: &mut ByteBuf,
-    field_name: Option<&str>,
-    object: &String,
-) -> Result<()> {
+pub fn serialize_string(buff: &mut ByteBuf, field_name: Option<&str>, object: &str) -> Result<()> {
     serialize_field_name(buff, field_name)?;
     encode::write_str(buff, object).map_err(Error::msg)?;
     Ok(())

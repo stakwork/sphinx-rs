@@ -61,13 +61,13 @@ pub fn raw_response_from_bytes(
 ) -> vls_protocol::Result<Vec<u8>> {
     let mut cursor = Cursor::new(res);
     msgs::read_serial_response_header(&mut cursor, expected_sequence)?;
-    Ok(msgs::read_raw(&mut cursor)?)
+    msgs::read_raw(&mut cursor)
 }
 
 pub fn response_from_bytes(res: Vec<u8>, expected_sequence: u16) -> vls_protocol::Result<Message> {
     let mut cursor = Cursor::new(res);
     msgs::read_serial_response_header(&mut cursor, expected_sequence)?;
-    Ok(msgs::read(&mut cursor)?)
+    msgs::read(&mut cursor)
 }
 
 #[cfg(test)]

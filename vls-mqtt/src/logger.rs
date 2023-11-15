@@ -15,7 +15,7 @@ pub fn log_errors(mut error_rx: broadcast::Receiver<Vec<u8>>) {
             .open(err_log_path)
         {
             while let Ok(err_msg) = error_rx.recv().await {
-                let mut log = format!("[{}]: ", chrono::Utc::now().to_string())
+                let mut log = format!("[{}]: ", chrono::Utc::now())
                     .as_bytes()
                     .to_vec();
                 log.extend_from_slice(&err_msg);

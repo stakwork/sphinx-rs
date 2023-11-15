@@ -16,7 +16,7 @@ impl StartingTimeFactory for RandomStartingTimeFactory {
 }
 
 impl RandomStartingTimeFactory {
-    pub(crate) fn new() -> Arc<dyn StartingTimeFactory> {
+    pub(crate) fn new() -> Arc<RandomStartingTimeFactory> {
         Arc::new(RandomStartingTimeFactory {})
     }
 }

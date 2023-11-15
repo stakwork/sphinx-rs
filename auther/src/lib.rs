@@ -15,7 +15,7 @@ const MAGIC_NUMBER: i32 = 31;
 pub fn sign_message(message: &[u8], secret_key: &SecretKey) -> Result<Vec<u8>> {
     let encmsg = lightning_hash(message)?;
     let secp_ctx = Secp256k1::signing_only();
-    let sig = secp_ctx.sign_ecdsa_recoverable(&encmsg, &secret_key);
+    let sig = secp_ctx.sign_ecdsa_recoverable(&encmsg, secret_key);
     let (rid, sig) = sig.serialize_compact();
     let mut fin = vec![(rid.to_i32() + MAGIC_NUMBER) as u8];
     fin.extend_from_slice(&sig[..]);
@@ -41,7 +41,7 @@ pub fn recover_pubkey(message: &[u8], sig: &[u8; 65]) -> Result<PublicKey> {
     let secp = Secp256k1::verification_only();
     let id = ecdsa::RecoveryId::from_i32(sig[0] as i32 - MAGIC_NUMBER).map_err(AnyErr::msg)?;
     let s = ecdsa::RecoverableSignature::from_compact(&sig[1..], id).map_err(AnyErr::msg)?;
-    Ok(secp.recover_ecdsa(&encmsg, &s).map_err(AnyErr::msg)?)
+    secp.recover_ecdsa(&encmsg, &s).map_err(AnyErr::msg)
 }
 
 pub fn lightning_hash(message: &[u8]) -> Result<Message> {

@@ -72,30 +72,36 @@ impl Token {
     }
     /// Verify signed token
     pub fn verify(&self, public_key: &PublicKey) -> Result<()> {
-        if let None = self.1 {
+        if self.1.is_none() {
             return Err(anyhow!("no sig".to_string()));
         }
         let msg = u32_to_bytes(self.0);
-        verify_message(&msg.to_vec(), &self.1.unwrap(), public_key)
+        verify_message(msg.as_ref(), &self.1.unwrap(), public_key)
     }
     /// Recover pubkey from signed token
     pub fn recover(&self) -> Result<PublicKey> {
-        if let None = self.1 {
+        if self.1.is_none() {
             return Err(anyhow!("no sig".to_string()));
         }
         let msg = u32_to_bytes(self.0);
-        recover_pubkey(&msg.to_vec(), &self.1.unwrap())
+        recover_pubkey(msg.as_ref(), &self.1.unwrap())
     }
     /// Recover pubkey from signed token, and check timestamp
     pub fn recover_within(&self, secs: u32) -> Result<PublicKey> {
-        if let None = self.1 {
+        if self.1.is_none() {
             return Err(anyhow!("no sig".to_string()));
         }
         if self.0 < now() - secs {
             return Err(anyhow!("expired".to_string()));
         }
         let msg = u32_to_bytes(self.0);
-        recover_pubkey(&msg.to_vec(), &self.1.unwrap())
+        recover_pubkey(msg.as_ref(), &self.1.unwrap())
+    }
+}
+
+impl Default for Token {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

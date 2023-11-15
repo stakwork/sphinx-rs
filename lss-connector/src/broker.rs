@@ -39,7 +39,7 @@ impl LssBroker {
     pub async fn new(uri: &str, ir: InitResponse, spk: PublicKey) -> Result<Self> {
         let client_id = secp256k1::PublicKey::from_slice(&ir.client_id)?;
         let auth = Auth {
-            client_id: client_id,
+            client_id,
             token: ir.auth_token.to_vec(),
         };
         let client = LssClient::new(uri, &spk, auth).await?;
@@ -58,7 +58,7 @@ impl LssBroker {
     pub async fn make_init_msg(&self) -> Result<Vec<u8>> {
         let spk = LssClient::get_server_pubkey(&self.uri).await?;
         let server_pubkey = spk.serialize();
-        Ok(Msg::Init(Init { server_pubkey }).to_vec()?)
+        Msg::Init(Init { server_pubkey }).to_vec()
     }
     // on reconnection
     // if no nonce was sent the the signer does not need state update
@@ -69,7 +69,7 @@ impl LssBroker {
             // send empty if not needed
             Default::default()
         };
-        Ok(Msg::Created(bm).to_vec()?)
+        Msg::Created(bm).to_vec()
     }
     pub async fn get_created_state_from_nonce(&self, nonce: &[u8]) -> Result<BrokerMutations> {
         let client = self.lss_client.lock().await;
@@ -160,5 +160,5 @@ pub async fn lss_handle(lss: &LssPersister, msg: &[u8]) -> Result<Vec<u8>> {
             server_hmac: Some(server_hmac),
         }
     };
-    Ok(Msg::Stored(bm).to_vec()?)
+    Msg::Stored(bm).to_vec()
 }

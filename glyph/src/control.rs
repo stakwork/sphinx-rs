@@ -25,7 +25,7 @@ impl Controller {
     }
     pub fn make_auth_token(&self) -> Result<String> {
         let t = Token::new();
-        Ok(t.sign_to_base64(&self.0)?)
+        t.sign_to_base64(&self.0)
     }
     pub fn pubkey(&self) -> PublicKey {
         self.1
@@ -39,7 +39,7 @@ impl Controller {
     pub fn build_msg(&mut self, msg: ControlMessage) -> anyhow::Result<Vec<u8>> {
         let mut buff = ByteBuf::new();
         serialize_controlmessage(&mut buff, &msg)?;
-        self.2 = self.2 + 1;
+        self.2 += 1;
         let ret = nonce::build_msg(buff.as_slice(), &self.0, self.2)?;
         Ok(ret)
     }
@@ -52,7 +52,7 @@ impl Controller {
         let msg = nonce::parse_msg(input, &self.1, self.2)?;
         let mut bytes = Bytes::new(&msg);
         let ret = deserialize_controlmessage(&mut bytes)?;
-        self.2 = self.2 + 1;
+        self.2 += 1;
         Ok(ret)
     }
     pub fn parse_msg_no_nonce(&mut self, input: &[u8]) -> anyhow::Result<(ControlMessage, u64)> {
@@ -63,7 +63,7 @@ impl Controller {
     }
     pub fn parse_response(&self, input: &[u8]) -> anyhow::Result<ControlResponse> {
         let mut bytes = Bytes::new(input);
-        Ok(deserialize_controlresponse(&mut bytes)?)
+        deserialize_controlresponse(&mut bytes)
     }
     // return the OG message for further processing
     pub fn handle(&mut self, input: &[u8]) -> anyhow::Result<(ControlMessage, ControlResponse)> {
@@ -79,7 +79,7 @@ impl Controller {
                 if msg_nonce.1 <= self.2 {
                     return Err(anyhow::anyhow!("invalid nonce"));
                 }
-                self.2 = self.2 + 1;
+                self.2 += 1;
                 store.set_nonce(self.2)?;
             }
         }
@@ -148,7 +148,7 @@ pub fn parse_control_response(input: &[u8]) -> anyhow::Result<ControlResponse> {
 
 pub fn parse_control_response_to_json(input: &[u8]) -> anyhow::Result<String> {
     let res = parse_control_response(input)?;
-    Ok(serde_json::to_string(&res).map_err(anyhow::Error::msg)?)
+    serde_json::to_string(&res).map_err(anyhow::Error::msg)
 }
 
 pub fn control_msg_from_json(msg: &[u8]) -> anyhow::Result<ControlMessage> {
@@ -255,7 +255,7 @@ mod tests {
 
         let msg = "{}";
         let res = control_msg_from_json(msg.as_bytes());
-        if let Ok(_) = res {
+        if res.is_ok() {
             panic!("should have failed");
         }
 

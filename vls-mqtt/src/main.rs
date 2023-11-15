@@ -29,12 +29,14 @@ pub const ROOT_STORE: &str = "teststore";
 
 // requests from incoming VLS messages
 #[derive(Debug)]
+#[allow(clippy::type_complexity)]
 pub struct VlsChanMsg {
     pub message: Vec<u8>,
     pub expected_sequence: Option<u16>,
     pub reply_tx: oneshot::Sender<Result<(Vec<u8>, Vec<u8>, u16, String, Option<[u8; 32]>)>>,
 }
 impl VlsChanMsg {
+    #[allow(clippy::type_complexity)]
     pub fn new(
         message: Vec<u8>,
         expected_sequence: Option<u16>,
@@ -65,6 +67,7 @@ pub struct LssChanMsg {
     pub reply_tx: oneshot::Sender<Result<(String, Vec<u8>)>>,
 }
 impl LssChanMsg {
+    #[allow(clippy::type_complexity)]
     pub fn new(
         message: Vec<u8>,
         previous: Option<(Vec<u8>, [u8; 32])>,
@@ -200,7 +203,7 @@ async fn rocket() -> _ {
 
     let rh_ = rh.clone();
     rocket::tokio::spawn(async move {
-        while let Some(_) = commit_rx.recv().await {
+        while commit_rx.recv().await.is_some() {
             log::info!("COMMIT persister!");
             if let Err(e) = rh_.node().get_persister().commit() {
                 log::error!("Local COMMIT error! {:?}", e);
@@ -209,9 +212,8 @@ async fn rocket() -> _ {
         }
     });
 
-    let rh_ = rh.clone();
     rocket::tokio::spawn(async move {
-        listen_for_commands(&mut ctrlr, ctrl_rx, &rh_, &approver_).await
+        listen_for_commands(&mut ctrlr, ctrl_rx, &rh, &approver_).await
     });
 
     rocket::tokio::spawn(async move {
@@ -234,7 +236,7 @@ async fn listen_for_commands(
         match ctrlr.handle(&msg.message) {
             Ok((cmsg, cres)) => {
                 let (res2, muts) = update_controls(rh, cmsg, cres, approver);
-                if let Some(_) = muts {
+                if muts.is_some() {
                     log::warn!("some mutations that need to be sent to LSS!");
                 }
                 let mut bb = ByteBuf::new();

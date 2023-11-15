@@ -43,9 +43,9 @@ pub async fn control(sender: &State<mpsc::Sender<ChannelRequest>>, msg: &str) ->
         return Err(Error::Fail);
     }
     let (request, reply_rx) = ChannelRequest::new(topics::CONTROL, message);
-    let _ = sender.send(request).await.map_err(|_| Error::Fail)?;
+    sender.send(request).await.map_err(|_| Error::Fail)?;
     let reply = reply_rx.await.map_err(|_| Error::Fail)?;
-    Ok(hex::encode(reply.reply).to_string())
+    Ok(hex::encode(reply.reply))
 }
 
 #[get("/errors")]
@@ -101,13 +101,12 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for Error {
     fn respond_to(self, req: &'r rocket::Request<'_>) -> response::Result<'o> {
         // log `self` to your favored error tracker, e.g.
         // sentry::capture_error(&self);
-        match self {
-            // in our simplistic example, we're happy to respond with the default 500 responder in all cases
-            _ => Status::InternalServerError.respond_to(req),
-        }
+        // in our simplistic example, we're happy to respond with the default 500 responder in all cases
+        Status::InternalServerError.respond_to(req)
     }
 }
 
+#[allow(clippy::upper_case_acronyms)]
 pub struct CORS;
 
 #[rocket::async_trait]

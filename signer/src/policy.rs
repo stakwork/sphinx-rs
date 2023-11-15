@@ -49,7 +49,7 @@ pub fn update_controls(
                         allowlist: al,
                     })
                 } else {
-                    res = ControlResponse::Error(format!("wrong ControlResponse type"))
+                    res = ControlResponse::Error("wrong ControlResponse type".to_string())
                 }
             }
             Err(e) => {
@@ -64,7 +64,7 @@ pub fn update_controls(
 
 pub fn set_allowlist(
     root_handler: &RootHandler,
-    allowlist: &Vec<String>,
+    allowlist: &[String],
 ) -> anyhow::Result<Mutations> {
     let muts = root_handler
         .with_persist(|node| Ok(node.set_allowlist(allowlist)?))

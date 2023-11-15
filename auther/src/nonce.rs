@@ -19,15 +19,15 @@ impl Controller {
         self.1
     }
     pub fn build_msg(&mut self, d: &[u8]) -> anyhow::Result<Vec<u8>> {
-        self.2 = self.2 + 1;
-        Ok(build_msg(d, &self.0, self.2)?)
+        self.2 += 1;
+        build_msg(d, &self.0, self.2)
     }
     pub fn build_msg_with_nonce(&mut self, d: &[u8], nonce: u64) -> anyhow::Result<Vec<u8>> {
-        Ok(build_msg(d, &self.0, nonce)?)
+        build_msg(d, &self.0, nonce)
     }
     pub fn parse_msg(&mut self, input: &[u8]) -> anyhow::Result<Vec<u8>> {
         let res = parse_msg(input, &self.1, self.2)?;
-        self.2 = self.2 + 1;
+        self.2 += 1;
         Ok(res)
     }
     pub fn parse_msg_with_nonce(&mut self, input: &[u8], nonce: u64) -> anyhow::Result<Vec<u8>> {

@@ -7,6 +7,7 @@ use std::convert::TryInto;
 pub use vls_persist::kvv::{cloud::CloudKVVStore, KVVPersister, KVVStore, KVV};
 use vls_protocol_signer::lightning_signer;
 extern crate alloc;
+use std::cmp::Ordering;
 use std::sync::Mutex;
 
 /// A key-version-value store backed by fsdb
@@ -79,22 +80,24 @@ impl FsKVVStore {
         value: &[u8],
     ) -> Result<Vec<u8>, Error> {
         let vv = Self::encode_vv(version, value);
-        if version < prev {
-            error!("version mismatch for {}: {} < {}", key, version, prev);
-            // version cannot go backwards
-            return Err(Error::VersionMismatch);
-        } else if version == prev {
-            // if same version, value must not have changed
-            if let Ok(existing) = self.db.get_raw(key) {
-                if existing != vv {
-                    error!("value mismatch for {}: {}", key, version);
-                    return Err(Error::VersionMismatch);
-                }
+        match version.cmp(&prev) {
+            Ordering::Less => {
+                error!("version mismatch for {}: {} < {}", key, version, prev);
+                // version cannot go backwards
+                Err(Error::VersionMismatch)
             }
-            return Ok(vv);
+            Ordering::Equal => {
+                // if same version, value must not have changed
+                if let Ok(existing) = self.db.get_raw(key) {
+                    if existing != vv {
+                        error!("value mismatch for {}: {}", key, version);
+                        return Err(Error::VersionMismatch);
+                    }
+                }
+                Ok(vv)
+            }
+            Ordering::Greater => Ok(vv),
         }
-
-        Ok(vv)
     }
 }
 
@@ -179,7 +182,7 @@ impl KVVStore for FsKVVStore {
             .map_err(|_| Error::Internal("could not list".to_string()))?;
         let mut result = Vec::new();
         for item in items {
-            let sep = if prefix.ends_with("/") {
+            let sep = if prefix.ends_with('/') {
                 "".to_string()
             } else {
                 "/".to_string()
@@ -195,36 +198,31 @@ impl KVVStore for FsKVVStore {
         Ok(Iter(result.into_iter()))
     }
     fn delete(&self, key: &str) -> Result<(), Error> {
-        Ok(self
-            .db
+        self.db
             .remove(key)
-            .map_err(|_| Error::Internal("could not remove".to_string()))?)
+            .map_err(|_| Error::Internal("could not remove".to_string()))
     }
     fn clear_database(&self) -> Result<(), Error> {
-        Ok(self
-            .db
+        self.db
             .clear()
-            .map_err(|_| Error::Internal("could not clear".to_string()))?)
+            .map_err(|_| Error::Internal("could not clear".to_string()))
     }
 }
 
 impl FsKVVStore {
     pub fn get_raw(&self, key: &str) -> Result<Vec<u8>, Error> {
-        Ok(self
-            .meta
+        self.meta
             .get_raw(key)
-            .map_err(|_| Error::Internal("failed get_raw".to_string()))?)
+            .map_err(|_| Error::Internal("failed get_raw".to_string()))
     }
     pub fn set_raw(&self, key: &str, data: &[u8]) -> Result<(), Error> {
-        Ok(self
-            .meta
+        self.meta
             .put_raw(key, data)
-            .map_err(|_| Error::Internal("failed put_raw".to_string()))?)
+            .map_err(|_| Error::Internal("failed put_raw".to_string()))
     }
     pub fn delete_raw(&self, key: &str) -> Result<(), Error> {
-        Ok(self
-            .meta
+        self.meta
             .remove(key)
-            .map_err(|_| Error::Internal("failed remove".to_string()))?)
+            .map_err(|_| Error::Internal("failed remove".to_string()))
     }
 }

@@ -99,7 +99,7 @@ impl Persist for FsPersister {
             network: config.network.to_string(),
         };
         let _ = self.nodes.put(&pk, &node_entry);
-        let _ = self.pubkeys.put(&pk, &node_id);
+        let _ = self.pubkeys.put(&pk, node_id);
         Ok(())
     }
     fn update_node(&self, node_id: &PublicKey, state: &CoreNodeState) -> Result<(), Error> {
@@ -289,6 +289,6 @@ impl Persist for FsPersister {
         Ok(())
     }
     fn recovery_required(&self) -> bool {
-        self.nodes.list().unwrap_or(Vec::new()).len() == 0
+        self.nodes.list().unwrap_or(Vec::new()).is_empty()
     }
 }

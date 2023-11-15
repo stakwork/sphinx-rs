@@ -26,7 +26,7 @@ pub async fn start(
 
         let pubkey = hex::encode(pubkey.serialize());
         let t = Token::new();
-        let token = t.sign_to_base64(&secret)?;
+        let token = t.sign_to_base64(secret)?;
 
         let broker: String = env::var("BROKER").unwrap_or("localhost:1883".to_string());
 
@@ -52,13 +52,13 @@ pub async fn start(
             let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
             match eventloop.poll().await {
                 Ok(event) => {
-                    if let Some(_) = incoming_conn_ack(event) {
+                    if incoming_conn_ack(event).is_some() {
                         println!("==========> MQTT connected!");
                         break (client, eventloop);
                     }
                 }
                 Err(e) => {
-                    try_i = try_i + 1;
+                    try_i += 1;
                     println!("reconnect.... {} {:?}", try_i, e);
                     rocket::tokio::time::sleep(Duration::from_secs(1)).await;
                 }
@@ -96,7 +96,7 @@ async fn main_listener(
     commit_tx: mpsc::Sender<()>,
 ) {
     // say hello to start
-    publish(client, &client_id, topics::HELLO, &[]).await;
+    publish(client, client_id, topics::HELLO, &[]).await;
 
     let mut expected_sequence: Option<u16> = None;
     let mut msgs: Option<(Vec<u8>, [u8; 32])> = None;
@@ -124,13 +124,11 @@ async fn main_listener(
                         // if error_msg.contains("PutConflict") {
                         //     exit(0);
                         // }
-                    } else {
-                        if let Some(seq) = sequence {
-                            expected_sequence = Some(seq + 1);
-                        }
+                    } else if let Some(seq) = sequence {
+                        expected_sequence = Some(seq + 1);
                     }
                     // println!("publish back to broker! {}", &return_topic);
-                    publish(client, &client_id, &return_topic, &bytes).await;
+                    publish(client, client_id, &return_topic, &bytes).await;
                     if return_topic == topics::LSS_CONFLICT_RES {
                         log::warn!("LSS PUT CONFLICT... RESTART");
                         exit(0);
@@ -221,23 +219,19 @@ async fn publish(client: &AsyncClient, client_id: &str, topic: &str, bytes: &[u8
     client
         .publish(res_topic, QoS::AtLeastOnce, false, bytes)
         .await
-        .expect(&format!("could not publish to {}", topic));
+        .unwrap_or_else(|_| panic!("could not publish to {}", topic));
 }
 
 fn incoming_bytes(event: Event) -> Option<(String, Vec<u8>)> {
-    if let Event::Incoming(packet) = event {
-        if let Packet::Publish(p) = packet {
+    if let Event::Incoming(Packet::Publish(p)) = event {
             return Some((p.topic, p.payload.to_vec()));
-        }
     }
     None
 }
 
 fn incoming_conn_ack(event: Event) -> Option<()> {
-    if let Event::Incoming(packet) = event {
-        if let Packet::ConnAck(_) = packet {
+    if let Event::Incoming(Packet::ConnAck(_)) = event {
             return Some(());
-        }
     }
     None
 }

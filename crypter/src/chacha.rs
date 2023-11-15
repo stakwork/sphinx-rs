@@ -22,9 +22,9 @@ pub fn encrypt(
     let mut ret: Vec<u8, PAYLOAD_LEN> = Vec::new();
     ret.extend_from_slice(&plaintext).unwrap();
     cipher
-        .encrypt_in_place(&nonce, b"", &mut ret)
+        .encrypt_in_place(nonce, b"", &mut ret)
         .or(Err(Error::msg("Failed to encrypt")))?;
-    ret.extend_from_slice(&nonce).unwrap();
+    ret.extend_from_slice(nonce).unwrap();
     let ret = ret.into_array().unwrap();
     Ok(ret)
 }
@@ -35,7 +35,7 @@ pub fn decrypt(payload: [u8; PAYLOAD_LEN], key: [u8; KEY_LEN]) -> anyhow::Result
     let mut buf: Vec<u8, CIPHER_LEN> = Vec::new();
     buf.extend_from_slice(&payload[..CIPHER_LEN]).unwrap();
     cipher
-        .decrypt_in_place(&nonce, b"", &mut buf)
+        .decrypt_in_place(nonce, b"", &mut buf)
         .or(Err(Error::msg("Failed to decrypt")))?;
     let ret = buf.into_array().unwrap();
     Ok(ret)

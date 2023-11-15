@@ -93,7 +93,7 @@ impl LssSigner {
         state: Option<BTreeMap<String, (u64, Vec<u8>)>>,
     ) -> Result<(RootHandler, Vec<u8>)> {
         // let helper = self.helper.lock().unwrap();
-        let has_muts = &c.muts.len() > &0;
+        let has_muts = !c.muts.is_empty();
         let muts = Mutations::from_vec(c.muts);
         if has_muts {
             let success = self.helper.check_hmac(
@@ -171,7 +171,7 @@ pub fn handle_lss_msg(
     use sphinx_glyph::topics;
 
     // println!("LssMsg::from_slice {:?}", &msg.message);
-    let lssmsg = Msg::from_slice(&msg)?;
+    let lssmsg = Msg::from_slice(msg)?;
     // println!("incoming LSS msg {:?}", lssmsg);
     match lssmsg {
         Msg::Init(_) => {
@@ -180,10 +180,8 @@ pub fn handle_lss_msg(
         }
         Msg::Created(bm) => {
             // dont need to check muts if theyre empty
-            if !bm.muts.is_empty() {
-                if !lss_signer.check_hmac(bm) {
-                    return Err(anyhow!("Invalid server hmac"));
-                }
+            if !bm.muts.is_empty() && !lss_signer.check_hmac(bm) {
+                return Err(anyhow!("Invalid server hmac"));
             }
             let bs = lss_signer.empty_created();
             Ok((topics::INIT_2_RES.to_string(), bs))

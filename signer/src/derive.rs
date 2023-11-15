@@ -8,7 +8,7 @@ pub const ENTROPY_LEN: usize = 16;
 
 pub fn node_keys(network: &Network, seed: &[u8]) -> (PublicKey, SecretKey) {
     let style = KeyDerivationStyle::Native;
-    let deriver = key_derive(style, network.clone());
+    let deriver = key_derive(style, *network);
     let ctx = Secp256k1::new();
     deriver.node_keys(seed, &ctx)
 }

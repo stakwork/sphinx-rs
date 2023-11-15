@@ -1,7 +1,7 @@
-use rand_chacha::ChaCha20Rng;
-use schnorr_fun::{frost, nonce, Message};
+
+use schnorr_fun::{frost, nonce};
 use sha2::Sha256;
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap};
 
 pub struct Frost {
     // for building the federations
@@ -64,7 +64,7 @@ pub enum FrostResponse {
 
 impl Frost {
     pub fn new() -> Self {
-        let mut sets = HashMap::new();
+        let sets = HashMap::new();
         // sets.insert(
         //     format!("test"),
         //     frost::new_with_deterministic_nonces::<Sha256>(),
@@ -77,28 +77,28 @@ impl Frost {
     // the clients handle responses from server
     pub fn handle(&mut self, msg: FrostResponse) -> Option<FrostMsg> {
         match msg {
-            FrostResponse::Set((id, set)) => {
+            FrostResponse::Set((_id, _set)) => {
                 // if the received set is complete, add it to sets
                 //   - new_keygen
                 //   - create_shares
                 None
             }
-            FrostResponse::Shares((id, shares)) => {
+            FrostResponse::Shares((_id, _shares)) => {
                 // add them to shares until complete
                 //   - finish_keygen
                 None
             }
-            FrostResponse::Sign((id, sign)) => {
+            FrostResponse::Sign((_id, _sign)) => {
                 // gen nonce
                 Some(FrostMsg::Nonce((
-                    format!("test"),
+                    "test".to_string(),
                     Nonce {
                         session_id: hex_secret_32(),
                         nonce: String::from(""),
                     },
                 )))
             }
-            FrostResponse::Nonce((id, nonce)) => {
+            FrostResponse::Nonce((id, _nonce)) => {
                 // add nonces until reached threshold
                 //   - start_sign_session
                 //   - sign
@@ -147,7 +147,7 @@ impl Frost {
             }
             FrostMsg::Shares((id, s)) => Some(FrostResponse::Shares((id, s))),
             FrostMsg::Nonce((id, nonce)) => Some(FrostResponse::Nonce((id, nonce))),
-            FrostMsg::Signed((id, sig)) => {
+            FrostMsg::Signed((_id, _sig)) => {
                 // collect sigs and see
                 //   - verify_signature_share
                 //   - combine_signature_shares
@@ -158,7 +158,7 @@ impl Frost {
 }
 
 pub fn hex_secret_32() -> String {
-    use rand::{Rng, RngCore};
+    use rand::{RngCore};
     let mut store_key_bytes = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut store_key_bytes);
     hex::encode(store_key_bytes)
@@ -221,10 +221,10 @@ mod tests {
         let (msg_tx, msg_rx) = chan::unbounded::<FrostMsg>();
         let (res_tx, res_rx) = chan::unbounded::<FrostResponse>();
 
-        let mut server = Server::new(res_tx.clone(), msg_rx.clone());
+        let mut server = Server::new(res_tx, msg_rx);
         let mut client1 = Client::new(msg_tx.clone(), res_rx.clone());
         let mut client2 = Client::new(msg_tx.clone(), res_rx.clone());
-        let mut client3 = Client::new(msg_tx.clone(), res_rx.clone());
+        let mut client3 = Client::new(msg_tx, res_rx);
 
         spawn(move || client1.start());
         spawn(move || client2.start());

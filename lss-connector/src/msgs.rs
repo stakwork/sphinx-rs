@@ -273,7 +273,7 @@ fn deserialize_lssmuts(
 
 impl Msg {
     pub fn to_vec(&self) -> Result<Vec<u8>> {
-        serialize_lssmsg(&self)
+        serialize_lssmsg(self)
     }
     pub fn from_slice(s: &[u8]) -> Result<Self> {
         deserialize_lssmsg(s)
@@ -299,7 +299,7 @@ impl Msg {
 }
 impl Response {
     pub fn to_vec(&self) -> Result<Vec<u8>> {
-        serialize_lssres(&self)
+        serialize_lssres(self)
     }
     pub fn from_slice(s: &[u8]) -> Result<Self> {
         deserialize_lssres(s)

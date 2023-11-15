@@ -19,7 +19,7 @@ impl MsgStore {
 }
 
 impl MsgStore {
-    pub fn set_prevs(&self, prev_vls: &Vec<u8>, prev_lss: &Vec<u8>) {
+    pub fn set_prevs(&self, prev_vls: &[u8], prev_lss: &[u8]) {
         let _ = self.prev_msgs.put_raw("prev_vls", prev_vls);
         let _ = self.prev_msgs.put_raw("prev_lss", prev_lss);
     }

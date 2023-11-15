@@ -55,7 +55,7 @@ pub fn builder(
 ) -> anyhow::Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
     let clock = make_clock();
     let random_time_factory = crate::rst::RandomStartingTimeFactory::new();
-    Ok(builder_inner(
+    builder_inner(
         seed,
         network,
         initial_policy,
@@ -64,7 +64,7 @@ pub fn builder(
         persister,
         clock,
         random_time_factory,
-    )?)
+    )
 }
 
 fn make_clock() -> Arc<dyn Clock> {
@@ -83,6 +83,7 @@ fn make_clock() -> Arc<dyn Clock> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn builder_inner(
     seed: [u8; 32],
     network: Network,
@@ -206,6 +207,7 @@ pub fn handle(
     Ok((out_bytes, sequence))
 }
 
+#[allow(clippy::type_complexity)]
 pub fn handle_with_lss(
     root_handler: &RootHandler,
     lss_signer: &LssSigner,

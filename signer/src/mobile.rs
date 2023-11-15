@@ -75,7 +75,7 @@ pub fn run_init_1(
 )> {
     let init = Msg::from_slice(lss_msg1)?.into_init()?;
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey).map_err(Error::msg)?;
-    let nonce = args.lss_nonce.clone();
+    let nonce = args.lss_nonce;
     let (rhb, approver) = root_handler_builder(args, state, velocity)?;
     let (lss_signer, res1) = LssSigner::new(&rhb, &server_pubkey, Some(nonce));
     Ok((
@@ -94,7 +94,7 @@ pub fn run_init_2(
     velocity: Option<Velocity>,
 ) -> Result<(RunReturn, RootHandler, Arc<SphinxApprover>, LssSigner)> {
     let (_res1, rhb, approver, lss_signer) = run_init_1(args, state.clone(), lss_msg1, velocity)?;
-    let created = Msg::from_slice(&lss_msg2)?.into_created()?;
+    let created = Msg::from_slice(lss_msg2)?.into_created()?;
     let (root_handler, res2) = lss_signer.build_with_lss(created, rhb, Some(state))?;
     Ok((
         RunReturn::new_lss(topics::INIT_2_RES, res2, "LssCreated".to_string()),
@@ -153,8 +153,8 @@ pub fn run_lss(
     println!("PREV LSS {:?}", previous_lss);
     let server_hmac: [u8; 32] = previous_lss.try_into()?;
     let prev = (previous_vls.to_vec(), server_hmac);
-    let (topic, res) = handle_lss_msg(&lss_msg, Some(prev), &lss_signer)?;
-    let ret = if &topic == topics::VLS_RES {
+    let (topic, res) = handle_lss_msg(lss_msg, Some(prev), &lss_signer)?;
+    let ret = if topic == topics::VLS_RES {
         RunReturn::new_vls(&topic, res, u16::default(), "VLS".to_string())
     } else {
         RunReturn::new_lss(&topic, res, "LssStore".to_string())

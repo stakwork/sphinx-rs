@@ -47,6 +47,7 @@ pub fn serialize_velocity(vel: &(u64, Vec<u64>)) -> Result<Vec<u8>> {
     Ok(buff.into_vec())
 }
 
+#[allow(clippy::type_complexity)]
 pub fn deserialize_state_vec(
     bytes: &mut decode::bytes::Bytes,
     field_name: Option<&str>,
@@ -141,9 +142,9 @@ pub fn deserialize_simple_state_map(b: &[u8]) -> Result<BTreeMap<String, Vec<u8>
 
 fn serialize_state_element(
     buff: &mut encode::buffer::ByteBuf,
-    x: &String,
+    x: &str,
     y: &u64,
-    z: &Vec<u8>,
+    z: &[u8],
 ) -> Result<()> {
     if TRACE {
         log::info!("serialize_state_element: start");
@@ -151,7 +152,7 @@ fn serialize_state_element(
     encode::write_str(buff, x).map_err(Error::msg)?;
     encode::write_array_len(buff, 2).map_err(Error::msg)?;
     encode::write_uint(buff, *y).map_err(Error::msg)?;
-    encode::write_bin(buff, &z).map_err(Error::msg)?;
+    encode::write_bin(buff, z).map_err(Error::msg)?;
     if TRACE {
         log::info!("serialize_state_element: end");
     }
@@ -160,11 +161,11 @@ fn serialize_state_element(
 
 fn serialize_simple_state_element(
     buff: &mut encode::buffer::ByteBuf,
-    x: &String,
-    z: &Vec<u8>,
+    x: &str,
+    z: &[u8],
 ) -> Result<()> {
     encode::write_str(buff, x).map_err(Error::msg)?;
-    encode::write_bin(buff, &z).map_err(Error::msg)?;
+    encode::write_bin(buff, z).map_err(Error::msg)?;
     Ok(())
 }
 

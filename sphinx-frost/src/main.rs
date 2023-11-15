@@ -74,7 +74,7 @@ fn main() {
 
     // start a sign session with these nonces for a message
     let session = frost.start_sign_session(&frost_key, nonces.clone(), message);
-    let session2 = frost2.start_sign_session(&frost_key, nonces.clone(), message);
+    let session2 = frost2.start_sign_session(&frost_key, nonces, message);
 
     // create a partial signature using our secret share and secret nonce
     let sig_0 = frost.sign(&frost_key, &session, 0, &secret_share_0, nonce_0);
