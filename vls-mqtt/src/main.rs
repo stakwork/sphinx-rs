@@ -212,9 +212,9 @@ async fn rocket() -> _ {
         }
     });
 
-    rocket::tokio::spawn(async move {
-        listen_for_commands(&mut ctrlr, ctrl_rx, &rh, &approver_).await
-    });
+    rocket::tokio::spawn(
+        async move { listen_for_commands(&mut ctrlr, ctrl_rx, &rh, &approver_).await },
+    );
 
     rocket::tokio::spawn(async move {
         loop {

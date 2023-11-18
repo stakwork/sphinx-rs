@@ -224,14 +224,14 @@ async fn publish(client: &AsyncClient, client_id: &str, topic: &str, bytes: &[u8
 
 fn incoming_bytes(event: Event) -> Option<(String, Vec<u8>)> {
     if let Event::Incoming(Packet::Publish(p)) = event {
-            return Some((p.topic, p.payload.to_vec()));
+        return Some((p.topic, p.payload.to_vec()));
     }
     None
 }
 
 fn incoming_conn_ack(event: Event) -> Option<()> {
     if let Event::Incoming(Packet::ConnAck(_)) = event {
-            return Some(());
+        return Some(());
     }
     None
 }

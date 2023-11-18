@@ -84,7 +84,8 @@ fn test_controlmessage_serde() {
         ControlMessage::Ota(OtaParams {
             version: u64::MAX,
             url: "https://www.sphinx.chat/signer/ota".to_string(),
-            sha256_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
+            sha256_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                .to_string(),
         }),
         ControlMessage::QueryAll,
     ] {
@@ -297,7 +298,8 @@ fn test_controlresponse_serde() {
         ControlResponse::OtaConfirm(OtaParams {
             version: u64::MAX,
             url: "https://www.sphinx.chat/signer/ota".to_string(),
-            sha256_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
+            sha256_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                .to_string(),
         }),
         ControlResponse::AllCurrent(All {
             policy: Policy {
@@ -583,7 +585,11 @@ fn deserialize_otaparams(bytes: &mut Bytes) -> Result<OtaParams> {
     let version = rmp::deserialize_uint(bytes, Some("version"))?;
     let url = rmp::deserialize_string(bytes, Some("url"))?;
     let sha256_hash = rmp::deserialize_string(bytes, Some("sha256_hash"))?;
-    Ok(OtaParams { version, url, sha256_hash })
+    Ok(OtaParams {
+        version,
+        url,
+        sha256_hash,
+    })
 }
 
 #[test]
