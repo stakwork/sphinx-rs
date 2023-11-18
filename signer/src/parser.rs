@@ -90,10 +90,11 @@ mod tests {
             peer_id: [0u8; 33],
             dbid: 0,
         };
-        msgs::write_serial_request_header(&mut &mut buf, &srh)
+        msgs::write_serial_request_header(&mut buf, &srh)
             .expect("failed to write_serial_request_header");
         msgs::write(&mut &mut buf, ping).expect("failed to serial write");
-        let _srh2 = msgs::read_serial_request_header(&mut &mut buf).unwrap();
+        buf.set_position(0u64);
+        let _srh2 = msgs::read_serial_request_header(&mut buf).unwrap();
         println!("{:?}", _srh2);
         let parsed_ping: msgs::Ping =
             msgs::read_message(&mut buf).expect("failed to read ping message");

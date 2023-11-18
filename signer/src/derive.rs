@@ -33,11 +33,11 @@ pub fn entropy_from_mnemonic(mn: &str) -> anyhow::Result<Vec<u8>> {
             ))
         }
     }
-    let e = mn.to_entropy_array().0.to_vec();
-    if e.len() != 16 {
+    let (array, len) = mn.to_entropy_array();
+    if len != 16 {
         return Err(anyhow::anyhow!("Should never happen, 12 words didn't convert to 16 bytes of entropy. Please try again."));
     }
-    Ok(e)
+    Ok(array[..len].to_vec())
 }
 
 pub fn mnemonic_to_seed(mn: &str) -> anyhow::Result<Vec<u8>> {
@@ -98,7 +98,7 @@ mod tests {
             "absurd amount doctor acoustic avoid letter advice cage absurd amount doctor adjust"
         );
         let en = entropy_from_mnemonic(&mn).expect("fail");
-        assert_eq!(&en[..], &entropy);
+        assert_eq!(en, entropy);
     }
 
     #[test]

@@ -352,7 +352,7 @@ mod tests {
     #[test]
     fn test_args_der() {
         let ts = "1111111111";
-        let j = format!("{{\"seed\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"network\":\"regtest\",\"policy\":{{\"msat_per_interval\":21000000000,\"interval\":\"daily\",\"htlc_limit_msat\":1000000000}},\"allowlist\":[],\"timestamp\":{},\"lss_nonce\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]}}", ts);
+        let j = format!("{{\"seed\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"network\":\"regtest\",\"policy\":{{\"msat_per_interval\":21000000000,\"interval\":\"daily\",\"htlc_limit_msat\":1000000000}},\"allowlist\":[],\"timestamp\":{},\"lss_nonce\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"signer_id\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]}}", ts);
         let a: Args = sphinx_glyph::serde_json::from_str(&j).unwrap();
         println!("ARGS {:?}", a);
     }
