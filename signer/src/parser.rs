@@ -14,8 +14,8 @@ pub fn raw_request_from_bytes(
         peer_id,
         dbid,
     };
-    msgs::write_serial_request_header(&mut &mut buf, &srh)?;
-    msgs::write_vec(&mut &mut buf, message)?;
+    msgs::write_serial_request_header(&mut buf, &srh)?;
+    msgs::write_vec(&mut buf, message)?;
     Ok(buf)
 }
 
@@ -31,8 +31,8 @@ pub fn request_from_msg<T: SerBolt + DeBolt>(
         peer_id,
         dbid,
     };
-    msgs::write_serial_request_header(&mut &mut buf, &srh)?;
-    msgs::write(&mut &mut buf, msg)?;
+    msgs::write_serial_request_header(&mut buf, &srh)?;
+    msgs::write(&mut buf, msg)?;
     Ok(buf)
 }
 
@@ -41,8 +41,8 @@ pub fn raw_response_from_msg<T: SerBolt + DeBolt>(
     sequence: u16,
 ) -> vls_protocol::Result<Vec<u8>> {
     let mut buf = Vec::new();
-    msgs::write_serial_response_header(&mut &mut buf, sequence)?;
-    msgs::write(&mut &mut buf, msg)?;
+    msgs::write_serial_response_header(&mut buf, sequence)?;
+    msgs::write(&mut buf, msg)?;
     Ok(buf)
 }
 
@@ -92,7 +92,7 @@ mod tests {
         };
         msgs::write_serial_request_header(&mut buf, &srh)
             .expect("failed to write_serial_request_header");
-        msgs::write(&mut &mut buf, ping).expect("failed to serial write");
+        msgs::write(&mut buf, ping).expect("failed to serial write");
         buf.set_position(0u64);
         let _srh2 = msgs::read_serial_request_header(&mut buf).unwrap();
         println!("{:?}", _srh2);

@@ -188,9 +188,9 @@ fn handle_inner(
     let (vls_msg, mutations) = reply;
     // make the VLS message bytes
     let mut buf = Vec::with_capacity(8usize + vls_msg.as_vec().len());
-    write_serial_response_header(&mut &mut buf, sequence)
+    write_serial_response_header(&mut buf, sequence)
         .map_err(|e| VlsHandlerError::HeaderWrite(format!("{:?}", e)))?;
-    msgs::write_vec(&mut &mut buf, vls_msg.as_vec())
+    msgs::write_vec(&mut buf, vls_msg.as_vec())
         .map_err(|e| VlsHandlerError::MsgWrite(format!("{:?}", e)))?;
     //println!("handled message, replying with: {:?}", out_md);
     Ok((buf, mutations, sequence, cmd))
@@ -246,13 +246,13 @@ pub fn parse_ping_and_form_response(msg_bytes: Vec<u8>) -> Vec<u8> {
     } = msgs::read_serial_request_header(&mut cursor).expect("read ping header");
     let ping: msgs::Ping = msgs::read_message(&mut cursor).expect("failed to read ping message");
     let mut buf = Vec::new();
-    msgs::write_serial_response_header(&mut &mut buf, sequence)
+    msgs::write_serial_response_header(&mut buf, sequence)
         .expect("failed to write_serial_request_header");
     let pong = msgs::Pong {
         id: ping.id,
         message: ping.message,
     };
-    msgs::write(&mut &mut buf, pong).expect("failed to serial write");
+    msgs::write(&mut buf, pong).expect("failed to serial write");
     buf
 }
 

@@ -307,8 +307,8 @@ mod tests {
             sequence: _sequence,
             peer_id: _peer_id,
             dbid: _dbid,
-        } = read_serial_request_header(&mut &mut msg).unwrap();
-        let message = msgs::read(&mut &mut msg).unwrap();
+        } = read_serial_request_header(&mut msg).unwrap();
+        let message = msgs::read(&mut msg).unwrap();
         println!("MSG {:?}", message);
         let (u5bytes, hrp_bytes) = match message {
             Message::SignInvoice(si) => (si.u5bytes, si.hrp),
