@@ -84,6 +84,7 @@ fn test_controlmessage_serde() {
         ControlMessage::Ota(OtaParams {
             version: u64::MAX,
             url: "https://www.sphinx.chat/signer/ota".to_string(),
+            sha256_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
         }),
         ControlMessage::QueryAll,
     ] {
@@ -296,6 +297,7 @@ fn test_controlresponse_serde() {
         ControlResponse::OtaConfirm(OtaParams {
             version: u64::MAX,
             url: "https://www.sphinx.chat/signer/ota".to_string(),
+            sha256_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
         }),
         ControlResponse::AllCurrent(All {
             policy: Policy {
@@ -569,17 +571,19 @@ fn serialize_otaparams(
     object: &OtaParams,
 ) -> Result<()> {
     rmp::serialize_field_name(buff, field_name)?;
-    rmp::serialize_map_len(buff, 2u32)?;
+    rmp::serialize_map_len(buff, 3u32)?;
     rmp::serialize_uint(buff, Some("version"), object.version)?;
     rmp::serialize_string(buff, Some("url"), &object.url)?;
+    rmp::serialize_string(buff, Some("sha256_hash"), &object.sha256_hash)?;
     Ok(())
 }
 
 fn deserialize_otaparams(bytes: &mut Bytes) -> Result<OtaParams> {
-    rmp::deserialize_map_len(bytes, 2)?;
+    rmp::deserialize_map_len(bytes, 3u32)?;
     let version = rmp::deserialize_uint(bytes, Some("version"))?;
     let url = rmp::deserialize_string(bytes, Some("url"))?;
-    Ok(OtaParams { version, url })
+    let sha256_hash = rmp::deserialize_string(bytes, Some("sha256_hash"))?;
+    Ok(OtaParams { version, url, sha256_hash })
 }
 
 #[test]
@@ -587,6 +591,7 @@ fn test_otaparams_serde() {
     let test = OtaParams {
         version: u64::MAX,
         url: "https://www.sphinx.chat/signer/ota".to_string(),
+        sha256_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
     };
 
     //serialize

@@ -97,6 +97,8 @@ impl Interval {
 pub struct OtaParams {
     pub version: u64,
     pub url: String,
+    // sha256 hash as integrity check of binary file
+    pub sha256_hash: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
