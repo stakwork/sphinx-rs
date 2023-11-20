@@ -35,6 +35,23 @@ pub fn sign_ms(seed: String, idx: u32, time: String, network: String) -> Result<
     Ok(hex::encode(sig))
 }
 
+pub fn sign_bytes(
+    seed: String,
+    idx: u32,
+    time: String,
+    network: String,
+    msg: Vec<u8>,
+) -> Result<String> {
+    let idx = idx_to_idx(idx)?;
+    let km = make_keys_manager(&seed, idx, &time, &network)?;
+    let sig = sphinx::sig::sign_message(&msg[..], &km.get_node_secret()).map_err(|_| {
+        SphinxError::BadCiper {
+            r: "sign failed".to_string(),
+        }
+    })?;
+    Ok(hex::encode(sig))
+}
+
 pub fn pubkey_from_seed(seed: String, idx: u32, time: String, network: String) -> Result<String> {
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
@@ -166,11 +183,19 @@ pub fn peel_payment(
     network: String,
     payload: Vec<u8>,
     rhash: String,
+    cur_height: u32,
+    cltv_expiry: u32,
 ) -> Result<Vec<u8>> {
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
     let payment_hash = parse_hash(&rhash)?;
-    Ok(run_peel_payment_to_bytes(&km, &payload, payment_hash)?)
+    Ok(run_peel_payment_to_bytes(
+        &km,
+        &payload,
+        payment_hash,
+        cur_height,
+        cltv_expiry,
+    )?)
 }
 
 pub fn peel_payment_msg(
@@ -180,11 +205,14 @@ pub fn peel_payment_msg(
     network: String,
     payload: Vec<u8>,
     rhash: String,
+    cur_height: u32,
+    cltv_expiry: u32,
 ) -> Result<String> {
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
     let payment_hash = parse_hash(&rhash)?;
-    let (_amt, _preimage, bytes) = run_peel_received_payment_to_bytes(&km, &payload, payment_hash)?;
+    let (_amt, _preimage, bytes) =
+        run_peel_received_payment_to_bytes(&km, &payload, payment_hash, cur_height, cltv_expiry)?;
     let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes, None)
         .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
     Ok(msg)
@@ -302,11 +330,19 @@ fn run_peel_received_onion_to_bytes(km: &MyKeysManager, pld: &[u8]) -> Result<Ve
     )
 }
 
-fn run_peel_payment_to_bytes(km: &MyKeysManager, pld: &[u8], rhash: [u8; 32]) -> Result<Vec<u8>> {
+fn run_peel_payment_to_bytes(
+    km: &MyKeysManager,
+    pld: &[u8],
+    rhash: [u8; 32],
+    cur_height: u32,
+    cltv_expiry: u32,
+) -> Result<Vec<u8>> {
     Ok(
-        sphinx::peel_payment_onion_to_bytes(km, pld, rhash).map_err(|e| SphinxError::Decrypt {
-            r: format!("{:?}", e),
-        })?,
+        sphinx::peel_payment_onion_to_bytes(km, pld, rhash, cur_height, cltv_expiry).map_err(
+            |e| SphinxError::Decrypt {
+                r: format!("{:?}", e),
+            },
+        )?,
     )
 }
 
@@ -314,10 +350,14 @@ fn run_peel_received_payment_to_bytes(
     km: &MyKeysManager,
     pld: &[u8],
     rhash: [u8; 32],
+    cur_height: u32,
+    cltv_expiry: u32,
 ) -> Result<(u64, String, Vec<u8>)> {
     Ok(
-        sphinx::peel_received_payment(km, pld, rhash).map_err(|e| SphinxError::Decrypt {
-            r: format!("{:?}", e),
+        sphinx::peel_received_payment(km, pld, rhash, cur_height, cltv_expiry).map_err(|e| {
+            SphinxError::Decrypt {
+                r: format!("{:?}", e),
+            }
         })?,
     )
 }
