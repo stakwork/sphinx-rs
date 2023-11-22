@@ -99,6 +99,9 @@ pub struct OtaParams {
     pub url: String,
     // sha256 hash as integrity check of binary file
     pub sha256_hash: String,
+    // schnorr signature, where secp256k1::Message is
+    // Message::from_hashed_data::<sha256::Hash>(ota_params.sha256_hash.as_bytes());
+    pub schnorr_sig: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
