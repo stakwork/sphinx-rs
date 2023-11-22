@@ -86,8 +86,7 @@ fn test_controlmessage_serde() {
             url: "https://www.sphinx.chat/signer/ota".to_string(),
             sha256_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                 .to_string(),
-            schnorr_sig: "f9dd9f988894ca7cbc8c3c1d1128090d993e981645c9e4abb3d94f88d259bae9f88cb362ed2492f3fbf09ea5efe49c33072d1caed63840a75aa9492aa97885a1"
-                .to_string(),
+            message_sig: "H119Q3ZihfysLmcMuOHdSqLqLwmEOOFHF96+16rFkEYEc3dXH8xW1lSM0Fi4ZjZ8XAMSMwltQWJ5pDblAhEZVoc=".to_string(),
         }),
         ControlMessage::QueryAll,
     ] {
@@ -302,8 +301,7 @@ fn test_controlresponse_serde() {
             url: "https://www.sphinx.chat/signer/ota".to_string(),
             sha256_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                 .to_string(),
-            schnorr_sig: "f9dd9f988894ca7cbc8c3c1d1128090d993e981645c9e4abb3d94f88d259bae9f88cb362ed2492f3fbf09ea5efe49c33072d1caed63840a75aa9492aa97885a1"
-                .to_string(),
+            message_sig: "H119Q3ZihfysLmcMuOHdSqLqLwmEOOFHF96+16rFkEYEc3dXH8xW1lSM0Fi4ZjZ8XAMSMwltQWJ5pDblAhEZVoc=".to_string(),
         }),
         ControlResponse::AllCurrent(All {
             policy: Policy {
@@ -581,7 +579,7 @@ fn serialize_otaparams(
     rmp::serialize_uint(buff, Some("version"), object.version)?;
     rmp::serialize_string(buff, Some("url"), &object.url)?;
     rmp::serialize_string(buff, Some("sha256_hash"), &object.sha256_hash)?;
-    rmp::serialize_string(buff, Some("schnorr_sig"), &object.schnorr_sig)?;
+    rmp::serialize_string(buff, Some("message_sig"), &object.message_sig)?;
     Ok(())
 }
 
@@ -590,12 +588,12 @@ fn deserialize_otaparams(bytes: &mut Bytes) -> Result<OtaParams> {
     let version = rmp::deserialize_uint(bytes, Some("version"))?;
     let url = rmp::deserialize_string(bytes, Some("url"))?;
     let sha256_hash = rmp::deserialize_string(bytes, Some("sha256_hash"))?;
-    let schnorr_sig = rmp::deserialize_string(bytes, Some("schnorr_sig"))?;
+    let message_sig = rmp::deserialize_string(bytes, Some("message_sig"))?;
     Ok(OtaParams {
         version,
         url,
         sha256_hash,
-        schnorr_sig,
+        message_sig,
     })
 }
 
@@ -605,7 +603,7 @@ fn test_otaparams_serde() {
         version: u64::MAX,
         url: "https://www.sphinx.chat/signer/ota".to_string(),
         sha256_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
-        schnorr_sig: "f9dd9f988894ca7cbc8c3c1d1128090d993e981645c9e4abb3d94f88d259bae9f88cb362ed2492f3fbf09ea5efe49c33072d1caed63840a75aa9492aa97885a1".to_string(),
+        message_sig: "H119Q3ZihfysLmcMuOHdSqLqLwmEOOFHF96+16rFkEYEc3dXH8xW1lSM0Fi4ZjZ8XAMSMwltQWJ5pDblAhEZVoc=".to_string(),
     };
 
     //serialize
