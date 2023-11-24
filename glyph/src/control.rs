@@ -6,7 +6,7 @@ use sphinx_auther::secp256k1::{PublicKey, SecretKey};
 use sphinx_auther::token::Token;
 use std::sync::{Arc, Mutex};
 
-// u64 is the nonce. Each signature must have a nonce incremented by 1
+// u64 is the nonce. Each signature must have a higher nonce
 pub struct Controller(SecretKey, PublicKey, u64, Arc<Mutex<dyn ControlPersist>>);
 
 impl Controller {
@@ -75,11 +75,12 @@ impl Controller {
         match msg {
             ControlMessage::Nonce => (),
             _ => {
-                // nonce must be incremented by one each time
-                if msg_nonce.1 != self.2 + 1 {
+                // nonce must be higher each time
+                // keep sanity and don't increment by more than 20 at a time
+                if msg_nonce.1 <= self.2 || msg_nonce.1 > self.2 + 20 {
                     return Err(anyhow::anyhow!("invalid nonce"));
                 }
-                self.2 += 1;
+                self.2 = msg_nonce.1;
                 store.set_nonce(self.2)?;
             }
         }
