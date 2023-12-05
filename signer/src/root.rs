@@ -1,4 +1,5 @@
 use crate::approver::{create_approver, SphinxApprover};
+use crate::vvcursor::VvCursor;
 use sphinx_glyph::types;
 use types::{Interval, Policy, Velocity};
 
@@ -134,12 +135,12 @@ pub fn policy_interval(int: Interval) -> VelocityControlIntervalType {
 // returns the VLS return msg and the muts
 fn handle_inner(
     root_handler: &RootHandler,
-    bytes: Vec<u8>,
+    bytes: Vec<Vec<u8>>,
     expected_sequence: Option<u16>,
     do_log: bool,
 ) -> Result<(Vec<u8>, Mutations, u16, String), VlsHandlerError> {
     // println!("Signer is handling these bytes: {:?}", bytes);
-    let mut cursor = Cursor::new(bytes);
+    let mut cursor = VvCursor::new(bytes);
     let msgs::SerialRequestHeader {
         sequence,
         peer_id,
@@ -155,6 +156,7 @@ fn handle_inner(
 
     let message =
         msgs::read(&mut cursor).map_err(|e| VlsHandlerError::MsgRead(format!("{:?}", e)))?;
+    drop(cursor);
 
     if let Message::HsmdInit(ref m) = message {
         if ChainHash::using_genesis_block(root_handler.node().network()).as_bytes()
@@ -198,7 +200,7 @@ fn handle_inner(
 
 pub fn handle(
     root_handler: &RootHandler,
-    bytes: Vec<u8>,
+    bytes: Vec<Vec<u8>>,
     expected_sequence: Option<u16>,
     do_log: bool,
 ) -> Result<(Vec<u8>, u16), VlsHandlerError> {
@@ -211,7 +213,7 @@ pub fn handle(
 pub fn handle_with_lss(
     root_handler: &RootHandler,
     lss_signer: &LssSigner,
-    bytes: Vec<u8>,
+    bytes: Vec<Vec<u8>>,
     expected_sequence: Option<u16>,
     do_log: bool,
 ) -> Result<(Vec<u8>, Vec<u8>, u16, String, Option<[u8; 32]>), VlsHandlerError> {

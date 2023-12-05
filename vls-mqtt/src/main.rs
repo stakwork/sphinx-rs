@@ -186,7 +186,7 @@ async fn rocket() -> _ {
             let s1 = approver.control().get_state();
             println!("RUN NOW: {:?}", &msg.expected_sequence);
             let res_res =
-                root::handle_with_lss(&rh_, &lss_signer, msg.message, msg.expected_sequence, false)
+                root::handle_with_lss(&rh_, &lss_signer, vec![msg.message], msg.expected_sequence, false)
                     .map_err(Error::msg);
             let s2 = approver.control().get_state();
             if s1 != s2 {

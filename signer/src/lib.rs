@@ -4,6 +4,7 @@ pub mod mobile;
 pub mod parser;
 pub mod root;
 pub mod rst;
+mod vvcursor;
 
 #[cfg(feature = "std")]
 pub mod policy;

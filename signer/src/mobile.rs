@@ -115,9 +115,14 @@ pub fn run_vls(
 ) -> Result<RunReturn> {
     let (_res, rh, approver, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2, velocity)?;
     let s1 = approver.control().get_state();
-    let (vls_res, lss_res, sequence, cmd, server_hmac) =
-        handle_with_lss(&rh, &lss_signer, vls_msg.to_vec(), expected_sequence, true)
-            .map_err(Error::msg)?;
+    let (vls_res, lss_res, sequence, cmd, server_hmac) = handle_with_lss(
+        &rh,
+        &lss_signer,
+        vec![vls_msg.to_vec()],
+        expected_sequence,
+        true,
+    )
+    .map_err(Error::msg)?;
     let mut ret = if lss_res.is_empty() {
         RunReturn::new_vls(topics::VLS_RES, vls_res, sequence, cmd)
     } else {
