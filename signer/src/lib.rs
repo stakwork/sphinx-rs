@@ -1,5 +1,6 @@
 pub mod approver;
 pub mod derive;
+#[cfg(not(feature = "lowmemory"))]
 pub mod mobile;
 pub mod parser;
 pub mod root;

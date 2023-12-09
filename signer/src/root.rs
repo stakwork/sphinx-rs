@@ -20,8 +20,15 @@ use lss_connector::{LssSigner, Response as LssResponse, SignerMutations};
 use thiserror::Error;
 use vls_protocol::model::PubKey;
 use vls_protocol::msgs::{self, read_serial_request_header, write_serial_response_header, Message};
+#[cfg(feature = "lowmemory")]
+use vls_protocol::serde_bolt::NonContiguousOctets;
 use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
+
+#[cfg(feature = "lowmemory")]
+pub type MsgBytes = NonContiguousOctets<1024>;
+#[cfg(not(feature = "lowmemory"))]
+pub type MsgBytes = Vec<u8>;
 
 #[derive(Error, Debug)]
 pub enum VlsHandlerError {
@@ -134,17 +141,19 @@ pub fn policy_interval(int: Interval) -> VelocityControlIntervalType {
 // returns the VLS return msg and the muts
 fn handle_inner(
     root_handler: &RootHandler,
-    bytes: Vec<u8>,
+    #[cfg(feature = "lowmemory")] mut bytes: MsgBytes,
+    #[cfg(not(feature = "lowmemory"))] bytes: MsgBytes,
     expected_sequence: Option<u16>,
     do_log: bool,
 ) -> Result<(Vec<u8>, Mutations, u16, String), VlsHandlerError> {
     // println!("Signer is handling these bytes: {:?}", bytes);
-    let mut cursor = Cursor::new(bytes);
+    #[cfg(not(feature = "lowmemory"))]
+    let mut bytes = Cursor::new(bytes);
     let msgs::SerialRequestHeader {
         sequence,
         peer_id,
         dbid,
-    } = read_serial_request_header(&mut cursor)
+    } = read_serial_request_header(&mut bytes)
         .map_err(|e| VlsHandlerError::HeaderRead(format!("{:?}", e)))?;
     log::info!("=> handler sequence: {}", sequence);
     if let Some(expected) = expected_sequence {
@@ -154,7 +163,7 @@ fn handle_inner(
     }
 
     let message =
-        msgs::read(&mut cursor).map_err(|e| VlsHandlerError::MsgRead(format!("{:?}", e)))?;
+        msgs::read(&mut bytes).map_err(|e| VlsHandlerError::MsgRead(format!("{:?}", e)))?;
 
     if let Message::HsmdInit(ref m) = message {
         if ChainHash::using_genesis_block(root_handler.node().network()).as_bytes()
@@ -198,7 +207,7 @@ fn handle_inner(
 
 pub fn handle(
     root_handler: &RootHandler,
-    bytes: Vec<u8>,
+    bytes: MsgBytes,
     expected_sequence: Option<u16>,
     do_log: bool,
 ) -> Result<(Vec<u8>, u16), VlsHandlerError> {
@@ -211,7 +220,7 @@ pub fn handle(
 pub fn handle_with_lss(
     root_handler: &RootHandler,
     lss_signer: &LssSigner,
-    bytes: Vec<u8>,
+    bytes: MsgBytes,
     expected_sequence: Option<u16>,
     do_log: bool,
 ) -> Result<(Vec<u8>, Vec<u8>, u16, String, Option<[u8; 32]>), VlsHandlerError> {
@@ -358,6 +367,8 @@ fn vls_cmd(msg: &Message) -> String {
         Message::CheckOutpointReply(_) => "CheckOutpointReply",
         Message::LockOutpoint(_) => "LockOutpoint",
         Message::LockOutpointReply(_) => "LockOutpointReply",
+        Message::ForgetChannel(_) => "ForgetChannel",
+        Message::ForgetChannelReply(_) => "ForgetChannelReply",
     };
     m.to_string()
 }
