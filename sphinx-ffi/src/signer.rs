@@ -248,14 +248,14 @@ impl VlsResponse {
     }
 }
 
-fn run_init_1_manual(
+fn _run_init_1_manual(
     args_string: String,
     state_mp: Vec<u8>,
     msg1: Vec<u8>,
     vel: Option<Vec<u8>>,
 ) -> Result<mobile::RunReturn> {
     let args = args_from_json(&args_string)?;
-    let state = state_from_mp(&state_mp)?;
+    let state = _state_from_mp(&state_mp)?;
     let velocity = vel_from_mp(vel)?;
     let ret =
         mobile::run_init_1(args, state, &msg1, velocity).map_err(|e| SphinxError::InitFailed {
@@ -264,7 +264,7 @@ fn run_init_1_manual(
     Ok(ret.0)
 }
 
-fn run_init_2_manual(
+fn _run_init_2_manual(
     args_string: String,
     state_mp: Vec<u8>,
     msg1: Vec<u8>,
@@ -272,7 +272,7 @@ fn run_init_2_manual(
     vel: Option<Vec<u8>>,
 ) -> Result<mobile::RunReturn> {
     let args = args_from_json(&args_string)?;
-    let state = state_from_mp(&state_mp)?;
+    let state = _state_from_mp(&state_mp)?;
     let velocity = vel_from_mp(vel)?;
     let ret = mobile::run_init_2(args, state, &msg1, &msg2, velocity).map_err(|e| {
         SphinxError::InitFailed {
@@ -282,7 +282,7 @@ fn run_init_2_manual(
     Ok(ret.0)
 }
 
-fn run_vls_manual(
+fn _run_vls_manual(
     args_string: String,
     state_mp: Vec<u8>,
     msg1: Vec<u8>,
@@ -292,7 +292,7 @@ fn run_vls_manual(
     vel: Option<Vec<u8>>,
 ) -> Result<mobile::RunReturn> {
     let args = args_from_json(&args_string)?;
-    let state = state_from_mp(&state_mp)?;
+    let state = _state_from_mp(&state_mp)?;
     let velocity = vel_from_mp(vel)?;
     let ret = mobile::run_vls(args, state, &msg1, &msg2, &vls_msg, sequence, velocity);
     Ok(ret.map_err(|e| SphinxError::VlsFailed {
@@ -300,7 +300,7 @@ fn run_vls_manual(
     })?)
 }
 
-fn run_lss_manual(
+fn _run_lss_manual(
     args_string: String,
     state_mp: Vec<u8>,
     msg1: Vec<u8>,
@@ -310,7 +310,7 @@ fn run_lss_manual(
     prev_lss: Vec<u8>,
 ) -> Result<mobile::RunReturn> {
     let args = args_from_json(&args_string)?;
-    let state = state_from_mp(&state_mp)?;
+    let state = _state_from_mp(&state_mp)?;
     let ret = mobile::run_lss(args, state, &msg1, &msg2, &lss_msg, &prev_vls, &prev_lss).map_err(
         |e| SphinxError::LssFailed {
             r: format!("{:?}", e),
@@ -319,7 +319,7 @@ fn run_lss_manual(
     Ok(ret)
 }
 
-fn state_from_mp(state_mp: &[u8]) -> Result<mobile::State> {
+fn _state_from_mp(state_mp: &[u8]) -> Result<mobile::State> {
     let state: mobile::State =
         rmp_utils::deserialize_state_map(state_mp).map_err(|e| SphinxError::BadState {
             r: format!("{:?}", e),

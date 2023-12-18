@@ -20,6 +20,13 @@ interface SphinxError {
   VlsFailed(string r);
   BadChildIndex(string r);
   BadMsg(string r);
+  AddContactFailed(string r);
+  GetContactFailed(string r);
+  HandleFailed(string r);
+  FetchMsgsFailed(string r);
+  SendFailed(string r);
+  SetNetworkFailed(string r);
+  SetBlockheightFailed(string r);
 };
 
 dictionary Keys {
@@ -33,6 +40,25 @@ dictionary VlsResponse {
     u16 sequence;
     string cmd;
     bytes state;
+};
+
+dictionary RunReturn {
+    string? topic_0;
+    bytes? payload_0;
+    string? topic_1;
+    bytes? payload_1;
+    string? topic_2;
+    bytes? payload_2;
+    bytes? state_mp;
+    string? msg;
+    string? msg_uuid;
+    string? msg_index;
+    string? msg_sender;
+    u64? new_balance;
+    string? my_contact_info;
+    string? sent_status;
+    string? settled_status;
+    string? error;
 };
 
 namespace sphinxrs {
@@ -64,29 +90,49 @@ namespace sphinxrs {
   VlsResponse run(string topic, string args, bytes state, bytes msg1, u16? expected_sequence);
   string sha_256(bytes msg);
   [Throws=SphinxError]
-  bytes create_onion(string seed, u32 idx, string time, string network, string hops, bytes payload);
+  bytes create_onion(string seed, u64 idx, string time, string network, string hops, bytes payload);
   [Throws=SphinxError]
-  bytes create_onion_msg(string seed, u32 idx, string time, string network, string hops, string json);
+  bytes create_onion_msg(string seed, u64 idx, string time, string network, string hops, string json);
   [Throws=SphinxError]
-  bytes create_keysend(string seed, u32 idx, string time, string network, string hops, u64 msat, string rhash, bytes payload, u32 curr_height, string preimage);
+  bytes create_keysend(string seed, u64 idx, string time, string network, string hops, u64 msat, string rhash, bytes payload, u32 curr_height, string preimage);
   [Throws=SphinxError]
-  bytes create_keysend_msg(string seed, u32 idx, string time, string network, string hops, u64 msat, string rhash, string msg_json, u32 curr_height, string preimage);
+  bytes create_keysend_msg(string seed, u64 idx, string time, string network, string hops, u64 msat, string rhash, string msg_json, u32 curr_height, string preimage);
   [Throws=SphinxError]
-  bytes peel_onion(string seed, u32 idx, string time, string network, bytes payload);
+  bytes peel_onion(string seed, u64 idx, string time, string network, bytes payload);
   [Throws=SphinxError]
-  string peel_onion_msg(string seed, u32 idx, string time, string network, bytes payload);
+  string peel_onion_msg(string seed, u64 idx, string time, string network, bytes payload);
   [Throws=SphinxError]
-  bytes peel_payment(string seed, u32 idx, string time, string network, bytes payload, string rhash, u32 cur_height, u32 cltv_expiry);
+  bytes peel_payment(string seed, u64 idx, string time, string network, bytes payload, string rhash, u32 cur_height, u32 cltv_expiry);
   [Throws=SphinxError]
-  string peel_payment_msg(string seed, u32 idx, string time, string network, bytes payload, string rhash, u32 cur_height, u32 cltv_expiry);
+  string peel_payment_msg(string seed, u64 idx, string time, string network, bytes payload, string rhash, u32 cur_height, u32 cltv_expiry);
   [Throws=SphinxError]
-  string sign_ms(string seed, u32 idx, string time, string network);
+  string sign_ms(string seed, u64 idx, string time, string network);
   [Throws=SphinxError]
-  string sign_bytes(string seed, u32 idx, string time, string network, bytes msg);
+  string sign_bytes(string seed, u64 idx, string time, string network, bytes msg);
   [Throws=SphinxError]
-  string pubkey_from_seed(string seed, u32 idx, string time, string network);
+  string pubkey_from_seed(string seed, u64 idx, string time, string network);
   [Throws=SphinxError]
   string root_sign_ms(string seed, string time, string network);
   [Throws=SphinxError]
   string xpub_from_seed(string seed, string time, string network);
+  [Throws=SphinxError]
+  RunReturn set_network(string network);
+  [Throws=SphinxError]
+  RunReturn set_blockheight(u32 blockheight);
+  [Throws=SphinxError]
+  RunReturn add_contact(string seed, string unique_time, bytes state, string to_pubkey, string route_hint, string my_alias, string my_img, u64 amt_msat);
+  [Throws=SphinxError]
+  string get_contact(bytes state, string pubkey);
+  [Throws=SphinxError]
+  string list_contacts(bytes state);
+  [Throws=SphinxError]
+  string get_subscription_topic(string seed, string unique_time, bytes state);
+  [Throws=SphinxError]
+  RunReturn initial_setup(string seed, string unique_time, bytes state);
+  [Throws=SphinxError]
+  RunReturn fetch_msgs(string seed, string unique_time, bytes state, u64 last_msg_idx, u32? limit);
+  [Throws=SphinxError]
+  RunReturn handle(string topic, bytes payload, string seed, string unique_time, bytes state, string my_alias, string my_img);
+  [Throws=SphinxError]
+  RunReturn send(string seed, string unique_time, string to, u8 msg_type, string msg_json, bytes state, string my_alias, string my_img, u64 amt_msat);
 };

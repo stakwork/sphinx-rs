@@ -1,3 +1,4 @@
+mod auto;
 mod control;
 mod onion;
 mod parse;
@@ -8,6 +9,8 @@ pub use control::*;
 pub use signer::*;
 
 pub use onion::*;
+
+pub use auto::*;
 
 use sphinx_crypter::chacha::{decrypt as chacha_decrypt, encrypt as chacha_encrypt};
 use sphinx_crypter::ecdh::derive_shared_secret_from_slice;
@@ -62,6 +65,20 @@ pub enum SphinxError {
     BadChildIndex { r: String },
     #[error("Bad Msg: {r}")]
     BadMsg { r: String },
+    #[error("AddContactFailed: {r}")]
+    AddContactFailed { r: String },
+    #[error("GetContactFailed: {r}")]
+    GetContactFailed { r: String },
+    #[error("HandleFailed: {r}")]
+    HandleFailed { r: String },
+    #[error("FetchMsgsFailed: {r}")]
+    FetchMsgsFailed { r: String },
+    #[error("SendFailed: {r}")]
+    SendFailed { r: String },
+    #[error("SetNetworkFailed: {r}")]
+    SetNetworkFailed { r: String },
+    #[error("SetBlockheightFailed: {r}")]
+    SetBlockheightFailed { r: String },
 }
 
 pub fn pubkey_from_secret_key(my_secret_key: String) -> Result<String> {

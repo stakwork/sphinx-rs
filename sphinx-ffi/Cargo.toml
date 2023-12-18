@@ -20,9 +20,15 @@ lightning = { git = "https://github.com/Evanfeenstra/rust-lightning", rev = "3f5
 
 [dependencies]
 sphinx-crypter = { path = "../crypter" }
-sphinx-signer = { path = "../signer", default-features = false, features = ["persist", "no-native"] }
+sphinx-signer = { path = "../signer", default-features = false, features = [
+    "persist",
+    "no-native",
+] }
 sphinx-glyph = { path = "../glyph", default-features = false }
-sphinx = { git = "https://github.com/stakwork/sphinx", rev = "ee62c9305006a7e33eccd379a5749beff25e5eff", features = ["msg"] }
+sphinx = { git = "https://github.com/stakwork/sphinx", rev = "a68d83b7a697403b52e9d26cfc2260627185942d", features = [
+    "msg",
+    "bindings",
+] }
 # sphinx = { path = "../../sphinx/sphinx" }
 uniffi = { version = "0.24.1", optional = true }
 hex = { version = "0.4.3", default-features = false }
@@ -33,10 +39,10 @@ rmp-utils = { version = "0.1.0", path = "../rmp-utils" }
 uniffi = { version = "0.24.1", optional = true, features = ["build"] }
 
 [profile.release]
-opt-level = 'z'     # Optimize for size.
-lto = true          # Enable Link Time Optimization
-codegen-units = 1   # Reduce number of codegen units to increase optimizations.
-debug = true # Enable debug symbols. For example, we can use `dwarfdump` to check crash traces.
+opt-level = 'z'   # Optimize for size.
+lto = true        # Enable Link Time Optimization
+codegen-units = 1 # Reduce number of codegen units to increase optimizations.
+debug = true      # Enable debug symbols. For example, we can use `dwarfdump` to check crash traces.
 
 [[bin]]
 name = "uniffi-bindgen"

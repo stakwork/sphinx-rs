@@ -24,7 +24,7 @@ pub fn root_sign_ms(seed: String, time: String, net: String) -> Result<String> {
     Ok(hex::encode(sig))
 }
 
-pub fn sign_ms(seed: String, idx: u32, time: String, network: String) -> Result<String> {
+pub fn sign_ms(seed: String, idx: u64, time: String, network: String) -> Result<String> {
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
     let sig = sphinx::sig::sign_message(time.as_bytes(), &km.get_node_secret()).map_err(|_| {
@@ -37,7 +37,7 @@ pub fn sign_ms(seed: String, idx: u32, time: String, network: String) -> Result<
 
 pub fn sign_bytes(
     seed: String,
-    idx: u32,
+    idx: u64,
     time: String,
     network: String,
     msg: Vec<u8>,
@@ -52,7 +52,7 @@ pub fn sign_bytes(
     Ok(hex::encode(sig))
 }
 
-pub fn pubkey_from_seed(seed: String, idx: u32, time: String, network: String) -> Result<String> {
+pub fn pubkey_from_seed(seed: String, idx: u64, time: String, network: String) -> Result<String> {
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
     let pubkey = km.get_node_pubkey();
@@ -67,7 +67,7 @@ fn create_onion_inner(km: &MyKeysManager, hops: String, payload: Vec<u8>) -> Res
 
 pub fn create_onion(
     seed: String,
-    idx: u32,
+    idx: u64,
     time: String,
     network: String,
     hops: String,
@@ -81,7 +81,7 @@ pub fn create_onion(
 
 pub fn create_onion_msg(
     seed: String,
-    idx: u32,
+    idx: u64,
     time: String,
     network: String,
     hops: String,
@@ -97,7 +97,7 @@ pub fn create_onion_msg(
 
 pub fn peel_onion(
     seed: String,
-    idx: u32,
+    idx: u64,
     time: String,
     network: String,
     payload: Vec<u8>,
@@ -109,7 +109,7 @@ pub fn peel_onion(
 
 pub fn peel_onion_msg(
     seed: String,
-    idx: u32,
+    idx: u64,
     time: String,
     network: String,
     payload: Vec<u8>,
@@ -117,7 +117,7 @@ pub fn peel_onion_msg(
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
     let bytes = run_peel_received_onion_to_bytes(&km, &payload)?;
-    let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes, None)
+    let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes, 0)
         .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
     Ok(msg)
 }
@@ -140,7 +140,7 @@ pub fn create_keysend_inner(
 
 pub fn create_keysend(
     seed: String,
-    idx: u32,
+    idx: u64,
     time: String,
     network: String,
     hops: String,
@@ -158,7 +158,7 @@ pub fn create_keysend(
 
 pub fn create_keysend_msg(
     seed: String,
-    idx: u32,
+    idx: u64,
     time: String,
     network: String,
     hops: String,
@@ -178,7 +178,7 @@ pub fn create_keysend_msg(
 
 pub fn peel_payment(
     seed: String,
-    idx: u32,
+    idx: u64,
     time: String,
     network: String,
     payload: Vec<u8>,
@@ -200,7 +200,7 @@ pub fn peel_payment(
 
 pub fn peel_payment_msg(
     seed: String,
-    idx: u32,
+    idx: u64,
     time: String,
     network: String,
     payload: Vec<u8>,
@@ -213,12 +213,12 @@ pub fn peel_payment_msg(
     let payment_hash = parse_hash(&rhash)?;
     let (_amt, _preimage, bytes) =
         run_peel_received_payment_to_bytes(&km, &payload, payment_hash, cur_height, cltv_expiry)?;
-    let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes, None)
+    let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes, 0)
         .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
     Ok(msg)
 }
 
-fn idx_to_idx(idx: u32) -> Result<Option<isize>> {
+fn idx_to_idx(idx: u64) -> Result<Option<i64>> {
     Ok(Some(idx.try_into().map_err(|_| {
         SphinxError::BadChildIndex {
             r: "infallible".to_string(),
@@ -228,7 +228,7 @@ fn idx_to_idx(idx: u32) -> Result<Option<isize>> {
 
 fn make_keys_manager(
     seed: &str,
-    idx: Option<isize>,
+    idx: Option<i64>,
     time: &str,
     network: &str,
 ) -> Result<MyKeysManager> {
@@ -237,7 +237,7 @@ fn make_keys_manager(
     let net = Network::from_str(network).map_err(|_| SphinxError::BadArgs {
         r: "invalid network".to_string(),
     })?;
-    let mut mkm = make_signer(&seed, idx, ts, net);
+    let mkm = make_signer(&seed, idx, ts, net);
     Ok(mkm)
 }
 
