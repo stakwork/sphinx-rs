@@ -18,6 +18,7 @@ std = ["vls-persist/std", "vls-protocol-signer/std", "vls-protocol/std", "lss-co
 broker-test = ["lss-connector/broker"]
 no-std = ["vls-protocol-signer/no-std", "vls-persist/no-std", "lss-connector/no-std", "sphinx-glyph/no-std"]
 no-native = ["lss-connector/no-native"]
+lowmemory = []
 
 [dependencies]
 sphinx-glyph = { path = '../glyph', default-features = false }
@@ -32,9 +33,9 @@ fsdb = { git = "https://github.com/Evanfeenstra/fsdb.git", rev = "7d0db454133bf3
 # fsdb = { path = "../../fsdb", optional = true }
 thiserror = "1.0.44"
 # vls
-vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "19447b1e5d2956aa72aeca4229da7a96c5eaf208", default-features = false, features = ["secp-lowmemory", "tracker_size_workaround"] }
-vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "19447b1e5d2956aa72aeca4229da7a96c5eaf208", default-features = false }
-vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "19447b1e5d2956aa72aeca4229da7a96c5eaf208", default-features = false, features = ["kvv"], optional = true }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "300495658a1903a45a081771fdf2fe6883b057a7", default-features = false, features = ["secp-lowmemory", "tracker_size_workaround"] }
+vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "300495658a1903a45a081771fdf2fe6883b057a7", default-features = false }
+vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "300495658a1903a45a081771fdf2fe6883b057a7", default-features = false, features = ["kvv"], optional = true }
 # local
 # vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory", "tracker_size_workaround"] }
 # vls-protocol = { path = "../../vls/vls-protocol", default-features = false }

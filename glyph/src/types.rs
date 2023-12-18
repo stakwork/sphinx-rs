@@ -99,6 +99,10 @@ pub struct OtaParams {
     pub url: String,
     // sha256 hash as integrity check of binary file
     pub sha256_hash: String,
+    // A base64 encoded bitcoin::sign_message::MessageSignature on the sha256_hash string
+    // Should satisfy bitcoin::sign_message::is_signed_by_address
+    // Get the message hash from bitcoin::sign_message::signed_msg_hash
+    pub message_sig: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
