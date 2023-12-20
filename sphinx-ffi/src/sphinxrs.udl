@@ -51,6 +51,7 @@ dictionary RunReturn {
     bytes? payload_2;
     bytes? state_mp;
     string? msg;
+    u8? msg_type;
     string? msg_uuid;
     string? msg_index;
     string? msg_sender;
