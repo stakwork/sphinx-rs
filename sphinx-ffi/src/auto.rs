@@ -189,3 +189,19 @@ impl From<bindings::RunReturn> for RunReturn {
         }
     }
 }
+
+pub fn make_media_token(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    host: String,
+    muid: String,
+    to: String,
+    exp: u32,
+) -> Result<String> {
+    Ok(
+        bindings::make_media_token(&seed, &unique_time, &full_state, &host, &muid, &to, exp)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}

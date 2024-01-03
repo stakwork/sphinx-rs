@@ -136,4 +136,6 @@ namespace sphinxrs {
   RunReturn handle(string topic, bytes payload, string seed, string unique_time, bytes state, string my_alias, string my_img);
   [Throws=SphinxError]
   RunReturn send(string seed, string unique_time, string to, u8 msg_type, string msg_json, bytes state, string my_alias, string my_img, u64 amt_msat);
+  [Throws=SphinxError]
+  string make_media_token(string seed, string unique_time, bytes state, string host, string muid, string to, u32 expiry);
 };

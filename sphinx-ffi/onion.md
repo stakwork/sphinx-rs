@@ -1,3 +1,12 @@
+### make_media_token
+
+**`(seed: String, unique_time: String, full_state: Bytes, host: String, muid: String, to: String, exp: u32)`**
+
+- host: "memes.sphinx.chat"
+- muid: the media id string you receive from meme server after uploading the file
+- to: pubkey of recipient
+- exp: expiration. Relay sets this to current timestamp + one year
+
 ### sign a timestamp (to connect to MQTT)
 
 **`root_sign_ms(seed: String, time: String)`**
