@@ -58,6 +58,7 @@ dictionary RunReturn {
     u64? new_balance;
     string? my_contact_info;
     string? sent_status;
+    string? sent_to;
     string? settled_status;
     string? error;
 };
