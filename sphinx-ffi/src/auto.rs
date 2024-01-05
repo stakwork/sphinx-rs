@@ -18,6 +18,7 @@ pub struct RunReturn {
     pub new_balance: Option<u64>,
     pub my_contact_info: Option<String>,
     pub sent_status: Option<String>,
+    pub sent_to: Option<String>,
     pub settled_status: Option<String>,
     pub error: Option<String>,
 }
@@ -184,6 +185,7 @@ impl From<bindings::RunReturn> for RunReturn {
             new_balance: rr.new_balance,
             my_contact_info: rr.my_contact_info,
             sent_status: rr.sent_status,
+            sent_to: rr.sent_to,
             settled_status: rr.settled_status,
             error: rr.error,
         }
