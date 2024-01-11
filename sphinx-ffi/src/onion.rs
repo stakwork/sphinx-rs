@@ -117,7 +117,7 @@ pub fn peel_onion_msg(
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
     let bytes = run_peel_received_onion_to_bytes(&km, &payload)?;
-    let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes, 0)
+    let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes)
         .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
     Ok(msg)
 }
@@ -213,7 +213,7 @@ pub fn peel_payment_msg(
     let payment_hash = parse_hash(&rhash)?;
     let (_amt, _preimage, bytes) =
         run_peel_received_payment_to_bytes(&km, &payload, payment_hash, cur_height, cltv_expiry)?;
-    let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes, 0)
+    let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes)
         .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
     Ok(msg)
 }
