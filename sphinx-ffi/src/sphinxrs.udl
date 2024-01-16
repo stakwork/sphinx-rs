@@ -140,4 +140,8 @@ namespace sphinxrs {
   RunReturn send(string seed, string unique_time, string to, u8 msg_type, string msg_json, bytes state, string my_alias, string my_img, u64 amt_msat);
   [Throws=SphinxError]
   string make_media_token(string seed, string unique_time, bytes state, string host, string muid, string to, u32 expiry);
+  [Throws=SphinxError]
+  string make_media_token_with_meta(string seed, string unique_time, bytes state, string host, string muid, string to, u32 expiry, string meta);
+  [Throws=SphinxError]
+  string make_invoice(string seed, string unique_time, bytes state, u64 amt_msat, string preimage, string description);
 };

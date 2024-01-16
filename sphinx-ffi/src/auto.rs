@@ -209,3 +209,47 @@ pub fn make_media_token(
             .into(),
     )
 }
+
+pub fn make_media_token_with_meta(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    host: String,
+    muid: String,
+    to: String,
+    exp: u32,
+    meta: String,
+) -> Result<String> {
+    Ok(bindings::make_media_token_with_meta(
+        &seed,
+        &unique_time,
+        &full_state,
+        &host,
+        &muid,
+        &to,
+        exp,
+        &meta,
+    )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
+}
+
+pub fn make_invoice(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    amt_msat: u64,
+    preimage: String,
+    description: String,
+) -> Result<String> {
+    Ok(bindings::make_invoice(
+        &seed,
+        &unique_time,
+        &full_state,
+        amt_msat,
+        &preimage,
+        &description,
+    )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
+}
