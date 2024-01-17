@@ -89,7 +89,7 @@ pub fn create_onion_msg(
 ) -> Result<Vec<u8>> {
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
-    let payload = sphinx::msg::create_sphinx_msg_from_json(&km, &msg_json)
+    let payload = sphinx::msg::create_sphinx_msg_from_json(&km, &msg_json, &time)
         .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
     let data = create_onion_inner(&km, hops, payload)?;
     Ok(data)
@@ -170,7 +170,7 @@ pub fn create_keysend_msg(
 ) -> Result<Vec<u8>> {
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
-    let payload = sphinx::msg::create_sphinx_msg_from_json(&km, &msg_json)
+    let payload = sphinx::msg::create_sphinx_msg_from_json(&km, &msg_json, &time)
         .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
     let data = create_keysend_inner(&km, hops, msat, rhash, payload, curr_height, preimage)?;
     Ok(data.to_vec())
