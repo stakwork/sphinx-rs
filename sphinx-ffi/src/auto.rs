@@ -3,6 +3,7 @@ use sphinx::bindings;
 use sphinx::serde_json;
 
 pub struct RunReturn {
+    pub new_subscription: Option<String>,
     pub topic_0: Option<String>,
     pub payload_0: Option<Vec<u8>>,
     pub topic_1: Option<String>,
@@ -22,6 +23,7 @@ pub struct RunReturn {
     pub sent_to: Option<String>,
     pub settled_status: Option<String>,
     pub error: Option<String>,
+    pub new_tribe: Option<String>,
 }
 
 pub fn set_network(net: String) -> Result<RunReturn> {
@@ -168,32 +170,6 @@ fn my_img_opt(my_img: &str) -> Option<&str> {
     }
 }
 
-impl From<bindings::RunReturn> for RunReturn {
-    fn from(rr: bindings::RunReturn) -> Self {
-        RunReturn {
-            topic_0: rr.topic_0,
-            payload_0: rr.payload_0,
-            topic_1: rr.topic_1,
-            payload_1: rr.payload_1,
-            topic_2: rr.topic_2,
-            payload_2: rr.payload_2,
-            state_mp: rr.state_mp,
-            msg: rr.msg,
-            msg_type: rr.msg_type,
-            msg_uuid: rr.msg_uuid,
-            msg_index: rr.msg_index,
-            msg_sender: rr.msg_sender,
-            msg_msat: rr.msg_msat,
-            new_balance: rr.new_balance,
-            my_contact_info: rr.my_contact_info,
-            sent_status: rr.sent_status,
-            sent_to: rr.sent_to,
-            settled_status: rr.settled_status,
-            error: rr.error,
-        }
-    }
-}
-
 pub fn make_media_token(
     seed: String,
     unique_time: String,
@@ -252,4 +228,72 @@ pub fn make_invoice(
     )
     .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
     .into())
+}
+
+pub fn create_tribe(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    tribe_server_pubkey: String,
+    tribe_json: String,
+) -> Result<RunReturn> {
+    Ok(bindings::create_tribe(
+        &seed,
+        &unique_time,
+        &full_state,
+        &tribe_server_pubkey,
+        &tribe_json,
+    )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
+}
+
+pub fn join_tribe(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    tribe_pubkey: String,
+    tribe_route_hint: String,
+    alias: String,
+    amt_msat: u64,
+) -> Result<RunReturn> {
+    Ok(bindings::join_tribe(
+        &seed,
+        &unique_time,
+        &full_state,
+        &tribe_pubkey,
+        &tribe_route_hint,
+        &alias,
+        amt_msat,
+    )
+    .map_err(|e| SphinxError::HandleFailed { r: e.to_string() })?
+    .into())
+}
+
+impl From<bindings::RunReturn> for RunReturn {
+    fn from(rr: bindings::RunReturn) -> Self {
+        RunReturn {
+            new_subscription: rr.new_subscription,
+            topic_0: rr.topic_0,
+            payload_0: rr.payload_0,
+            topic_1: rr.topic_1,
+            payload_1: rr.payload_1,
+            topic_2: rr.topic_2,
+            payload_2: rr.payload_2,
+            state_mp: rr.state_mp,
+            msg: rr.msg,
+            msg_type: rr.msg_type,
+            msg_uuid: rr.msg_uuid,
+            msg_index: rr.msg_index,
+            msg_sender: rr.msg_sender,
+            msg_msat: rr.msg_msat,
+            new_balance: rr.new_balance,
+            my_contact_info: rr.my_contact_info,
+            sent_status: rr.sent_status,
+            sent_to: rr.sent_to,
+            settled_status: rr.settled_status,
+            error: rr.error,
+            new_tribe: rr.new_tribe,
+        }
+    }
 }

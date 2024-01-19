@@ -43,6 +43,7 @@ dictionary VlsResponse {
 };
 
 dictionary RunReturn {
+    string? new_subscription;
     string? topic_0;
     bytes? payload_0;
     string? topic_1;
@@ -62,6 +63,7 @@ dictionary RunReturn {
     string? sent_to;
     string? settled_status;
     string? error;
+    string? new_tribe;
 };
 
 namespace sphinxrs {
@@ -144,4 +146,8 @@ namespace sphinxrs {
   string make_media_token_with_meta(string seed, string unique_time, bytes state, string host, string muid, string to, u32 expiry, string meta);
   [Throws=SphinxError]
   string make_invoice(string seed, string unique_time, bytes state, u64 amt_msat, string preimage, string description);
+  [Throws=SphinxError]
+  RunReturn create_tribe(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_json);
+  [Throws=SphinxError]
+  RunReturn join_tribe(string seed, string unique_time, bytes state, string tribe_pubkey, string tribe_route_hint, string alias, u64 amt_msat);
 };
