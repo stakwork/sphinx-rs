@@ -1,4 +1,5 @@
 use crate::approver::SphinxApprover;
+use crate::kvv::{CloudKVVStore, KVVPersister, MemoryKVVStore, RmpFormat};
 use crate::root::{builder_inner, handle_with_lss};
 use anyhow::{Error, Result};
 use lightning_signer::bitcoin::Network;
@@ -14,8 +15,6 @@ use sphinx_glyph::topics;
 use sphinx_glyph::types::{Policy, Velocity};
 use std::collections::BTreeMap;
 use std::time::Duration;
-use vls_persist::kvv::cloud::CloudKVVStore;
-pub use vls_persist::kvv::memory::MemoryKVVStore;
 use vls_protocol_signer::handler::{RootHandler, RootHandlerBuilder};
 use vls_protocol_signer::lightning_signer;
 
@@ -169,8 +168,8 @@ fn root_handler_builder(
 ) -> Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
     use std::time::UNIX_EPOCH;
 
-    let memstore = MemoryKVVStore::new(args.signer_id).0;
-    let persister = CloudKVVStore::new(memstore);
+    let memstore = MemoryKVVStore::new(args.signer_id);
+    let persister = KVVPersister(CloudKVVStore::new(memstore), RmpFormat);
 
     let muts: Vec<_> = state
         .iter()

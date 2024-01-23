@@ -4,11 +4,27 @@ use lightning_signer::SendSync;
 use log::error;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
-pub use vls_persist::kvv::{cloud::CloudKVVStore, KVVPersister, KVVStore, KVV};
+pub use vls_persist::kvv::{
+    cloud::CloudKVVStore, memory::MemoryKVVStore, JsonFormat, KVVPersister, KVVStore, ValueFormat,
+    KVV,
+};
 use vls_protocol_signer::lightning_signer;
 extern crate alloc;
 use std::cmp::Ordering;
 use std::sync::Mutex;
+
+pub struct RmpFormat;
+
+impl SendSync for RmpFormat {}
+
+impl ValueFormat for RmpFormat {
+    fn ser_value<T: ?Sized + serde::Serialize>(value: &T) -> Result<Vec<u8>, Error> {
+        Ok(rmp_serde::to_vec(value).unwrap())
+    }
+    fn de_value<T: serde::de::DeserializeOwned>(value: &[u8]) -> Result<T, Error> {
+        Ok(rmp_serde::from_slice(value).unwrap())
+    }
+}
 
 /// A key-version-value store backed by fsdb
 pub struct FsKVVStore {
@@ -32,7 +48,7 @@ impl Iterator for Iter {
 impl SendSync for FsKVVStore {}
 
 impl FsKVVStore {
-    pub fn new(path: &str, signer_id: [u8; 16], maxsize: Option<usize>) -> KVVPersister<Self> {
+    pub fn new(path: &str, signer_id: [u8; 16], maxsize: Option<usize>) -> Self {
         let db = Fsdb::new(path).expect("could not create db");
         let bucket = db
             .any_bucket::<Vec<u8>>(maxsize)
@@ -54,12 +70,12 @@ impl FsKVVStore {
         let meta = db
             .bucket::<Vec<u8>>("meta", None)
             .expect("could not create bucket");
-        KVVPersister(Self {
+        Self {
             db: bucket,
             meta,
             signer_id,
             versions: Mutex::new(versions),
-        })
+        }
     }
     fn decode_vv(vv: &[u8]) -> (u64, Vec<u8>) {
         let version = u64::from_be_bytes(vv[..8].try_into().unwrap());

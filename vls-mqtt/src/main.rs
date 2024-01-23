@@ -12,7 +12,7 @@ use glyph::ser::{serialize_controlresponse, ByteBuf};
 use lss::init_lss;
 use rand::RngCore;
 use rocket::tokio::sync::{broadcast, mpsc, oneshot};
-use sphinx_signer::kvv::{CloudKVVStore, FsKVVStore};
+use sphinx_signer::kvv::{CloudKVVStore, FsKVVStore, JsonFormat, KVVPersister};
 use sphinx_signer::lightning_signer::bitcoin::Network;
 use sphinx_signer::lightning_signer::persist::Persist;
 use sphinx_signer::lightning_signer::wallet::Wallet;
@@ -115,8 +115,8 @@ async fn rocket() -> _ {
 
     let client_id = hex::encode(signer_id);
 
-    let kvv_store = FsKVVStore::new(&store_path, signer_id, None).0;
-    let fs_persister = CloudKVVStore::new(kvv_store);
+    let kvv_store = FsKVVStore::new(&store_path, signer_id, None);
+    let fs_persister = KVVPersister(CloudKVVStore::new(kvv_store), RmpFormat);
 
     // FIXME initial allowlist
     // let initial_allowlist = Vec::new();
