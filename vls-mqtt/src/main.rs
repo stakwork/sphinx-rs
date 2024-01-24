@@ -12,7 +12,7 @@ use glyph::ser::{serialize_controlresponse, ByteBuf};
 use lss::init_lss;
 use rand::RngCore;
 use rocket::tokio::sync::{broadcast, mpsc, oneshot};
-use sphinx_signer::kvv::{CloudKVVStore, FsKVVStore, KVVPersister, RmpFormat};
+use sphinx_signer::kvv::{fs::FsKVVStore, CloudKVVStore, KVVPersister, RmpFormat};
 use sphinx_signer::lightning_signer::bitcoin::Network;
 use sphinx_signer::lightning_signer::persist::Persist;
 use sphinx_signer::lightning_signer::wallet::Wallet;
