@@ -12,7 +12,6 @@ pub mod policy;
 #[cfg(feature = "fspersist")]
 pub mod persist;
 
-#[cfg(feature = "fspersist")]
 pub mod kvv;
 
 #[cfg(feature = "fspersist")]
