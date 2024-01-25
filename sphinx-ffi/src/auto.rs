@@ -147,6 +147,7 @@ pub fn send(
     my_alias: String,
     my_img: String,
     amt_msat: u64,
+    is_tribe: bool,
 ) -> Result<RunReturn> {
     Ok(bindings::send(
         &seed,
@@ -158,6 +159,7 @@ pub fn send(
         &my_alias,
         &my_img_opt(&my_img),
         amt_msat,
+        is_tribe,
     )
     .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
     .into())
