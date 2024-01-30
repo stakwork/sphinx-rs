@@ -1,5 +1,6 @@
 pub use vls_persist::kvv::{
-    cloud::CloudKVVStore, memory::MemoryKVVStore, KVVPersister, KVVStore, ValueFormat, KVV,
+    cloud::CloudKVVStore, memory::MemoryKVVStore, JsonFormat, KVVPersister, KVVStore, ValueFormat,
+    KVV,
 };
 pub use vls_protocol_signer::lightning_signer::{persist::Error, SendSync};
 
