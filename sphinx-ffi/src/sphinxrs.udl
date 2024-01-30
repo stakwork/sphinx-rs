@@ -57,6 +57,7 @@ dictionary RunReturn {
     string? msg_index;
     string? msg_sender;
     u64? msg_msat;
+    u64? msg_timestamp;
     u64? new_balance;
     string? my_contact_info;
     string? sent_status;
