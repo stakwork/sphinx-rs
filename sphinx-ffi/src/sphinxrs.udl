@@ -65,6 +65,7 @@ dictionary RunReturn {
     string? settled_status;
     string? error;
     string? new_tribe;
+    string? tribe_members;
 };
 
 namespace sphinxrs {
@@ -146,9 +147,13 @@ namespace sphinxrs {
   [Throws=SphinxError]
   string make_media_token_with_meta(string seed, string unique_time, bytes state, string host, string muid, string to, u32 expiry, string meta);
   [Throws=SphinxError]
+  string make_media_token_with_price(string seed, string unique_time, bytes state, string host, string muid, string to, u32 expiry, u64 price);
+  [Throws=SphinxError]
   string make_invoice(string seed, string unique_time, bytes state, u64 amt_msat, string preimage, string description);
   [Throws=SphinxError]
   RunReturn create_tribe(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_json);
   [Throws=SphinxError]
   RunReturn join_tribe(string seed, string unique_time, bytes state, string tribe_pubkey, string tribe_route_hint, string alias, u64 amt_msat);
+  [Throws=SphinxError]
+  RunReturn list_tribe_members(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_pubkey);
 };

@@ -25,6 +25,7 @@ pub struct RunReturn {
     pub settled_status: Option<String>,
     pub error: Option<String>,
     pub new_tribe: Option<String>,
+    pub tribe_members: Option<String>,
 }
 
 pub fn set_network(net: String) -> Result<RunReturn> {
@@ -213,6 +214,30 @@ pub fn make_media_token_with_meta(
     .into())
 }
 
+pub fn make_media_token_with_price(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    host: String,
+    muid: String,
+    to: String,
+    exp: u32,
+    price: u64,
+) -> Result<String> {
+    Ok(bindings::make_media_token_with_price(
+        &seed,
+        &unique_time,
+        &full_state,
+        &host,
+        &muid,
+        &to,
+        exp,
+        price,
+    )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
+}
+
 pub fn make_invoice(
     seed: String,
     unique_time: String,
@@ -273,6 +298,24 @@ pub fn join_tribe(
     .into())
 }
 
+pub fn list_tribe_members(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    tribe_server_pubkey: String,
+    tribe_pubkey: String,
+) -> Result<RunReturn> {
+    Ok(bindings::list_tribe_members(
+        &seed,
+        &unique_time,
+        &full_state,
+        &tribe_server_pubkey,
+        &tribe_pubkey,
+    )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
+}
+
 impl From<bindings::RunReturn> for RunReturn {
     fn from(rr: bindings::RunReturn) -> Self {
         RunReturn {
@@ -298,6 +341,7 @@ impl From<bindings::RunReturn> for RunReturn {
             settled_status: rr.settled_status,
             error: rr.error,
             new_tribe: rr.new_tribe,
+            tribe_members: rr.tribe_members,
         }
     }
 }
