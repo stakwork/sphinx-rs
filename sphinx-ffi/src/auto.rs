@@ -26,6 +26,9 @@ pub struct RunReturn {
     pub error: Option<String>,
     pub new_tribe: Option<String>,
     pub tribe_members: Option<String>,
+    pub new_invite: Option<String>,
+    pub inviter_contact_info: Option<String>,
+    pub lsp_host: Option<String>,
 }
 
 pub fn set_network(net: String) -> Result<RunReturn> {
@@ -316,6 +319,33 @@ pub fn list_tribe_members(
     .into())
 }
 
+pub fn make_invite(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    host: String,
+    amt_msat: u64,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::make_invite(&seed, &unique_time, &full_state, &host, amt_msat)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
+pub fn process_invite(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    invite_qr: String,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::process_invite(&seed, &unique_time, &full_state, &invite_qr)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
 impl From<bindings::RunReturn> for RunReturn {
     fn from(rr: bindings::RunReturn) -> Self {
         RunReturn {
@@ -342,6 +372,9 @@ impl From<bindings::RunReturn> for RunReturn {
             error: rr.error,
             new_tribe: rr.new_tribe,
             tribe_members: rr.tribe_members,
+            new_invite: rr.new_invite,
+            inviter_contact_info: rr.inviter_contact_info,
+            lsp_host: rr.lsp_host,
         }
     }
 }
