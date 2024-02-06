@@ -147,7 +147,7 @@ RustBuffer uniffi_sphinxrs_fn_func_make_invoice(RustBuffer seed, RustBuffer uniq
 );
 RustBuffer uniffi_sphinxrs_fn_func_create_tribe(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_json, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_join_tribe(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_pubkey, RustBuffer tribe_route_hint, RustBuffer alias, uint64_t amt_msat, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_sphinxrs_fn_func_join_tribe(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_pubkey, RustBuffer tribe_route_hint, RustBuffer alias, uint64_t amt_msat, int8_t is_private, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_list_tribe_members(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_pubkey, RustCallStatus *_Nonnull out_status
 );

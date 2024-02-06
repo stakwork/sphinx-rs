@@ -287,6 +287,7 @@ pub fn join_tribe(
     tribe_route_hint: String,
     alias: String,
     amt_msat: u64,
+    is_private: bool,
 ) -> Result<RunReturn> {
     Ok(bindings::join_tribe(
         &seed,
@@ -296,6 +297,7 @@ pub fn join_tribe(
         &tribe_route_hint,
         &alias,
         amt_msat,
+        is_private,
     )
     .map_err(|e| SphinxError::HandleFailed { r: e.to_string() })?
     .into())
