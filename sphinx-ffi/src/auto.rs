@@ -3,7 +3,6 @@ use sphinx::bindings;
 use sphinx::serde_json;
 
 pub struct RunReturn {
-    pub new_subscription: Option<String>,
     pub topic_0: Option<String>,
     pub payload_0: Option<Vec<u8>>,
     pub topic_1: Option<String>,
@@ -96,6 +95,17 @@ pub fn get_subscription_topic(
 ) -> Result<String> {
     Ok(
         bindings::get_subscription_topic(&seed, &unique_time, &full_state)
+            .map_err(|e| SphinxError::HandleFailed { r: e.to_string() })?,
+    )
+}
+
+pub fn get_tribe_management_topic(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+) -> Result<String> {
+    Ok(
+        bindings::get_tribe_management_topic(&seed, &unique_time, &full_state)
             .map_err(|e| SphinxError::HandleFailed { r: e.to_string() })?,
     )
 }
@@ -351,7 +361,6 @@ pub fn process_invite(
 impl From<bindings::RunReturn> for RunReturn {
     fn from(rr: bindings::RunReturn) -> Self {
         RunReturn {
-            new_subscription: rr.new_subscription,
             topic_0: rr.topic_0,
             payload_0: rr.payload_0,
             topic_1: rr.topic_1,

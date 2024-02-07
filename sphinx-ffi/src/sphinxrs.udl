@@ -43,7 +43,6 @@ dictionary VlsResponse {
 };
 
 dictionary RunReturn {
-    string? new_subscription;
     string? topic_0;
     bytes? payload_0;
     string? topic_1;
@@ -137,6 +136,8 @@ namespace sphinxrs {
   string list_contacts(bytes state);
   [Throws=SphinxError]
   string get_subscription_topic(string seed, string unique_time, bytes state);
+  [Throws=SphinxError]
+  string get_tribe_management_topic(string seed, string unique_time, bytes state);
   [Throws=SphinxError]
   RunReturn initial_setup(string seed, string unique_time, bytes state);
   [Throws=SphinxError]
