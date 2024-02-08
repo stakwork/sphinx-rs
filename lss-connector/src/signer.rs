@@ -4,7 +4,7 @@ use lightning_signer::persist::ExternalPersistHelper;
 use lightning_signer::persist::Mutations;
 use secp256k1::PublicKey;
 use std::collections::BTreeMap;
-use vls_protocol_signer::handler::{RootHandler, RootHandlerBuilder};
+use vls_protocol_signer::handler::{HandlerBuilder, InitHandler};
 use vls_protocol_signer::lightning_signer;
 
 #[cfg(not(feature = "no-native"))]
@@ -22,7 +22,7 @@ pub struct LssSigner {
 
 impl LssSigner {
     pub fn new(
-        builder: &RootHandlerBuilder,
+        builder: &HandlerBuilder,
         server_pubkey: &PublicKey,
         _nonce: Option<[u8; 32]>,
     ) -> (Self, Vec<u8>) {
@@ -89,9 +89,9 @@ impl LssSigner {
     pub fn build_with_lss(
         &self,
         c: BrokerMutations,
-        handler_builder: RootHandlerBuilder,
+        handler_builder: HandlerBuilder,
         state: Option<BTreeMap<String, (u64, Vec<u8>)>>,
-    ) -> Result<(RootHandler, Vec<u8>)> {
+    ) -> Result<(InitHandler, Vec<u8>)> {
         // let helper = self.helper.lock().unwrap();
         let has_muts = !c.muts.is_empty();
         let muts = Mutations::from_vec(c.muts);

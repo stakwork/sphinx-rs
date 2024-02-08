@@ -22,7 +22,7 @@ use vls_protocol::model::PubKey;
 use vls_protocol::msgs::{self, read_serial_request_header, write_serial_response_header, Message};
 #[cfg(feature = "lowmemory")]
 use vls_protocol::serde_bolt::NonContiguousOctets;
-use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};
+use vls_protocol_signer::handler::{Handler, HandlerBuilder, InitHandler, RootHandler};
 use vls_protocol_signer::lightning_signer;
 
 #[cfg(feature = "lowmemory")]
@@ -59,7 +59,7 @@ pub fn builder(
     initial_allowlist: Vec<String>,
     initial_velocity: Option<Velocity>,
     persister: Arc<dyn Persist>,
-) -> anyhow::Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
+) -> anyhow::Result<(HandlerBuilder, Arc<SphinxApprover>)> {
     let clock = make_clock();
     let random_time_factory = crate::rst::RandomStartingTimeFactory::new();
     builder_inner(
@@ -100,7 +100,7 @@ pub fn builder_inner(
     persister: Arc<dyn Persist>,
     clock: Arc<dyn Clock>,
     starting_time_factory: Arc<dyn StartingTimeFactory>,
-) -> anyhow::Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
+) -> anyhow::Result<(HandlerBuilder, Arc<SphinxApprover>)> {
     //
     let policy = make_policy(network, &initial_policy);
     let validator_factory = Arc::new(SimpleValidatorFactory::new_with_policy(policy));
@@ -112,9 +112,9 @@ pub fn builder_inner(
         clock: clock.clone(),
     };
 
-    log::debug!("create root handler builder with network {:?}", network);
+    log::debug!("create handler builder with network {:?}", network);
     let mut handler_builder =
-        RootHandlerBuilder::new(network, 0, services, seed).allowlist(initial_allowlist);
+        HandlerBuilder::new(network, 0, services, seed).allowlist(initial_allowlist);
     // FIXME set up a manual approver (ui_approver)
     let approv = create_approver(clock.clone(), initial_policy, initial_velocity);
     let approver = Arc::new(approv);
@@ -136,6 +136,43 @@ pub fn policy_interval(int: Interval) -> VelocityControlIntervalType {
         Interval::Hourly => VelocityControlIntervalType::Hourly,
         Interval::Daily => VelocityControlIntervalType::Daily,
     }
+}
+
+pub fn handle_init(
+    init_handler: &mut InitHandler,
+    bytes: Vec<u8>,
+    do_log: bool,
+) -> Result<(Vec<u8>, bool, String), VlsHandlerError> {
+    let mut bytes = Cursor::new(bytes);
+    let msgs::SerialRequestHeader {
+        sequence,
+        peer_id: _,
+        dbid: _,
+    } = read_serial_request_header(&mut bytes)
+        .map_err(|e| VlsHandlerError::HeaderRead(format!("{:?}", e)))?;
+    let message =
+        msgs::read(&mut bytes).map_err(|e| VlsHandlerError::MsgRead(format!("{:?}", e)))?;
+    if let Message::HsmdInit(ref m) = message {
+        if ChainHash::using_genesis_block(init_handler.node().network()).as_bytes()
+            != m.chain_params.as_ref()
+        {
+            log::warn!("chain network {:?}", m.chain_params.as_ref());
+            log::warn!("init handler network {:?}", init_handler.node().network());
+            log::error!("The network setting of CLN and VLS don't match!");
+            panic!("The network setting of CLN and VLS don't match!");
+        }
+    }
+    let cmd = vls_cmd(&message);
+    if do_log {
+        log::info!("VLS INIT: => {}", &cmd);
+    }
+    let (is_done, vls_msg) = init_handler.handle(message).expect("handle");
+    let mut buf = Vec::with_capacity(8usize + vls_msg.as_vec().len());
+    write_serial_response_header(&mut buf, sequence)
+        .map_err(|e| VlsHandlerError::HeaderWrite(format!("{:?}", e)))?;
+    msgs::write_vec(&mut buf, vls_msg.as_vec())
+        .map_err(|e| VlsHandlerError::MsgWrite(format!("{:?}", e)))?;
+    Ok((buf, is_done, cmd))
 }
 
 // returns the VLS return msg and the muts
@@ -161,21 +198,8 @@ fn handle_inner(
             return Err(VlsHandlerError::BadSequence(sequence, expected));
         }
     }
-
     let message =
         msgs::read(&mut bytes).map_err(|e| VlsHandlerError::MsgRead(format!("{:?}", e)))?;
-
-    if let Message::HsmdInit(ref m) = message {
-        if ChainHash::using_genesis_block(root_handler.node().network()).as_bytes()
-            != m.chain_params.as_ref()
-        {
-            log::warn!("chain network {:?}", m.chain_params.as_ref());
-            log::warn!("root handler network {:?}", root_handler.node().network());
-            log::error!("The network setting of CLN and VLS don't match!");
-            panic!("The network setting of CLN and VLS don't match!");
-        }
-    }
-
     let cmd = vls_cmd(&message);
     if do_log {
         log::info!("VLS: => {}", &cmd);
@@ -369,6 +393,8 @@ fn vls_cmd(msg: &Message) -> String {
         Message::LockOutpointReply(_) => "LockOutpointReply",
         Message::ForgetChannel(_) => "ForgetChannel",
         Message::ForgetChannelReply(_) => "ForgetChannelReply",
+        Message::RevokeCommitmentTx(_) => "RevokeCommitmentTx",
+        Message::RevokeCommitmentTxReply(_) => "RevokeCommitmentTxReply",
     };
     m.to_string()
 }

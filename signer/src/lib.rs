@@ -23,5 +23,5 @@ pub use vls_protocol;
 
 pub use derive::node_keys as derive_node_keys;
 pub use vls_protocol_signer::approver::WarningPositiveApprover;
-pub use vls_protocol_signer::handler::{Handler, RootHandler, RootHandlerBuilder};
+pub use vls_protocol_signer::handler::{Handler, HandlerBuilder, InitHandler, RootHandler};
 pub use vls_protocol_signer::lightning_signer;

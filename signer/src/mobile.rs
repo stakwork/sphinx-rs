@@ -1,6 +1,6 @@
 use crate::approver::SphinxApprover;
 use crate::kvv::{CloudKVVStore, KVVPersister, MemoryKVVStore, RmpFormat};
-use crate::root::{builder_inner, handle_with_lss};
+use crate::root::{builder_inner, handle_init, handle_with_lss};
 use anyhow::{Error, Result};
 use lightning_signer::bitcoin::Network;
 use lightning_signer::persist::{Mutations, Persist};
@@ -15,7 +15,7 @@ use sphinx_glyph::topics;
 use sphinx_glyph::types::{Policy, Velocity};
 use std::collections::BTreeMap;
 use std::time::Duration;
-use vls_protocol_signer::handler::{RootHandler, RootHandlerBuilder};
+use vls_protocol_signer::handler::{HandlerBuilder, InitHandler, RootHandler};
 use vls_protocol_signer::lightning_signer;
 
 // fully create a VLS node run the command on it
@@ -66,20 +66,15 @@ pub fn run_init_1(
     state: State,
     lss_msg1: &[u8],
     velocity: Option<Velocity>,
-) -> Result<(
-    RunReturn,
-    RootHandlerBuilder,
-    Arc<SphinxApprover>,
-    LssSigner,
-)> {
+) -> Result<(RunReturn, HandlerBuilder, Arc<SphinxApprover>, LssSigner)> {
     let init = Msg::from_slice(lss_msg1)?.into_init()?;
     let server_pubkey = PublicKey::from_slice(&init.server_pubkey).map_err(Error::msg)?;
     let nonce = args.lss_nonce;
-    let (rhb, approver) = root_handler_builder(args, state, velocity)?;
-    let (lss_signer, res1) = LssSigner::new(&rhb, &server_pubkey, Some(nonce));
+    let (hb, approver) = handler_builder(args, state, velocity)?;
+    let (lss_signer, res1) = LssSigner::new(&hb, &server_pubkey, Some(nonce));
     Ok((
         RunReturn::new_lss(topics::INIT_1_RES, res1, "LssInit".to_string()),
-        rhb,
+        hb,
         approver,
         lss_signer,
     ))
@@ -91,12 +86,33 @@ pub fn run_init_2(
     lss_msg1: &[u8],
     lss_msg2: &[u8],
     velocity: Option<Velocity>,
-) -> Result<(RunReturn, RootHandler, Arc<SphinxApprover>, LssSigner)> {
-    let (_res1, rhb, approver, lss_signer) = run_init_1(args, state.clone(), lss_msg1, velocity)?;
+) -> Result<(RunReturn, InitHandler, Arc<SphinxApprover>, LssSigner)> {
+    let (_res1, hb, approver, lss_signer) = run_init_1(args, state.clone(), lss_msg1, velocity)?;
     let created = Msg::from_slice(lss_msg2)?.into_created()?;
-    let (root_handler, res2) = lss_signer.build_with_lss(created, rhb, Some(state))?;
+    let (init_handler, res2) = lss_signer.build_with_lss(created, hb, Some(state))?;
     Ok((
         RunReturn::new_lss(topics::INIT_2_RES, res2, "LssCreated".to_string()),
+        init_handler,
+        approver,
+        lss_signer,
+    ))
+}
+
+pub fn run_init_3(
+    args: Args,
+    state: State,
+    lss_msg1: &[u8],
+    lss_msg2: &[u8],
+    lss_msg3: &[u8],
+    velocity: Option<Velocity>,
+) -> Result<(RunReturn, RootHandler, Arc<SphinxApprover>, LssSigner)> {
+    let (_res, mut ih, approver, lss_signer) =
+        run_init_2(args, state, lss_msg1, lss_msg2, velocity)?;
+    let (res3, init, _cmd) = handle_init(&mut ih, lss_msg3.to_vec(), false).unwrap();
+    assert!(init);
+    let root_handler = ih.into_root_handler();
+    Ok((
+        RunReturn::new_lss(topics::INIT_3_RES, res3, "HsmdInit".to_string()),
         root_handler,
         approver,
         lss_signer,
@@ -108,11 +124,13 @@ pub fn run_vls(
     state: State,
     lss_msg1: &[u8],
     lss_msg2: &[u8],
+    lss_msg3: &[u8],
     vls_msg: &[u8],
     expected_sequence: Option<u16>,
     velocity: Option<Velocity>,
 ) -> Result<RunReturn> {
-    let (_res, rh, approver, lss_signer) = run_init_2(args, state, lss_msg1, lss_msg2, velocity)?;
+    let (_res, rh, approver, lss_signer) =
+        run_init_3(args, state, lss_msg1, lss_msg2, lss_msg3, velocity)?;
     let s1 = approver.control().get_state();
     let (vls_res, lss_res, sequence, cmd, server_hmac) =
         handle_with_lss(&rh, &lss_signer, vls_msg.to_vec(), expected_sequence, true)
@@ -161,11 +179,11 @@ pub fn run_lss(
     Ok(ret)
 }
 
-fn root_handler_builder(
+fn handler_builder(
     args: Args,
     state: State,
     velocity: Option<Velocity>,
-) -> Result<(RootHandlerBuilder, Arc<SphinxApprover>)> {
+) -> Result<(HandlerBuilder, Arc<SphinxApprover>)> {
     use std::time::UNIX_EPOCH;
 
     let memstore = MemoryKVVStore::new(args.signer_id);
@@ -185,7 +203,7 @@ fn root_handler_builder(
     let persister = Arc::new(persister);
     let clock = Arc::new(NowClock::new(d));
     let stf = Arc::new(NowStartingTimeFactory::new(d));
-    let (rhb, approver) = builder_inner(
+    let (hb, approver) = builder_inner(
         args.seed,
         args.network,
         args.policy,
@@ -197,9 +215,9 @@ fn root_handler_builder(
     )?;
     // let muts = tmp.prepare();
     // if !muts.is_empty() {
-    //     log::info!("root_handler_builder MUTS: {:?}", muts);
+    //     log::info!("handler_builder MUTS: {:?}", muts);
     // }
-    Ok((rhb, approver))
+    Ok((hb, approver))
 }
 
 impl RunReturn {
@@ -433,7 +451,7 @@ mod tests {
         })
         .to_vec()?;
 
-        let (res1, _rhb, _approver, _lss_signer) =
+        let (res1, _hb, _approver, _lss_signer) =
             run_init_1(args.clone(), state.clone(), &bi1, None)?;
         let lss_bytes = res1.lss_bytes.unwrap();
 

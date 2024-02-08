@@ -9,6 +9,8 @@ pub const INIT_1_MSG: &str = "init-1-msg";
 pub const INIT_1_RES: &str = "init-1-res";
 pub const INIT_2_MSG: &str = "init-2-msg";
 pub const INIT_2_RES: &str = "init-2-res";
+pub const INIT_3_MSG: &str = "init-3-msg";
+pub const INIT_3_RES: &str = "init-3-res";
 pub const LSS_MSG: &str = "lss-msg";
 pub const LSS_RES: &str = "lss-res";
 pub const LSS_CONFLICT: &str = "lss-conflict";
@@ -23,6 +25,7 @@ pub const BROKER_SUBS: &[&str] = &[
     PROXY_RES,
     INIT_1_RES,
     INIT_2_RES,
+    INIT_3_RES,
     LSS_RES,
     LSS_CONFLICT_RES,
 ];
@@ -33,6 +36,7 @@ pub const SIGNER_SUBS: &[&str] = &[
     PROXY,
     INIT_1_MSG,
     INIT_2_MSG,
+    INIT_3_MSG,
     LSS_MSG,
     LSS_CONFLICT,
 ];

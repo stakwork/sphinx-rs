@@ -187,6 +187,7 @@ async fn got_msg(
     } else if topic.ends_with(topics::LSS_MSG)
         || topic.ends_with(topics::INIT_1_MSG)
         || topic.ends_with(topics::INIT_2_MSG)
+        || topic.ends_with(topics::INIT_3_MSG)
         || topic.ends_with(topics::LSS_CONFLICT)
     {
         let (lss_msg, reply_rx) = LssChanMsg::new(msg_bytes.to_vec(), msgs.clone());
