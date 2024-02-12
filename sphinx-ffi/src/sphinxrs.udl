@@ -42,7 +42,18 @@ dictionary VlsResponse {
     bytes state;
 };
 
+dictionary Msg {
+    string? message;
+    u8? type;
+    string? uuid;
+    string? index;
+    string? sender;
+    u64? msat;
+    u64? timestamp;
+};
+
 dictionary RunReturn {
+    sequence<Msg> msgs;
     string? topic_0;
     bytes? payload_0;
     string? topic_1;
@@ -50,13 +61,6 @@ dictionary RunReturn {
     string? topic_2;
     bytes? payload_2;
     bytes? state_mp;
-    string? msg;
-    u8? msg_type;
-    string? msg_uuid;
-    string? msg_index;
-    string? msg_sender;
-    u64? msg_msat;
-    u64? msg_timestamp;
     u64? new_balance;
     string? my_contact_info;
     string? sent_status;

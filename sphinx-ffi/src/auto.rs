@@ -2,7 +2,18 @@ use crate::{Result, SphinxError};
 use sphinx::bindings;
 use sphinx::serde_json;
 
+pub struct Msg {
+    pub r#type: Option<u8>,
+    pub message: Option<String>,
+    pub sender: Option<String>,
+    pub uuid: Option<String>,
+    pub index: Option<String>,
+    pub msat: Option<u64>,
+    pub timestamp: Option<u64>,
+}
+
 pub struct RunReturn {
+    pub msgs: Vec<Msg>,
     pub topic_0: Option<String>,
     pub payload_0: Option<Vec<u8>>,
     pub topic_1: Option<String>,
@@ -10,13 +21,6 @@ pub struct RunReturn {
     pub topic_2: Option<String>,
     pub payload_2: Option<Vec<u8>>,
     pub state_mp: Option<Vec<u8>>,
-    pub msg: Option<String>,
-    pub msg_type: Option<u8>,
-    pub msg_uuid: Option<String>,
-    pub msg_index: Option<String>,
-    pub msg_sender: Option<String>,
-    pub msg_msat: Option<u64>,
-    pub msg_timestamp: Option<u64>,
     pub new_balance: Option<u64>,
     pub my_contact_info: Option<String>,
     pub sent_status: Option<String>,
@@ -358,9 +362,24 @@ pub fn process_invite(
     )
 }
 
+impl From<bindings::Msg> for Msg {
+    fn from(rr: bindings::Msg) -> Self {
+        Msg {
+            r#type: rr.r#type,
+            message: rr.message,
+            sender: rr.sender,
+            uuid: rr.uuid,
+            index: rr.index,
+            msat: rr.msat,
+            timestamp: rr.timestamp,
+        }
+    }
+}
+
 impl From<bindings::RunReturn> for RunReturn {
     fn from(rr: bindings::RunReturn) -> Self {
         RunReturn {
+            msgs: rr.msgs.into_iter().map(|m| m.into()).collect(),
             topic_0: rr.topic_0,
             payload_0: rr.payload_0,
             topic_1: rr.topic_1,
@@ -368,13 +387,6 @@ impl From<bindings::RunReturn> for RunReturn {
             topic_2: rr.topic_2,
             payload_2: rr.payload_2,
             state_mp: rr.state_mp,
-            msg: rr.msg,
-            msg_type: rr.msg_type,
-            msg_uuid: rr.msg_uuid,
-            msg_index: rr.msg_index,
-            msg_sender: rr.msg_sender,
-            msg_msat: rr.msg_msat,
-            msg_timestamp: rr.msg_timestamp,
             new_balance: rr.new_balance,
             my_contact_info: rr.my_contact_info,
             sent_status: rr.sent_status,
