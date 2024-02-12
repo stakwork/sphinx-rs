@@ -924,7 +924,8 @@ data class Msg (
     var `index`: String?, 
     var `sender`: String?, 
     var `msat`: ULong?, 
-    var `timestamp`: ULong?
+    var `timestamp`: ULong?, 
+    var `sentTo`: String?
 ) {
     
 }
@@ -939,6 +940,7 @@ public object FfiConverterTypeMsg: FfiConverterRustBuffer<Msg> {
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalULong.read(buf),
             FfiConverterOptionalULong.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -949,7 +951,8 @@ public object FfiConverterTypeMsg: FfiConverterRustBuffer<Msg> {
             FfiConverterOptionalString.allocationSize(value.`index`) +
             FfiConverterOptionalString.allocationSize(value.`sender`) +
             FfiConverterOptionalULong.allocationSize(value.`msat`) +
-            FfiConverterOptionalULong.allocationSize(value.`timestamp`)
+            FfiConverterOptionalULong.allocationSize(value.`timestamp`) +
+            FfiConverterOptionalString.allocationSize(value.`sentTo`)
     )
 
     override fun write(value: Msg, buf: ByteBuffer) {
@@ -960,6 +963,7 @@ public object FfiConverterTypeMsg: FfiConverterRustBuffer<Msg> {
             FfiConverterOptionalString.write(value.`sender`, buf)
             FfiConverterOptionalULong.write(value.`msat`, buf)
             FfiConverterOptionalULong.write(value.`timestamp`, buf)
+            FfiConverterOptionalString.write(value.`sentTo`, buf)
     }
 }
 
@@ -978,7 +982,6 @@ data class RunReturn (
     var `newBalance`: ULong?, 
     var `myContactInfo`: String?, 
     var `sentStatus`: String?, 
-    var `sentTo`: String?, 
     var `settledStatus`: String?, 
     var `error`: String?, 
     var `newTribe`: String?, 
@@ -1011,7 +1014,6 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
-            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -1027,7 +1029,6 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalULong.allocationSize(value.`newBalance`) +
             FfiConverterOptionalString.allocationSize(value.`myContactInfo`) +
             FfiConverterOptionalString.allocationSize(value.`sentStatus`) +
-            FfiConverterOptionalString.allocationSize(value.`sentTo`) +
             FfiConverterOptionalString.allocationSize(value.`settledStatus`) +
             FfiConverterOptionalString.allocationSize(value.`error`) +
             FfiConverterOptionalString.allocationSize(value.`newTribe`) +
@@ -1049,7 +1050,6 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalULong.write(value.`newBalance`, buf)
             FfiConverterOptionalString.write(value.`myContactInfo`, buf)
             FfiConverterOptionalString.write(value.`sentStatus`, buf)
-            FfiConverterOptionalString.write(value.`sentTo`, buf)
             FfiConverterOptionalString.write(value.`settledStatus`, buf)
             FfiConverterOptionalString.write(value.`error`, buf)
             FfiConverterOptionalString.write(value.`newTribe`, buf)

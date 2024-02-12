@@ -50,6 +50,7 @@ dictionary Msg {
     string? sender;
     u64? msat;
     u64? timestamp;
+    string? sent_to;
 };
 
 dictionary RunReturn {
@@ -64,7 +65,6 @@ dictionary RunReturn {
     u64? new_balance;
     string? my_contact_info;
     string? sent_status;
-    string? sent_to;
     string? settled_status;
     string? error;
     string? new_tribe;

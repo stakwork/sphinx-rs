@@ -10,6 +10,7 @@ pub struct Msg {
     pub index: Option<String>,
     pub msat: Option<u64>,
     pub timestamp: Option<u64>,
+    pub sent_to: Option<String>,
 }
 
 pub struct RunReturn {
@@ -24,7 +25,6 @@ pub struct RunReturn {
     pub new_balance: Option<u64>,
     pub my_contact_info: Option<String>,
     pub sent_status: Option<String>,
-    pub sent_to: Option<String>,
     pub settled_status: Option<String>,
     pub error: Option<String>,
     pub new_tribe: Option<String>,
@@ -372,6 +372,7 @@ impl From<bindings::Msg> for Msg {
             index: rr.index,
             msat: rr.msat,
             timestamp: rr.timestamp,
+            sent_to: rr.sent_to,
         }
     }
 }
@@ -390,7 +391,6 @@ impl From<bindings::RunReturn> for RunReturn {
             new_balance: rr.new_balance,
             my_contact_info: rr.my_contact_info,
             sent_status: rr.sent_status,
-            sent_to: rr.sent_to,
             settled_status: rr.settled_status,
             error: rr.error,
             new_tribe: rr.new_tribe,
