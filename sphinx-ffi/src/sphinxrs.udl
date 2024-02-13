@@ -55,12 +55,8 @@ dictionary Msg {
 
 dictionary RunReturn {
     sequence<Msg> msgs;
-    string? topic_0;
-    bytes? payload_0;
-    string? topic_1;
-    bytes? payload_1;
-    string? topic_2;
-    bytes? payload_2;
+    sequence<string> topics;
+    sequence<bytes> payloads;
     bytes? state_mp;
     u64? new_balance;
     string? my_contact_info;

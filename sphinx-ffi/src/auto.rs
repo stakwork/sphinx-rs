@@ -15,12 +15,8 @@ pub struct Msg {
 
 pub struct RunReturn {
     pub msgs: Vec<Msg>,
-    pub topic_0: Option<String>,
-    pub payload_0: Option<Vec<u8>>,
-    pub topic_1: Option<String>,
-    pub payload_1: Option<Vec<u8>>,
-    pub topic_2: Option<String>,
-    pub payload_2: Option<Vec<u8>>,
+    pub topics: Vec<String>,
+    pub payloads: Vec<Vec<u8>>,
     pub state_mp: Option<Vec<u8>>,
     pub new_balance: Option<u64>,
     pub my_contact_info: Option<String>,
@@ -381,12 +377,8 @@ impl From<bindings::RunReturn> for RunReturn {
     fn from(rr: bindings::RunReturn) -> Self {
         RunReturn {
             msgs: rr.msgs.into_iter().map(|m| m.into()).collect(),
-            topic_0: rr.topic_0,
-            payload_0: rr.payload_0,
-            topic_1: rr.topic_1,
-            payload_1: rr.payload_1,
-            topic_2: rr.topic_2,
-            payload_2: rr.payload_2,
+            topics: rr.topics,
+            payloads: rr.payloads,
             state_mp: rr.state_mp,
             new_balance: rr.new_balance,
             my_contact_info: rr.my_contact_info,
