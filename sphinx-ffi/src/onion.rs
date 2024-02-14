@@ -302,7 +302,7 @@ fn run_create_keysend_bytes(
 ) -> Result<[u8; 1366]> {
     Ok(sphinx::create_keysend_bytes(
         km,
-        hops,
+        &hops,
         value,
         rhash,
         Some(pld.to_vec()),
