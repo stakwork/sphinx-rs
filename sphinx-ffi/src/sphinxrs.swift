@@ -592,11 +592,12 @@ public struct RunReturn {
     public var `tribeMembers`: String?
     public var `newInvite`: String?
     public var `inviterContactInfo`: String?
+    public var `initialTribe`: String?
     public var `lspHost`: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(`msgs`: [Msg], `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `lspHost`: String?) {
+    public init(`msgs`: [Msg], `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `initialTribe`: String?, `lspHost`: String?) {
         self.`msgs` = `msgs`
         self.`topics` = `topics`
         self.`payloads` = `payloads`
@@ -610,6 +611,7 @@ public struct RunReturn {
         self.`tribeMembers` = `tribeMembers`
         self.`newInvite` = `newInvite`
         self.`inviterContactInfo` = `inviterContactInfo`
+        self.`initialTribe` = `initialTribe`
         self.`lspHost` = `lspHost`
     }
 }
@@ -656,6 +658,9 @@ extension RunReturn: Equatable, Hashable {
         if lhs.`inviterContactInfo` != rhs.`inviterContactInfo` {
             return false
         }
+        if lhs.`initialTribe` != rhs.`initialTribe` {
+            return false
+        }
         if lhs.`lspHost` != rhs.`lspHost` {
             return false
         }
@@ -676,6 +681,7 @@ extension RunReturn: Equatable, Hashable {
         hasher.combine(`tribeMembers`)
         hasher.combine(`newInvite`)
         hasher.combine(`inviterContactInfo`)
+        hasher.combine(`initialTribe`)
         hasher.combine(`lspHost`)
     }
 }
@@ -697,6 +703,7 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
             `tribeMembers`: FfiConverterOptionString.read(from: &buf), 
             `newInvite`: FfiConverterOptionString.read(from: &buf), 
             `inviterContactInfo`: FfiConverterOptionString.read(from: &buf), 
+            `initialTribe`: FfiConverterOptionString.read(from: &buf), 
             `lspHost`: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -715,6 +722,7 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.`tribeMembers`, into: &buf)
         FfiConverterOptionString.write(value.`newInvite`, into: &buf)
         FfiConverterOptionString.write(value.`inviterContactInfo`, into: &buf)
+        FfiConverterOptionString.write(value.`initialTribe`, into: &buf)
         FfiConverterOptionString.write(value.`lspHost`, into: &buf)
     }
 }

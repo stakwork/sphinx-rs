@@ -27,6 +27,7 @@ pub struct RunReturn {
     pub tribe_members: Option<String>,
     pub new_invite: Option<String>,
     pub inviter_contact_info: Option<String>,
+    pub initial_tribe: Option<String>,
     pub lsp_host: Option<String>,
 }
 
@@ -396,6 +397,7 @@ impl From<bindings::RunReturn> for RunReturn {
             tribe_members: rr.tribe_members,
             new_invite: rr.new_invite,
             inviter_contact_info: rr.inviter_contact_info,
+            initial_tribe: rr.initial_tribe,
             lsp_host: rr.lsp_host,
         }
     }

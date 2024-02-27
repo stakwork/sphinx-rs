@@ -991,6 +991,7 @@ data class RunReturn (
     var `tribeMembers`: String?, 
     var `newInvite`: String?, 
     var `inviterContactInfo`: String?, 
+    var `initialTribe`: String?, 
     var `lspHost`: String?
 ) {
     
@@ -1004,6 +1005,7 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterSequenceByteArray.read(buf),
             FfiConverterOptionalByteArray.read(buf),
             FfiConverterOptionalULong.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -1030,6 +1032,7 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalString.allocationSize(value.`tribeMembers`) +
             FfiConverterOptionalString.allocationSize(value.`newInvite`) +
             FfiConverterOptionalString.allocationSize(value.`inviterContactInfo`) +
+            FfiConverterOptionalString.allocationSize(value.`initialTribe`) +
             FfiConverterOptionalString.allocationSize(value.`lspHost`)
     )
 
@@ -1047,6 +1050,7 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalString.write(value.`tribeMembers`, buf)
             FfiConverterOptionalString.write(value.`newInvite`, buf)
             FfiConverterOptionalString.write(value.`inviterContactInfo`, buf)
+            FfiConverterOptionalString.write(value.`initialTribe`, buf)
             FfiConverterOptionalString.write(value.`lspHost`, buf)
     }
 }

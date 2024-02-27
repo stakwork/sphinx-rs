@@ -67,6 +67,7 @@ dictionary RunReturn {
     string? tribe_members;
     string? new_invite;
     string? inviter_contact_info;
+    string? initial_tribe;
     string? lsp_host;
 };
 
