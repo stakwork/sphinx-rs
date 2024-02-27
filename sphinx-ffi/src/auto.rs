@@ -51,6 +51,7 @@ pub fn add_contact(
     my_alias: String,
     my_img: String,
     amt_msat: u64,
+    invite_code: Option<String>,
 ) -> Result<RunReturn> {
     Ok(bindings::add_contact(
         &seed,
@@ -61,6 +62,7 @@ pub fn add_contact(
         &my_alias,
         &my_img_opt(&my_img),
         amt_msat,
+        invite_code.as_deref(),
     )
     .map_err(|e| SphinxError::AddContactFailed { r: e.to_string() })?
     .into())
@@ -356,6 +358,11 @@ pub fn process_invite(
             .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
             .into(),
     )
+}
+
+pub fn code_from_invite(invite_qr: String) -> Result<String> {
+    Ok(bindings::code_from_invite(&invite_qr)
+        .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?)
 }
 
 impl From<bindings::Msg> for Msg {

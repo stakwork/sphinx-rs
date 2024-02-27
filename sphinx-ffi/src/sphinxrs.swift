@@ -1620,7 +1620,7 @@ public func `setBlockheight`(`blockheight`: UInt32) throws -> RunReturn {
     )
 }
 
-public func `addContact`(`seed`: String, `uniqueTime`: String, `state`: Data, `toPubkey`: String, `routeHint`: String, `myAlias`: String, `myImg`: String, `amtMsat`: UInt64) throws -> RunReturn {
+public func `addContact`(`seed`: String, `uniqueTime`: String, `state`: Data, `toPubkey`: String, `routeHint`: String, `myAlias`: String, `myImg`: String, `amtMsat`: UInt64, `inviteCode`: String?) throws -> RunReturn {
     return try  FfiConverterTypeRunReturn.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_add_contact(
@@ -1631,7 +1631,8 @@ public func `addContact`(`seed`: String, `uniqueTime`: String, `state`: Data, `t
         FfiConverterString.lower(`routeHint`),
         FfiConverterString.lower(`myAlias`),
         FfiConverterString.lower(`myImg`),
-        FfiConverterUInt64.lower(`amtMsat`),$0)
+        FfiConverterUInt64.lower(`amtMsat`),
+        FfiConverterOptionString.lower(`inviteCode`),$0)
 }
     )
 }
@@ -1862,6 +1863,15 @@ public func `processInvite`(`seed`: String, `uniqueTime`: String, `state`: Data,
     )
 }
 
+public func `codeFromInvite`(`inviteQr`: String) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_code_from_invite(
+        FfiConverterString.lower(`inviteQr`),$0)
+}
+    )
+}
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch
@@ -1964,7 +1974,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_set_blockheight() != 43943) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_add_contact() != 51154) {
+    if (uniffi_sphinxrs_checksum_func_add_contact() != 11442) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_get_contact() != 19847) {
@@ -2016,6 +2026,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_process_invite() != 52237) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_code_from_invite() != 40279) {
         return InitializationResult.apiChecksumMismatch
     }
 
