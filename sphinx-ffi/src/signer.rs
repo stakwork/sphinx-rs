@@ -21,6 +21,7 @@ pub struct VlsResponse {
 
 pub const MSG_1: &str = "MSG_1";
 pub const MSG_2: &str = "MSG_2";
+pub const MSG_3: &str = "MSG_3";
 pub const PREV_VLS: &str = "PREV_VLS";
 pub const PREV_LSS: &str = "PREV_LSS";
 pub const VELOCITY: &str = "VELOCITY";
@@ -36,6 +37,7 @@ pub fn run(
     match last {
         topics::INIT_1_MSG => Ok(run_init_1(args_json, easy_mp, msg, sequence)?),
         topics::INIT_2_MSG => Ok(run_init_2(args_json, easy_mp, msg, sequence)?),
+        topics::INIT_3_MSG => Ok(run_init_3(args_json, easy_mp, msg, sequence)?),
         topics::VLS => Ok(run_vls(args_json, easy_mp, msg, sequence)?),
         topics::LSS_MSG => Ok(run_lss(args_json, easy_mp, msg, sequence)?),
         _ => Err(SphinxError::BadTopic {
@@ -52,7 +54,10 @@ fn run_init_1(
 ) -> Result<VlsResponse> {
     let args = args_from_json(&args_json)?;
     let mut easy = easy_from_mp(&easy_mp)?;
-    pull_unchecked(&mut easy, &[MSG_1, MSG_2, PREV_VLS, PREV_LSS, VELOCITY]);
+    pull_unchecked(
+        &mut easy,
+        &[MSG_1, MSG_2, MSG_3, PREV_VLS, PREV_LSS, VELOCITY],
+    );
     let state = state_from_easy(easy)?;
     let ret =
         mobile::run_init_1(args, state, &msg1, None).map_err(|e| SphinxError::InitFailed {
@@ -73,7 +78,7 @@ fn run_init_2(
     let args = args_from_json(&args_json)?;
     let mut easy = easy_from_mp(&easy_mp)?;
     let msg1 = pull_from(&mut easy, MSG_1)?;
-    pull_unchecked(&mut easy, &[MSG_2, PREV_VLS, PREV_LSS, VELOCITY]);
+    pull_unchecked(&mut easy, &[MSG_2, MSG_3, PREV_VLS, PREV_LSS, VELOCITY]);
     let state = state_from_easy(easy)?;
     let ret = mobile::run_init_2(args, state, &msg1, &msg2, None).map_err(|e| {
         SphinxError::InitFailed {
@@ -82,6 +87,29 @@ fn run_init_2(
     })?;
     let mut extras = BTreeMap::new();
     extras.insert(MSG_2.to_string(), msg2);
+    let muts = ser_state(&ret.0.lss_bytes, extras)?;
+    Ok(VlsResponse::new(ret.0, muts)?)
+}
+
+fn run_init_3(
+    args_json: String,
+    easy_mp: Vec<u8>,
+    msg3: Vec<u8>,
+    _sequence: Option<u16>,
+) -> Result<VlsResponse> {
+    let args = args_from_json(&args_json)?;
+    let mut easy = easy_from_mp(&easy_mp)?;
+    let msg1 = pull_from(&mut easy, MSG_1)?;
+    let msg2 = pull_from(&mut easy, MSG_2)?;
+    pull_unchecked(&mut easy, &[MSG_3, PREV_VLS, PREV_LSS, VELOCITY]);
+    let state = state_from_easy(easy)?;
+    let ret = mobile::run_init_3(args, state, &msg1, &msg2, &msg3, None).map_err(|e| {
+        SphinxError::InitFailed {
+            r: format!("{:?}", e),
+        }
+    })?;
+    let mut extras = BTreeMap::new();
+    extras.insert(MSG_3.to_string(), msg3);
     let muts = ser_state(&ret.0.lss_bytes, extras)?;
     Ok(VlsResponse::new(ret.0, muts)?)
 }
@@ -96,11 +124,14 @@ fn run_vls(
     let mut easy = easy_from_mp(&easy_mp)?;
     let msg1 = pull_from(&mut easy, MSG_1)?;
     let msg2 = pull_from(&mut easy, MSG_2)?;
+    let msg3 = pull_from(&mut easy, MSG_3)?;
     pull_unchecked(&mut easy, &[PREV_VLS, PREV_LSS]);
     let vel = pull_from(&mut easy, VELOCITY).ok();
     let velocity = vel_from_mp(vel)?;
     let state = state_from_easy(easy)?;
-    let ran = mobile::run_vls(args, state, &msg1, &msg2, &vls_msg, sequence, velocity);
+    let ran = mobile::run_vls(
+        args, state, &msg1, &msg2, &msg3, &vls_msg, sequence, velocity,
+    );
     let ret = ran.map_err(|e| SphinxError::VlsFailed {
         r: format!("{:?}", e),
     })?;
@@ -287,6 +318,7 @@ fn _run_vls_manual(
     state_mp: Vec<u8>,
     msg1: Vec<u8>,
     msg2: Vec<u8>,
+    msg3: Vec<u8>,
     vls_msg: Vec<u8>,
     sequence: Option<u16>,
     vel: Option<Vec<u8>>,
@@ -294,7 +326,9 @@ fn _run_vls_manual(
     let args = args_from_json(&args_string)?;
     let state = _state_from_mp(&state_mp)?;
     let velocity = vel_from_mp(vel)?;
-    let ret = mobile::run_vls(args, state, &msg1, &msg2, &vls_msg, sequence, velocity);
+    let ret = mobile::run_vls(
+        args, state, &msg1, &msg2, &msg3, &vls_msg, sequence, velocity,
+    );
     Ok(ret.map_err(|e| SphinxError::VlsFailed {
         r: format!("{:?}", e),
     })?)

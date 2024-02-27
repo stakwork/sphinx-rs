@@ -129,7 +129,7 @@ namespace sphinxrs {
   [Throws=SphinxError]
   RunReturn set_blockheight(u32 blockheight);
   [Throws=SphinxError]
-  RunReturn add_contact(string seed, string unique_time, bytes state, string to_pubkey, string route_hint, string my_alias, string my_img, u64 amt_msat);
+  RunReturn add_contact(string seed, string unique_time, bytes state, string to_pubkey, string route_hint, string my_alias, string my_img, u64 amt_msat, string? invite_code);
   [Throws=SphinxError]
   string get_contact(bytes state, string pubkey);
   [Throws=SphinxError]
@@ -164,4 +164,6 @@ namespace sphinxrs {
   RunReturn make_invite(string seed, string unique_time, bytes state, string host, u64 amt_msat);
   [Throws=SphinxError]
   RunReturn process_invite(string seed, string unique_time, bytes state, string invite_qr);
+  [Throws=SphinxError]
+  string code_from_invite(string invite_qr);
 };
