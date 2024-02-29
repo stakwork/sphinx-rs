@@ -27,6 +27,7 @@ pub struct RunReturn {
     pub tribe_members: Option<String>,
     pub new_invite: Option<String>,
     pub inviter_contact_info: Option<String>,
+    pub inviter_alias: Option<String>,
     pub initial_tribe: Option<String>,
     pub lsp_host: Option<String>,
 }
@@ -340,9 +341,10 @@ pub fn make_invite(
     full_state: Vec<u8>,
     host: String,
     amt_msat: u64,
+    my_alias: String,
 ) -> Result<RunReturn> {
     Ok(
-        bindings::make_invite(&seed, &unique_time, &full_state, &host, amt_msat)
+        bindings::make_invite(&seed, &unique_time, &full_state, &host, amt_msat, &my_alias)
             .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
             .into(),
     )
@@ -397,6 +399,7 @@ impl From<bindings::RunReturn> for RunReturn {
             tribe_members: rr.tribe_members,
             new_invite: rr.new_invite,
             inviter_contact_info: rr.inviter_contact_info,
+            inviter_alias: rr.inviter_alias,
             initial_tribe: rr.initial_tribe,
             lsp_host: rr.lsp_host,
         }

@@ -67,6 +67,7 @@ dictionary RunReturn {
     string? tribe_members;
     string? new_invite;
     string? inviter_contact_info;
+    string? inviter_alias;
     string? initial_tribe;
     string? lsp_host;
 };
@@ -162,7 +163,7 @@ namespace sphinxrs {
   [Throws=SphinxError]
   RunReturn list_tribe_members(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_pubkey);
   [Throws=SphinxError]
-  RunReturn make_invite(string seed, string unique_time, bytes state, string host, u64 amt_msat);
+  RunReturn make_invite(string seed, string unique_time, bytes state, string host, u64 amt_msat, string my_alias);
   [Throws=SphinxError]
   RunReturn process_invite(string seed, string unique_time, bytes state, string invite_qr);
   [Throws=SphinxError]
