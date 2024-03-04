@@ -1854,7 +1854,7 @@ public func `listTribeMembers`(`seed`: String, `uniqueTime`: String, `state`: Da
     )
 }
 
-public func `makeInvite`(`seed`: String, `uniqueTime`: String, `state`: Data, `host`: String, `amtMsat`: UInt64, `myAlias`: String) throws -> RunReturn {
+public func `makeInvite`(`seed`: String, `uniqueTime`: String, `state`: Data, `host`: String, `amtMsat`: UInt64, `myAlias`: String, `tribeHost`: String?, `tribePubkey`: String?) throws -> RunReturn {
     return try  FfiConverterTypeRunReturn.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_make_invite(
@@ -1863,7 +1863,9 @@ public func `makeInvite`(`seed`: String, `uniqueTime`: String, `state`: Data, `h
         FfiConverterData.lower(`state`),
         FfiConverterString.lower(`host`),
         FfiConverterUInt64.lower(`amtMsat`),
-        FfiConverterString.lower(`myAlias`),$0)
+        FfiConverterString.lower(`myAlias`),
+        FfiConverterOptionString.lower(`tribeHost`),
+        FfiConverterOptionString.lower(`tribePubkey`),$0)
 }
     )
 }
@@ -2039,7 +2041,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_list_tribe_members() != 48922) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_make_invite() != 61878) {
+    if (uniffi_sphinxrs_checksum_func_make_invite() != 6280) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_process_invite() != 52237) {

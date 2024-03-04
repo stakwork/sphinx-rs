@@ -342,12 +342,21 @@ pub fn make_invite(
     host: String,
     amt_msat: u64,
     my_alias: String,
+    tribe_host: Option<String>,
+    tribe_pubkey: Option<String>,
 ) -> Result<RunReturn> {
-    Ok(
-        bindings::make_invite(&seed, &unique_time, &full_state, &host, amt_msat, &my_alias)
-            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
-            .into(),
+    Ok(bindings::make_invite(
+        &seed,
+        &unique_time,
+        &full_state,
+        &host,
+        amt_msat,
+        &my_alias,
+        tribe_host.as_deref(),
+        tribe_pubkey.as_deref(),
     )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
 }
 
 pub fn process_invite(

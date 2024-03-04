@@ -163,7 +163,7 @@ namespace sphinxrs {
   [Throws=SphinxError]
   RunReturn list_tribe_members(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_pubkey);
   [Throws=SphinxError]
-  RunReturn make_invite(string seed, string unique_time, bytes state, string host, u64 amt_msat, string my_alias);
+  RunReturn make_invite(string seed, string unique_time, bytes state, string host, u64 amt_msat, string my_alias, string? tribe_host, string? tribe_pubkey);
   [Throws=SphinxError]
   RunReturn process_invite(string seed, string unique_time, bytes state, string invite_qr);
   [Throws=SphinxError]
