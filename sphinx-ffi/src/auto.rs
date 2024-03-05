@@ -18,6 +18,7 @@ pub struct RunReturn {
     pub topics: Vec<String>,
     pub payloads: Vec<Vec<u8>>,
     pub state_mp: Option<Vec<u8>>,
+    pub state_to_delete: Vec<String>,
     pub new_balance: Option<u64>,
     pub my_contact_info: Option<String>,
     pub sent_status: Option<String>,
@@ -30,6 +31,7 @@ pub struct RunReturn {
     pub inviter_alias: Option<String>,
     pub initial_tribe: Option<String>,
     pub lsp_host: Option<String>,
+    pub invoice: Option<String>,
 }
 
 pub fn set_network(net: String) -> Result<RunReturn> {
@@ -260,19 +262,27 @@ pub fn make_invoice(
     unique_time: String,
     full_state: Vec<u8>,
     amt_msat: u64,
-    preimage: String,
     description: String,
-) -> Result<String> {
-    Ok(bindings::make_invoice(
-        &seed,
-        &unique_time,
-        &full_state,
-        amt_msat,
-        &preimage,
-        &description,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::make_invoice(&seed, &unique_time, &full_state, amt_msat, &description)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
     )
-    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
-    .into())
+}
+
+pub fn pay_invoice(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    bolt11: String,
+    overpay_msat: Option<u64>,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::pay_invoice(&seed, &unique_time, &full_state, &bolt11, overpay_msat)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
 }
 
 pub fn create_tribe(
@@ -399,6 +409,7 @@ impl From<bindings::RunReturn> for RunReturn {
             topics: rr.topics,
             payloads: rr.payloads,
             state_mp: rr.state_mp,
+            state_to_delete: rr.state_to_delete,
             new_balance: rr.new_balance,
             my_contact_info: rr.my_contact_info,
             sent_status: rr.sent_status,
@@ -411,6 +422,7 @@ impl From<bindings::RunReturn> for RunReturn {
             inviter_alias: rr.inviter_alias,
             initial_tribe: rr.initial_tribe,
             lsp_host: rr.lsp_host,
+            invoice: rr.invoice,
         }
     }
 }

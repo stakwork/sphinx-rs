@@ -352,7 +352,7 @@ fn run_peel_received_payment_to_bytes(
     rhash: [u8; 32],
     cur_height: u32,
     cltv_expiry: u32,
-) -> Result<(u64, String, Vec<u8>)> {
+) -> Result<(u64, Option<String>, Vec<u8>)> {
     Ok(
         sphinx::peel_received_payment(km, pld, rhash, cur_height, cltv_expiry).map_err(|e| {
             SphinxError::Decrypt {

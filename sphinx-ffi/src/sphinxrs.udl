@@ -58,6 +58,7 @@ dictionary RunReturn {
     sequence<string> topics;
     sequence<bytes> payloads;
     bytes? state_mp;
+    sequence<string> state_to_delete;
     u64? new_balance;
     string? my_contact_info;
     string? sent_status;
@@ -70,6 +71,7 @@ dictionary RunReturn {
     string? inviter_alias;
     string? initial_tribe;
     string? lsp_host;
+    string? invoice;
 };
 
 namespace sphinxrs {
@@ -155,7 +157,9 @@ namespace sphinxrs {
   [Throws=SphinxError]
   string make_media_token_with_price(string seed, string unique_time, bytes state, string host, string muid, string to, u32 expiry, u64 price);
   [Throws=SphinxError]
-  string make_invoice(string seed, string unique_time, bytes state, u64 amt_msat, string preimage, string description);
+  RunReturn make_invoice(string seed, string unique_time, bytes state, u64 amt_msat, string description);
+  [Throws=SphinxError]
+  RunReturn pay_invoice(string seed, string unique_time, bytes state, string bolt11, u64? overpay_msat);
   [Throws=SphinxError]
   RunReturn create_tribe(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_json);
   [Throws=SphinxError]
