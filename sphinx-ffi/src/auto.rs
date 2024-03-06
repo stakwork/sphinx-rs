@@ -285,6 +285,11 @@ pub fn pay_invoice(
     )
 }
 
+pub fn payment_hash_from_invoice(bolt11: String) -> Result<String> {
+    Ok(bindings::payment_hash_from_invoice(&bolt11)
+        .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?)
+}
+
 pub fn create_tribe(
     seed: String,
     unique_time: String,
