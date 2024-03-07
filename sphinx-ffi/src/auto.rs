@@ -32,6 +32,8 @@ pub struct RunReturn {
     pub initial_tribe: Option<String>,
     pub lsp_host: Option<String>,
     pub invoice: Option<String>,
+    pub route: Option<String>,
+    pub node: Option<String>,
 }
 
 pub fn set_network(net: String) -> Result<RunReturn> {
@@ -428,6 +430,8 @@ impl From<bindings::RunReturn> for RunReturn {
             initial_tribe: rr.initial_tribe,
             lsp_host: rr.lsp_host,
             invoice: rr.invoice,
+            route: rr.route,
+            node: rr.node,
         }
     }
 }

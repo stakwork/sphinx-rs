@@ -72,6 +72,8 @@ dictionary RunReturn {
     string? initial_tribe;
     string? lsp_host;
     string? invoice;
+    string? route;
+    string? node;
 };
 
 namespace sphinxrs {

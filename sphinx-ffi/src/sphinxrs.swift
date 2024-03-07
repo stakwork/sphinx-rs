@@ -597,10 +597,12 @@ public struct RunReturn {
     public var `initialTribe`: String?
     public var `lspHost`: String?
     public var `invoice`: String?
+    public var `route`: String?
+    public var `node`: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(`msgs`: [Msg], `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?) {
+    public init(`msgs`: [Msg], `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?, `route`: String?, `node`: String?) {
         self.`msgs` = `msgs`
         self.`topics` = `topics`
         self.`payloads` = `payloads`
@@ -619,6 +621,8 @@ public struct RunReturn {
         self.`initialTribe` = `initialTribe`
         self.`lspHost` = `lspHost`
         self.`invoice` = `invoice`
+        self.`route` = `route`
+        self.`node` = `node`
     }
 }
 
@@ -679,6 +683,12 @@ extension RunReturn: Equatable, Hashable {
         if lhs.`invoice` != rhs.`invoice` {
             return false
         }
+        if lhs.`route` != rhs.`route` {
+            return false
+        }
+        if lhs.`node` != rhs.`node` {
+            return false
+        }
         return true
     }
 
@@ -701,6 +711,8 @@ extension RunReturn: Equatable, Hashable {
         hasher.combine(`initialTribe`)
         hasher.combine(`lspHost`)
         hasher.combine(`invoice`)
+        hasher.combine(`route`)
+        hasher.combine(`node`)
     }
 }
 
@@ -725,7 +737,9 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
             `inviterAlias`: FfiConverterOptionString.read(from: &buf), 
             `initialTribe`: FfiConverterOptionString.read(from: &buf), 
             `lspHost`: FfiConverterOptionString.read(from: &buf), 
-            `invoice`: FfiConverterOptionString.read(from: &buf)
+            `invoice`: FfiConverterOptionString.read(from: &buf), 
+            `route`: FfiConverterOptionString.read(from: &buf), 
+            `node`: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -748,6 +762,8 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.`initialTribe`, into: &buf)
         FfiConverterOptionString.write(value.`lspHost`, into: &buf)
         FfiConverterOptionString.write(value.`invoice`, into: &buf)
+        FfiConverterOptionString.write(value.`route`, into: &buf)
+        FfiConverterOptionString.write(value.`node`, into: &buf)
     }
 }
 
