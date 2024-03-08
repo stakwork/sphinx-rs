@@ -599,10 +599,12 @@ public struct RunReturn {
     public var `invoice`: String?
     public var `route`: String?
     public var `node`: String?
+    public var `lastRead`: String?
+    public var `muteLevels`: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(`msgs`: [Msg], `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?, `route`: String?, `node`: String?) {
+    public init(`msgs`: [Msg], `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?, `route`: String?, `node`: String?, `lastRead`: String?, `muteLevels`: String?) {
         self.`msgs` = `msgs`
         self.`topics` = `topics`
         self.`payloads` = `payloads`
@@ -623,6 +625,8 @@ public struct RunReturn {
         self.`invoice` = `invoice`
         self.`route` = `route`
         self.`node` = `node`
+        self.`lastRead` = `lastRead`
+        self.`muteLevels` = `muteLevels`
     }
 }
 
@@ -689,6 +693,12 @@ extension RunReturn: Equatable, Hashable {
         if lhs.`node` != rhs.`node` {
             return false
         }
+        if lhs.`lastRead` != rhs.`lastRead` {
+            return false
+        }
+        if lhs.`muteLevels` != rhs.`muteLevels` {
+            return false
+        }
         return true
     }
 
@@ -713,6 +723,8 @@ extension RunReturn: Equatable, Hashable {
         hasher.combine(`invoice`)
         hasher.combine(`route`)
         hasher.combine(`node`)
+        hasher.combine(`lastRead`)
+        hasher.combine(`muteLevels`)
     }
 }
 
@@ -739,7 +751,9 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
             `lspHost`: FfiConverterOptionString.read(from: &buf), 
             `invoice`: FfiConverterOptionString.read(from: &buf), 
             `route`: FfiConverterOptionString.read(from: &buf), 
-            `node`: FfiConverterOptionString.read(from: &buf)
+            `node`: FfiConverterOptionString.read(from: &buf), 
+            `lastRead`: FfiConverterOptionString.read(from: &buf), 
+            `muteLevels`: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -764,6 +778,8 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.`invoice`, into: &buf)
         FfiConverterOptionString.write(value.`route`, into: &buf)
         FfiConverterOptionString.write(value.`node`, into: &buf)
+        FfiConverterOptionString.write(value.`lastRead`, into: &buf)
+        FfiConverterOptionString.write(value.`muteLevels`, into: &buf)
     }
 }
 
@@ -886,6 +902,7 @@ public enum SphinxError {
     case SendFailed(`r`: String)
     case SetNetworkFailed(`r`: String)
     case SetBlockheightFailed(`r`: String)
+    case ParseStateFailed(`r`: String)
 
     fileprivate static func uniffiErrorHandler(_ error: RustBuffer) throws -> Error {
         return try FfiConverterTypeSphinxError.lift(error)
@@ -982,6 +999,9 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
             `r`: try FfiConverterString.read(from: &buf)
             )
         case 27: return .SetBlockheightFailed(
+            `r`: try FfiConverterString.read(from: &buf)
+            )
+        case 28: return .ParseStateFailed(
             `r`: try FfiConverterString.read(from: &buf)
             )
 
@@ -1128,6 +1148,11 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
         
         case let .SetBlockheightFailed(`r`):
             writeInt(&buf, Int32(27))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .ParseStateFailed(`r`):
+            writeInt(&buf, Int32(28))
             FfiConverterString.write(`r`, into: &buf)
             
         }
@@ -1944,6 +1969,63 @@ public func `codeFromInvite`(`inviteQr`: String) throws -> String {
     )
 }
 
+public func `getDefaultTribeServer`(`state`: Data) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_get_default_tribe_server(
+        FfiConverterData.lower(`state`),$0)
+}
+    )
+}
+
+public func `read`(`seed`: String, `uniqueTime`: String, `state`: Data, `pubkey`: String, `msgIdx`: UInt64) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_read(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),
+        FfiConverterString.lower(`pubkey`),
+        FfiConverterUInt64.lower(`msgIdx`),$0)
+}
+    )
+}
+
+public func `getReads`(`seed`: String, `uniqueTime`: String, `state`: Data) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_get_reads(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),$0)
+}
+    )
+}
+
+public func `mute`(`seed`: String, `uniqueTime`: String, `state`: Data, `pubkey`: String, `muteLevel`: UInt8) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_mute(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),
+        FfiConverterString.lower(`pubkey`),
+        FfiConverterUInt8.lower(`muteLevel`),$0)
+}
+    )
+}
+
+public func `getMutes`(`seed`: String, `uniqueTime`: String, `state`: Data) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_get_mutes(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),$0)
+}
+    )
+}
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch
@@ -2107,6 +2189,21 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_code_from_invite() != 40279) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_get_default_tribe_server() != 13603) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_read() != 47440) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_get_reads() != 13726) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_mute() != 58453) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_get_mutes() != 4885) {
         return InitializationResult.apiChecksumMismatch
     }
 

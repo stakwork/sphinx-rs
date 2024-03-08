@@ -163,6 +163,16 @@ RustBuffer uniffi_sphinxrs_fn_func_process_invite(RustBuffer seed, RustBuffer un
 );
 RustBuffer uniffi_sphinxrs_fn_func_code_from_invite(RustBuffer invite_qr, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_get_default_tribe_server(RustBuffer state, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_read(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer pubkey, uint64_t msg_idx, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_get_reads(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_mute(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer pubkey, uint8_t mute_level, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_get_mutes(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
+);
 RustBuffer ffi_sphinxrs_rustbuffer_alloc(int32_t size, RustCallStatus *_Nonnull out_status
 );
 RustBuffer ffi_sphinxrs_rustbuffer_from_bytes(ForeignBytes bytes, RustCallStatus *_Nonnull out_status
@@ -319,6 +329,21 @@ uint16_t uniffi_sphinxrs_checksum_func_process_invite(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_code_from_invite(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_get_default_tribe_server(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_read(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_get_reads(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_mute(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_get_mutes(void
     
 );
 uint32_t ffi_sphinxrs_uniffi_contract_version(void

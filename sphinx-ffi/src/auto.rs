@@ -34,6 +34,8 @@ pub struct RunReturn {
     pub invoice: Option<String>,
     pub route: Option<String>,
     pub node: Option<String>,
+    pub last_read: Option<String>,
+    pub mute_levels: Option<String>,
 }
 
 pub fn set_network(net: String) -> Result<RunReturn> {
@@ -46,6 +48,12 @@ pub fn set_blockheight(bh: u32) -> Result<RunReturn> {
     Ok(bindings::set_blockheight(bh)
         .map_err(|e| SphinxError::SetBlockheightFailed { r: e.to_string() })?
         .into())
+}
+
+pub fn get_default_tribe_server(full_state: Vec<u8>) -> Result<String> {
+    let ns = bindings::get_default_tribe_server(&full_state)
+        .map_err(|e| SphinxError::ParseStateFailed { r: e.to_string() })?;
+    Ok(ns.to_string())
 }
 
 pub fn add_contact(
@@ -394,6 +402,46 @@ pub fn code_from_invite(invite_qr: String) -> Result<String> {
         .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?)
 }
 
+pub fn read(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    pubkey: String,
+    msg_idx: u64,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::read(&seed, &unique_time, &full_state, &pubkey, msg_idx)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
+pub fn get_reads(seed: String, unique_time: String, full_state: Vec<u8>) -> Result<RunReturn> {
+    Ok(bindings::get_reads(&seed, &unique_time, &full_state)
+        .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+        .into())
+}
+
+pub fn mute(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    pubkey: String,
+    mute_level: u8,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::mute(&seed, &unique_time, &full_state, &pubkey, mute_level)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
+pub fn get_mutes(seed: String, unique_time: String, full_state: Vec<u8>) -> Result<RunReturn> {
+    Ok(bindings::get_mutes(&seed, &unique_time, &full_state)
+        .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+        .into())
+}
+
 impl From<bindings::Msg> for Msg {
     fn from(rr: bindings::Msg) -> Self {
         Msg {
@@ -432,6 +480,8 @@ impl From<bindings::RunReturn> for RunReturn {
             invoice: rr.invoice,
             route: rr.route,
             node: rr.node,
+            last_read: rr.last_read,
+            mute_levels: rr.mute_levels,
         }
     }
 }

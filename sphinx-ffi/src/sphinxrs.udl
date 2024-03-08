@@ -27,6 +27,7 @@ interface SphinxError {
   SendFailed(string r);
   SetNetworkFailed(string r);
   SetBlockheightFailed(string r);
+  ParseStateFailed(string r);
 };
 
 dictionary Keys {
@@ -74,6 +75,8 @@ dictionary RunReturn {
     string? invoice;
     string? route;
     string? node;
+    string? last_read;
+    string? mute_levels;
 };
 
 namespace sphinxrs {
@@ -176,4 +179,14 @@ namespace sphinxrs {
   RunReturn process_invite(string seed, string unique_time, bytes state, string invite_qr);
   [Throws=SphinxError]
   string code_from_invite(string invite_qr);
+  [Throws=SphinxError]
+  string get_default_tribe_server(bytes state);
+  [Throws=SphinxError]
+  RunReturn read(string seed, string unique_time, bytes state, string pubkey, u64 msg_idx);
+  [Throws=SphinxError]
+  RunReturn get_reads(string seed, string unique_time, bytes state);
+  [Throws=SphinxError]
+  RunReturn mute(string seed, string unique_time, bytes state, string pubkey, u8 mute_level);
+  [Throws=SphinxError]
+  RunReturn get_mutes(string seed, string unique_time, bytes state);
 };

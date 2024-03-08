@@ -79,6 +79,8 @@ pub enum SphinxError {
     SetNetworkFailed { r: String },
     #[error("SetBlockheightFailed: {r}")]
     SetBlockheightFailed { r: String },
+    #[error("ParseStateFailed: {r}")]
+    ParseStateFailed { r: String },
 }
 
 pub fn pubkey_from_secret_key(my_secret_key: String) -> Result<String> {
