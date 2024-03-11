@@ -2026,6 +2026,18 @@ public func `getMutes`(`seed`: String, `uniqueTime`: String, `state`: Data) thro
     )
 }
 
+public func `setPushToken`(`seed`: String, `uniqueTime`: String, `state`: Data, `pushToken`: String) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_set_push_token(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),
+        FfiConverterString.lower(`pushToken`),$0)
+}
+    )
+}
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch
@@ -2204,6 +2216,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_get_mutes() != 4885) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_set_push_token() != 7668) {
         return InitializationResult.apiChecksumMismatch
     }
 

@@ -442,6 +442,19 @@ pub fn get_mutes(seed: String, unique_time: String, full_state: Vec<u8>) -> Resu
         .into())
 }
 
+pub fn set_push_token(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    push_token: String,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::set_push_token(&seed, &unique_time, &full_state, &push_token)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
 impl From<bindings::Msg> for Msg {
     fn from(rr: bindings::Msg) -> Self {
         Msg {

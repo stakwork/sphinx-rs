@@ -189,4 +189,6 @@ namespace sphinxrs {
   RunReturn mute(string seed, string unique_time, bytes state, string pubkey, u8 mute_level);
   [Throws=SphinxError]
   RunReturn get_mutes(string seed, string unique_time, bytes state);
+  [Throws=SphinxError]
+  RunReturn set_push_token(string seed, string unique_time, bytes state, string push_token);
 };
