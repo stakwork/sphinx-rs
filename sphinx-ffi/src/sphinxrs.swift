@@ -1248,6 +1248,27 @@ fileprivate struct FfiConverterOptionUInt64: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionBool: FfiConverterRustBuffer {
+    typealias SwiftType = Bool?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterBool.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterBool.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
     typealias SwiftType = String?
 
@@ -2038,6 +2059,36 @@ public func `setPushToken`(`seed`: String, `uniqueTime`: String, `state`: Data, 
     )
 }
 
+public func `fetchMsgsBatch`(`seed`: String, `uniqueTime`: String, `state`: Data, `lastMsgIdx`: UInt64, `limit`: UInt32?, `reverse`: Bool?, `isRestore`: Bool?) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_fetch_msgs_batch(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),
+        FfiConverterUInt64.lower(`lastMsgIdx`),
+        FfiConverterOptionUInt32.lower(`limit`),
+        FfiConverterOptionBool.lower(`reverse`),
+        FfiConverterOptionBool.lower(`isRestore`),$0)
+}
+    )
+}
+
+public func `fetchMsgsBatchOkkey`(`seed`: String, `uniqueTime`: String, `state`: Data, `lastMsgIdx`: UInt64, `limit`: UInt32?, `reverse`: Bool?, `isRestore`: Bool?) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_fetch_msgs_batch_okkey(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),
+        FfiConverterUInt64.lower(`lastMsgIdx`),
+        FfiConverterOptionUInt32.lower(`limit`),
+        FfiConverterOptionBool.lower(`reverse`),
+        FfiConverterOptionBool.lower(`isRestore`),$0)
+}
+    )
+}
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch
@@ -2219,6 +2270,12 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_set_push_token() != 7668) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_fetch_msgs_batch() != 65179) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_fetch_msgs_batch_okkey() != 11004) {
         return InitializationResult.apiChecksumMismatch
     }
 
