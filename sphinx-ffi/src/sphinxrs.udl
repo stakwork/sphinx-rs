@@ -168,6 +168,8 @@ namespace sphinxrs {
   [Throws=SphinxError]
   string payment_hash_from_invoice(string bolt11);
   [Throws=SphinxError]
+  string parse_invoice(string invoice_json);
+  [Throws=SphinxError]
   RunReturn create_tribe(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_json);
   [Throws=SphinxError]
   RunReturn join_tribe(string seed, string unique_time, bytes state, string tribe_pubkey, string tribe_route_hint, string alias, u64 amt_msat, boolean is_private);

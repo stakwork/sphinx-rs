@@ -151,6 +151,8 @@ RustBuffer uniffi_sphinxrs_fn_func_pay_invoice(RustBuffer seed, RustBuffer uniqu
 );
 RustBuffer uniffi_sphinxrs_fn_func_payment_hash_from_invoice(RustBuffer bolt11, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_parse_invoice(RustBuffer invoice_json, RustCallStatus *_Nonnull out_status
+);
 RustBuffer uniffi_sphinxrs_fn_func_create_tribe(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_json, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_join_tribe(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_pubkey, RustBuffer tribe_route_hint, RustBuffer alias, uint64_t amt_msat, int8_t is_private, RustCallStatus *_Nonnull out_status
@@ -317,6 +319,9 @@ uint16_t uniffi_sphinxrs_checksum_func_pay_invoice(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_payment_hash_from_invoice(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_parse_invoice(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_create_tribe(void

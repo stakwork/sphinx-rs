@@ -300,6 +300,11 @@ pub fn payment_hash_from_invoice(bolt11: String) -> Result<String> {
         .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?)
 }
 
+pub fn parse_invoice(bolt11: String) -> Result<String> {
+    Ok(bindings::parse_invoice(&bolt11)
+        .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?)
+}
+
 pub fn create_tribe(
     seed: String,
     unique_time: String,
