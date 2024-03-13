@@ -166,6 +166,8 @@ namespace sphinxrs {
   [Throws=SphinxError]
   RunReturn pay_invoice(string seed, string unique_time, bytes state, string bolt11, u64? overpay_msat);
   [Throws=SphinxError]
+  RunReturn pay_contact_invoice(string seed, string unique_time, bytes state, string bolt11, string my_alias, string my_img);
+  [Throws=SphinxError]
   string payment_hash_from_invoice(string bolt11);
   [Throws=SphinxError]
   string parse_invoice(string invoice_json);

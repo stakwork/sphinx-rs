@@ -288,11 +288,36 @@ pub fn pay_invoice(
     bolt11: String,
     overpay_msat: Option<u64>,
 ) -> Result<RunReturn> {
-    Ok(
-        bindings::pay_invoice(&seed, &unique_time, &full_state, &bolt11, overpay_msat)
-            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
-            .into(),
+    Ok(bindings::pay_invoice(
+        &seed,
+        &unique_time,
+        &full_state,
+        &bolt11,
+        overpay_msat,
+        None,
     )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
+}
+
+pub fn pay_contact_invoice(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    bolt11: String,
+    my_alias: String,
+    my_img: String,
+) -> Result<RunReturn> {
+    Ok(bindings::pay_contact_invoice(
+        &seed,
+        &unique_time,
+        &full_state,
+        &bolt11,
+        &my_alias,
+        &my_img_opt(&my_img),
+    )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
 }
 
 pub fn payment_hash_from_invoice(bolt11: String) -> Result<String> {
