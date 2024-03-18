@@ -117,7 +117,7 @@ pub fn peel_onion_msg(
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
     let bytes = run_peel_received_onion_to_bytes(&km, &payload)?;
-    let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes)
+    let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes, None)
         .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
     Ok(msg)
 }
@@ -211,9 +211,9 @@ pub fn peel_payment_msg(
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
     let payment_hash = parse_hash(&rhash)?;
-    let (_amt, _preimage, bytes) =
+    let (amt_opt, _preimage, bytes) =
         run_peel_received_payment_to_bytes(&km, &payload, payment_hash, cur_height, cltv_expiry)?;
-    let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes)
+    let msg = sphinx::msg::parse_sphinx_msg_to_json(&bytes, amt_opt)
         .map_err(|e| SphinxError::BadMsg { r: e.to_string() })?;
     Ok(msg)
 }
@@ -352,7 +352,7 @@ fn run_peel_received_payment_to_bytes(
     rhash: [u8; 32],
     cur_height: u32,
     cltv_expiry: u32,
-) -> Result<(u64, Option<String>, Vec<u8>)> {
+) -> Result<(Option<u64>, Option<String>, Vec<u8>)> {
     Ok(
         sphinx::peel_received_payment(km, pld, rhash, cur_height, cltv_expiry).map_err(|e| {
             SphinxError::Decrypt {
