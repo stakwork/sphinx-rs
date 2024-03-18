@@ -307,6 +307,7 @@ pub fn pay_contact_invoice(
     bolt11: String,
     my_alias: String,
     my_img: String,
+    is_tribe: bool,
 ) -> Result<RunReturn> {
     Ok(bindings::pay_contact_invoice(
         &seed,
@@ -315,6 +316,7 @@ pub fn pay_contact_invoice(
         &bolt11,
         &my_alias,
         &my_img_opt(&my_img),
+        is_tribe,
     )
     .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
     .into())

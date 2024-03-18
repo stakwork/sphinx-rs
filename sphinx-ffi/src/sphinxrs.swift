@@ -1902,7 +1902,7 @@ public func `payInvoice`(`seed`: String, `uniqueTime`: String, `state`: Data, `b
     )
 }
 
-public func `payContactInvoice`(`seed`: String, `uniqueTime`: String, `state`: Data, `bolt11`: String, `myAlias`: String, `myImg`: String) throws -> RunReturn {
+public func `payContactInvoice`(`seed`: String, `uniqueTime`: String, `state`: Data, `bolt11`: String, `myAlias`: String, `myImg`: String, `isTribe`: Bool) throws -> RunReturn {
     return try  FfiConverterTypeRunReturn.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_pay_contact_invoice(
@@ -1911,7 +1911,8 @@ public func `payContactInvoice`(`seed`: String, `uniqueTime`: String, `state`: D
         FfiConverterData.lower(`state`),
         FfiConverterString.lower(`bolt11`),
         FfiConverterString.lower(`myAlias`),
-        FfiConverterString.lower(`myImg`),$0)
+        FfiConverterString.lower(`myImg`),
+        FfiConverterBool.lower(`isTribe`),$0)
 }
     )
 }
@@ -2256,7 +2257,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_pay_invoice() != 40951) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_pay_contact_invoice() != 38258) {
+    if (uniffi_sphinxrs_checksum_func_pay_contact_invoice() != 2604) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_payment_hash_from_invoice() != 3194) {
