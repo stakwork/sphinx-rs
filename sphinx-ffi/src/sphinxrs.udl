@@ -47,6 +47,7 @@ dictionary Msg {
     string? message;
     u8? type;
     string? uuid;
+    string? tag;
     string? index;
     string? sender;
     u64? msat;
