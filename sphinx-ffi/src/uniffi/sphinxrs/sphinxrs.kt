@@ -1074,6 +1074,7 @@ public object FfiConverterTypeMsg: FfiConverterRustBuffer<Msg> {
 
 data class RunReturn (
     var `msgs`: List<Msg>, 
+    var `msgsTotal`: ULong?, 
     var `topics`: List<String>, 
     var `payloads`: List<ByteArray>, 
     var `stateMp`: ByteArray?, 
@@ -1103,6 +1104,7 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
     override fun read(buf: ByteBuffer): RunReturn {
         return RunReturn(
             FfiConverterSequenceTypeMsg.read(buf),
+            FfiConverterOptionalULong.read(buf),
             FfiConverterSequenceString.read(buf),
             FfiConverterSequenceByteArray.read(buf),
             FfiConverterOptionalByteArray.read(buf),
@@ -1129,6 +1131,7 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
 
     override fun allocationSize(value: RunReturn) = (
             FfiConverterSequenceTypeMsg.allocationSize(value.`msgs`) +
+            FfiConverterOptionalULong.allocationSize(value.`msgsTotal`) +
             FfiConverterSequenceString.allocationSize(value.`topics`) +
             FfiConverterSequenceByteArray.allocationSize(value.`payloads`) +
             FfiConverterOptionalByteArray.allocationSize(value.`stateMp`) +
@@ -1154,6 +1157,7 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
 
     override fun write(value: RunReturn, buf: ByteBuffer) {
             FfiConverterSequenceTypeMsg.write(value.`msgs`, buf)
+            FfiConverterOptionalULong.write(value.`msgsTotal`, buf)
             FfiConverterSequenceString.write(value.`topics`, buf)
             FfiConverterSequenceByteArray.write(value.`payloads`, buf)
             FfiConverterOptionalByteArray.write(value.`stateMp`, buf)
