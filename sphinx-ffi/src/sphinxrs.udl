@@ -200,4 +200,6 @@ namespace sphinxrs {
   RunReturn fetch_msgs_batch(string seed, string unique_time, bytes state, u64 last_msg_idx, u32? limit, boolean? reverse, boolean? is_restore);
   [Throws=SphinxError]
   RunReturn fetch_msgs_batch_okkey(string seed, string unique_time, bytes state, u64 last_msg_idx, u32? limit, boolean? reverse, boolean? is_restore);
+  [Throws=SphinxError]
+  RunReturn fetch_first_msgs_per_key(string seed, string unique_time, bytes state, u64 last_msg_idx, u32? limit, boolean? reverse, boolean? is_restore);
 };

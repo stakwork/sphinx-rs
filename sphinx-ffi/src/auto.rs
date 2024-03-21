@@ -532,6 +532,28 @@ pub fn fetch_msgs_batch_okkey(
     .into())
 }
 
+pub fn fetch_first_msgs_per_key(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    last_msg_idx: u64,
+    limit: Option<u32>,
+    reverse: Option<bool>,
+    is_restore: Option<bool>,
+) -> Result<RunReturn> {
+    Ok(bindings::fetch_first_msgs_per_key(
+        &seed,
+        &unique_time,
+        &full_state,
+        last_msg_idx,
+        limit,
+        reverse,
+        is_restore,
+    )
+    .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
+    .into())
+}
+
 impl From<bindings::Msg> for Msg {
     fn from(rr: bindings::Msg) -> Self {
         Msg {
