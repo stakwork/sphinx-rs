@@ -17,6 +17,7 @@ pub struct Msg {
 pub struct RunReturn {
     pub msgs: Vec<Msg>,
     pub msgs_total: Option<u64>,
+    pub msgs_counts: Option<String>,
     pub topics: Vec<String>,
     pub payloads: Vec<Vec<u8>>,
     pub state_mp: Option<Vec<u8>>,
@@ -576,6 +577,7 @@ impl From<bindings::RunReturn> for RunReturn {
         RunReturn {
             msgs: rr.msgs.into_iter().map(|m| m.into()).collect(),
             msgs_total: rr.msgs_total,
+            msgs_counts: rr.msgs_counts,
             topics: rr.topics,
             payloads: rr.payloads,
             state_mp: rr.state_mp,

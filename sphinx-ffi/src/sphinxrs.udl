@@ -58,6 +58,7 @@ dictionary Msg {
 dictionary RunReturn {
     sequence<Msg> msgs;
     u64? msgs_total;
+    string? msgs_counts;
     sequence<string> topics;
     sequence<bytes> payloads;
     bytes? state_mp;
