@@ -199,6 +199,8 @@ namespace sphinxrs {
   [Throws=SphinxError]
   RunReturn set_push_token(string seed, string unique_time, bytes state, string push_token);
   [Throws=SphinxError]
+  RunReturn get_msgs_counts(string seed, string unique_time, bytes state);
+  [Throws=SphinxError]
   RunReturn fetch_msgs_batch(string seed, string unique_time, bytes state, u64 last_msg_idx, u32? limit, boolean? reverse, boolean? is_restore);
   [Throws=SphinxError]
   RunReturn fetch_msgs_batch_okkey(string seed, string unique_time, bytes state, u64 last_msg_idx, u32? limit, boolean? reverse, boolean? is_restore);

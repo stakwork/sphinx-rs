@@ -2107,6 +2107,17 @@ public func `setPushToken`(`seed`: String, `uniqueTime`: String, `state`: Data, 
     )
 }
 
+public func `getMsgsCounts`(`seed`: String, `uniqueTime`: String, `state`: Data) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_get_msgs_counts(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),$0)
+}
+    )
+}
+
 public func `fetchMsgsBatch`(`seed`: String, `uniqueTime`: String, `state`: Data, `lastMsgIdx`: UInt64, `limit`: UInt32?, `reverse`: Bool?, `isRestore`: Bool?) throws -> RunReturn {
     return try  FfiConverterTypeRunReturn.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
@@ -2339,6 +2350,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_set_push_token() != 7668) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_get_msgs_counts() != 29743) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_fetch_msgs_batch() != 65179) {

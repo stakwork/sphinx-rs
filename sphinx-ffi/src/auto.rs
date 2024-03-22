@@ -490,6 +490,16 @@ pub fn set_push_token(
     )
 }
 
+pub fn get_msgs_counts(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+) -> Result<RunReturn> {
+    Ok(bindings::get_msgs_counts(&seed, &unique_time, &full_state)
+        .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
+        .into())
+}
+
 pub fn fetch_msgs_batch(
     seed: String,
     unique_time: String,
