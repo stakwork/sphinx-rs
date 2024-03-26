@@ -12,6 +12,7 @@ pub struct Msg {
     pub msat: Option<u64>,
     pub timestamp: Option<u64>,
     pub sent_to: Option<String>,
+    pub from_me: Option<bool>,
 }
 
 pub struct RunReturn {
@@ -578,6 +579,7 @@ impl From<bindings::Msg> for Msg {
             msat: rr.msat,
             timestamp: rr.timestamp,
             sent_to: rr.sent_to,
+            from_me: rr.from_me,
         }
     }
 }

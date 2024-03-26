@@ -53,6 +53,7 @@ dictionary Msg {
     u64? msat;
     u64? timestamp;
     string? sent_to;
+    boolean? from_me;
 };
 
 dictionary RunReturn {
