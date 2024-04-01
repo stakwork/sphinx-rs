@@ -1107,7 +1107,9 @@ data class RunReturn (
     var `route`: String?, 
     var `node`: String?, 
     var `lastRead`: String?, 
-    var `muteLevels`: String?
+    var `muteLevels`: String?, 
+    var `payments`: String?, 
+    var `paymentsTotal`: ULong?
 ) {
     
 }
@@ -1139,6 +1141,8 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalULong.read(buf),
         )
     }
 
@@ -1166,7 +1170,9 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalString.allocationSize(value.`route`) +
             FfiConverterOptionalString.allocationSize(value.`node`) +
             FfiConverterOptionalString.allocationSize(value.`lastRead`) +
-            FfiConverterOptionalString.allocationSize(value.`muteLevels`)
+            FfiConverterOptionalString.allocationSize(value.`muteLevels`) +
+            FfiConverterOptionalString.allocationSize(value.`payments`) +
+            FfiConverterOptionalULong.allocationSize(value.`paymentsTotal`)
     )
 
     override fun write(value: RunReturn, buf: ByteBuffer) {
@@ -1194,6 +1200,8 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalString.write(value.`node`, buf)
             FfiConverterOptionalString.write(value.`lastRead`, buf)
             FfiConverterOptionalString.write(value.`muteLevels`, buf)
+            FfiConverterOptionalString.write(value.`payments`, buf)
+            FfiConverterOptionalULong.write(value.`paymentsTotal`, buf)
     }
 }
 
