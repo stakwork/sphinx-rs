@@ -40,6 +40,8 @@ pub struct RunReturn {
     pub node: Option<String>,
     pub last_read: Option<String>,
     pub mute_levels: Option<String>,
+    pub payments: Option<String>,
+    pub payments_total: Option<u64>,
 }
 
 pub fn set_network(net: String) -> Result<RunReturn> {
@@ -611,6 +613,8 @@ impl From<bindings::RunReturn> for RunReturn {
             node: rr.node,
             last_read: rr.last_read,
             mute_levels: rr.mute_levels,
+            payments: rr.payments,
+            payments_total: rr.payments_total,
         }
     }
 }

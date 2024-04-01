@@ -619,10 +619,12 @@ public struct RunReturn {
     public var `node`: String?
     public var `lastRead`: String?
     public var `muteLevels`: String?
+    public var `payments`: String?
+    public var `paymentsTotal`: UInt64?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(`msgs`: [Msg], `msgsTotal`: UInt64?, `msgsCounts`: String?, `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?, `route`: String?, `node`: String?, `lastRead`: String?, `muteLevels`: String?) {
+    public init(`msgs`: [Msg], `msgsTotal`: UInt64?, `msgsCounts`: String?, `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?, `route`: String?, `node`: String?, `lastRead`: String?, `muteLevels`: String?, `payments`: String?, `paymentsTotal`: UInt64?) {
         self.`msgs` = `msgs`
         self.`msgsTotal` = `msgsTotal`
         self.`msgsCounts` = `msgsCounts`
@@ -647,6 +649,8 @@ public struct RunReturn {
         self.`node` = `node`
         self.`lastRead` = `lastRead`
         self.`muteLevels` = `muteLevels`
+        self.`payments` = `payments`
+        self.`paymentsTotal` = `paymentsTotal`
     }
 }
 
@@ -725,6 +729,12 @@ extension RunReturn: Equatable, Hashable {
         if lhs.`muteLevels` != rhs.`muteLevels` {
             return false
         }
+        if lhs.`payments` != rhs.`payments` {
+            return false
+        }
+        if lhs.`paymentsTotal` != rhs.`paymentsTotal` {
+            return false
+        }
         return true
     }
 
@@ -753,6 +763,8 @@ extension RunReturn: Equatable, Hashable {
         hasher.combine(`node`)
         hasher.combine(`lastRead`)
         hasher.combine(`muteLevels`)
+        hasher.combine(`payments`)
+        hasher.combine(`paymentsTotal`)
     }
 }
 
@@ -783,7 +795,9 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
             `route`: FfiConverterOptionString.read(from: &buf), 
             `node`: FfiConverterOptionString.read(from: &buf), 
             `lastRead`: FfiConverterOptionString.read(from: &buf), 
-            `muteLevels`: FfiConverterOptionString.read(from: &buf)
+            `muteLevels`: FfiConverterOptionString.read(from: &buf), 
+            `payments`: FfiConverterOptionString.read(from: &buf), 
+            `paymentsTotal`: FfiConverterOptionUInt64.read(from: &buf)
         )
     }
 
@@ -812,6 +826,8 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.`node`, into: &buf)
         FfiConverterOptionString.write(value.`lastRead`, into: &buf)
         FfiConverterOptionString.write(value.`muteLevels`, into: &buf)
+        FfiConverterOptionString.write(value.`payments`, into: &buf)
+        FfiConverterOptionUInt64.write(value.`paymentsTotal`, into: &buf)
     }
 }
 

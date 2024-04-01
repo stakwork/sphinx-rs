@@ -81,6 +81,8 @@ dictionary RunReturn {
     string? node;
     string? last_read;
     string? mute_levels;
+    string? payments;
+    u64? payments_total;
 };
 
 namespace sphinxrs {
