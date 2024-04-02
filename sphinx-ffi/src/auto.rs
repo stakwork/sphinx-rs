@@ -569,6 +569,30 @@ pub fn fetch_first_msgs_per_key(
     .into())
 }
 
+pub fn fetch_payments(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    last_msg_idx: Option<u64>,
+    limit: Option<u32>,
+    scid: Option<u64>,
+    remote_only: Option<bool>,
+    min_msat: Option<u64>,
+) -> Result<RunReturn> {
+    Ok(bindings::fetch_payments(
+        &seed,
+        &unique_time,
+        &full_state,
+        last_msg_idx,
+        limit,
+        scid,
+        remote_only,
+        min_msat,
+    )
+    .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
+    .into())
+}
+
 impl From<bindings::Msg> for Msg {
     fn from(rr: bindings::Msg) -> Self {
         Msg {

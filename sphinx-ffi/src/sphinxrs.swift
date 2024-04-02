@@ -2187,6 +2187,22 @@ public func `fetchFirstMsgsPerKey`(`seed`: String, `uniqueTime`: String, `state`
     )
 }
 
+public func `fetchPayments`(`seed`: String, `uniqueTime`: String, `state`: Data, `lastMsgIdx`: UInt64?, `limit`: UInt32?, `scid`: UInt64?, `remoteOnly`: Bool?, `minMsat`: UInt64?) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_fetch_payments(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),
+        FfiConverterOptionUInt64.lower(`lastMsgIdx`),
+        FfiConverterOptionUInt32.lower(`limit`),
+        FfiConverterOptionUInt64.lower(`scid`),
+        FfiConverterOptionBool.lower(`remoteOnly`),
+        FfiConverterOptionUInt64.lower(`minMsat`),$0)
+}
+    )
+}
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch
@@ -2386,6 +2402,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_fetch_first_msgs_per_key() != 10950) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_fetch_payments() != 18180) {
         return InitializationResult.apiChecksumMismatch
     }
 
