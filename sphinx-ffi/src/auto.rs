@@ -510,7 +510,6 @@ pub fn fetch_msgs_batch(
     last_msg_idx: u64,
     limit: Option<u32>,
     reverse: Option<bool>,
-    is_restore: Option<bool>,
 ) -> Result<RunReturn> {
     Ok(bindings::fetch_msgs_batch(
         &seed,
@@ -519,7 +518,6 @@ pub fn fetch_msgs_batch(
         last_msg_idx,
         limit,
         reverse,
-        is_restore,
     )
     .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
     .into())
@@ -532,7 +530,6 @@ pub fn fetch_msgs_batch_okkey(
     last_msg_idx: u64,
     limit: Option<u32>,
     reverse: Option<bool>,
-    is_restore: Option<bool>,
 ) -> Result<RunReturn> {
     Ok(bindings::fetch_msgs_batch_okkey(
         &seed,
@@ -541,7 +538,6 @@ pub fn fetch_msgs_batch_okkey(
         last_msg_idx,
         limit,
         reverse,
-        is_restore,
     )
     .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
     .into())
@@ -554,7 +550,6 @@ pub fn fetch_first_msgs_per_key(
     last_msg_idx: u64,
     limit: Option<u32>,
     reverse: Option<bool>,
-    is_restore: Option<bool>,
 ) -> Result<RunReturn> {
     Ok(bindings::fetch_first_msgs_per_key(
         &seed,
@@ -563,7 +558,6 @@ pub fn fetch_first_msgs_per_key(
         last_msg_idx,
         limit,
         reverse,
-        is_restore,
     )
     .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
     .into())
