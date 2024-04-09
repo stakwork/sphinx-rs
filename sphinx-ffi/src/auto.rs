@@ -72,6 +72,7 @@ pub fn add_contact(
     my_img: String,
     amt_msat: u64,
     invite_code: Option<String>,
+    their_alias: Option<String>,
 ) -> Result<RunReturn> {
     Ok(bindings::add_contact(
         &seed,
@@ -83,6 +84,7 @@ pub fn add_contact(
         &my_img_opt(&my_img),
         amt_msat,
         invite_code.as_deref(),
+        &their_alias.as_deref(),
     )
     .map_err(|e| SphinxError::AddContactFailed { r: e.to_string() })?
     .into())

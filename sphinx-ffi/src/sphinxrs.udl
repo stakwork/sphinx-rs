@@ -144,7 +144,7 @@ namespace sphinxrs {
   [Throws=SphinxError]
   RunReturn set_blockheight(u32 blockheight);
   [Throws=SphinxError]
-  RunReturn add_contact(string seed, string unique_time, bytes state, string to_pubkey, string route_hint, string my_alias, string my_img, u64 amt_msat, string? invite_code);
+  RunReturn add_contact(string seed, string unique_time, bytes state, string to_pubkey, string route_hint, string my_alias, string my_img, u64 amt_msat, string? invite_code, string? their_alias);
   [Throws=SphinxError]
   string get_contact(bytes state, string pubkey);
   [Throws=SphinxError]
