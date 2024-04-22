@@ -210,5 +210,5 @@ namespace sphinxrs {
   [Throws=SphinxError]
   RunReturn fetch_first_msgs_per_key(string seed, string unique_time, bytes state, u64 last_msg_idx, u32? limit, boolean? reverse);
   [Throws=SphinxError]
-  RunReturn fetch_payments(string seed, string unique_time, bytes state, u64? last_msg_idx, u32? limit, u64? scid, boolean? remote_only, u64? min_msat);
+  RunReturn fetch_payments(string seed, string unique_time, bytes state, u64? since, u32? limit, u64? scid, boolean? remote_only, u64? min_msat);
 };
