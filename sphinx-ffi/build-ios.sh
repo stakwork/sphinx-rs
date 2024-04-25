@@ -1,7 +1,7 @@
-echo "=> creating swift bindings"
+echo "=> compiling swift ios bindings"
 cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language swift
 
-echo "=> creating swift bindings"
+echo "=> creating swift ios bindings"
 sed -i '' 's/module\ sphinxrsFFI/framework\ module\ sphinxrsFFI/' src/sphinxrsFFI.modulemap
 
 echo "=> building x86_64-apple-ios"
