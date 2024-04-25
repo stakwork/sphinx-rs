@@ -150,6 +150,8 @@ namespace sphinxrs {
   [Throws=SphinxError]
   string list_contacts(bytes state);
   [Throws=SphinxError]
+  string contact_pubkey_by_child_index(bytes state, u64 child_idx);
+  [Throws=SphinxError]
   string get_subscription_topic(string seed, string unique_time, bytes state);
   [Throws=SphinxError]
   string get_tribe_management_topic(string seed, string unique_time, bytes state);

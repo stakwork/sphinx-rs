@@ -112,6 +112,16 @@ pub fn list_contacts(full_state: Vec<u8>) -> Result<String> {
     Ok(json)
 }
 
+pub fn contact_pubkey_by_child_index(full_state: Vec<u8>, child_idx: u64) -> Result<String> {
+    Ok(
+        bindings::contact_pubkey_by_child_index(&full_state, child_idx).map_err(|e| {
+            SphinxError::GetContactFailed {
+                r: format!("contact_pubkey_by_child_index failed: {:?}", e),
+            }
+        })?,
+    )
+}
+
 pub fn get_subscription_topic(
     seed: String,
     unique_time: String,
