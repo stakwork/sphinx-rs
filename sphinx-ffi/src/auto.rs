@@ -574,6 +574,7 @@ pub fn fetch_payments(
     scid: Option<u64>,
     remote_only: Option<bool>,
     min_msat: Option<u64>,
+    reverse: Option<bool>,
 ) -> Result<RunReturn> {
     Ok(bindings::fetch_payments(
         &seed,
@@ -584,6 +585,7 @@ pub fn fetch_payments(
         scid,
         remote_only,
         min_msat,
+        reverse,
     )
     .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
     .into())
