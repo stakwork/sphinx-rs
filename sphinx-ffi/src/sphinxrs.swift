@@ -1809,6 +1809,17 @@ public func `contactPubkeyByChildIndex`(`state`: Data, `childIdx`: UInt64) throw
     )
 }
 
+public func `contactPubkeyByEncryptedChild`(`seed`: String, `state`: Data, `childIdx`: UInt64) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(
+        FfiConverterString.lower(`seed`),
+        FfiConverterData.lower(`state`),
+        FfiConverterUInt64.lower(`childIdx`),$0)
+}
+    )
+}
+
 public func `getSubscriptionTopic`(`seed`: String, `uniqueTime`: String, `state`: Data) throws -> String {
     return try  FfiConverterString.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
@@ -2324,6 +2335,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_contact_pubkey_by_child_index() != 7496) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_contact_pubkey_by_encrypted_child() != 34504) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_get_subscription_topic() != 12763) {

@@ -122,6 +122,20 @@ pub fn contact_pubkey_by_child_index(full_state: Vec<u8>, child_idx: u64) -> Res
     )
 }
 
+pub fn contact_pubkey_by_encrypted_child(
+    seed: String,
+    full_state: Vec<u8>,
+    child_idx: u64,
+) -> Result<String> {
+    Ok(
+        bindings::contact_pubkey_by_encrypted_child(&seed, &full_state, child_idx).map_err(
+            |e| SphinxError::GetContactFailed {
+                r: format!("contact_pubkey_by_encrypted_child failed: {:?}", e),
+            },
+        )?,
+    )
+}
+
 pub fn get_subscription_topic(
     seed: String,
     unique_time: String,
