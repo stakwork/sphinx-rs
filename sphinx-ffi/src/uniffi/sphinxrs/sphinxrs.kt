@@ -430,7 +430,7 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_contact_pubkey_by_child_index(`state`: RustBuffer.ByValue,`childIdx`: Long,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(`seed`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`childIdx`: Long,_uniffi_out_err: RustCallStatus, 
+    fun uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(`seed`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`child`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_get_subscription_topic(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
@@ -748,7 +748,7 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
     if (lib.uniffi_sphinxrs_checksum_func_contact_pubkey_by_child_index() != 7496.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_sphinxrs_checksum_func_contact_pubkey_by_encrypted_child() != 34504.toShort()) {
+    if (lib.uniffi_sphinxrs_checksum_func_contact_pubkey_by_encrypted_child() != 6829.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_get_subscription_topic() != 12763.toShort()) {
@@ -2438,10 +2438,10 @@ fun `contactPubkeyByChildIndex`(`state`: ByteArray, `childIdx`: ULong): String {
 
 @Throws(SphinxException::class)
 
-fun `contactPubkeyByEncryptedChild`(`seed`: String, `state`: ByteArray, `childIdx`: ULong): String {
+fun `contactPubkeyByEncryptedChild`(`seed`: String, `state`: ByteArray, `child`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(FfiConverterString.lower(`seed`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`childIdx`),_status)
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(FfiConverterString.lower(`seed`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`child`),_status)
 })
 }
 

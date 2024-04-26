@@ -152,7 +152,7 @@ namespace sphinxrs {
   [Throws=SphinxError]
   string contact_pubkey_by_child_index(bytes state, u64 child_idx);
   [Throws=SphinxError]
-  string contact_pubkey_by_encrypted_child(string seed, bytes state, u64 child_idx);
+  string contact_pubkey_by_encrypted_child(string seed, bytes state, string child);
   [Throws=SphinxError]
   string get_subscription_topic(string seed, string unique_time, bytes state);
   [Throws=SphinxError]
