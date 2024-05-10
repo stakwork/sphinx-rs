@@ -13,6 +13,7 @@ pub struct Msg {
     pub timestamp: Option<u64>,
     pub sent_to: Option<String>,
     pub from_me: Option<bool>,
+    pub payment_hash: Option<String>,
 }
 
 pub struct RunReturn {
@@ -226,6 +227,21 @@ pub fn send(
     )
     .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
     .into())
+}
+
+pub fn keysend(
+    seed: String,
+    unique_time: String,
+    to: String,
+    full_state: Vec<u8>,
+    amt_msat: u64,
+    data: Option<Vec<u8>>,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::keysend(&seed, &unique_time, &to, &full_state, amt_msat, data)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
 }
 
 fn my_img_opt(my_img: &str) -> Option<&str> {
@@ -628,6 +644,7 @@ impl From<bindings::Msg> for Msg {
             timestamp: rr.timestamp,
             sent_to: rr.sent_to,
             from_me: rr.from_me,
+            payment_hash: rr.payment_hash,
         }
     }
 }

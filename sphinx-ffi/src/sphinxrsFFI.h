@@ -143,6 +143,8 @@ RustBuffer uniffi_sphinxrs_fn_func_handle(RustBuffer topic, RustBuffer payload, 
 );
 RustBuffer uniffi_sphinxrs_fn_func_send(RustBuffer seed, RustBuffer unique_time, RustBuffer to, uint8_t msg_type, RustBuffer msg_json, RustBuffer state, RustBuffer my_alias, RustBuffer my_img, uint64_t amt_msat, int8_t is_tribe, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_keysend(RustBuffer seed, RustBuffer unique_time, RustBuffer to, RustBuffer state, uint64_t amt_msat, RustBuffer data, RustCallStatus *_Nonnull out_status
+);
 RustBuffer uniffi_sphinxrs_fn_func_make_media_token(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer host, RustBuffer muid, RustBuffer to, uint32_t expiry, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_make_media_token_with_meta(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer host, RustBuffer muid, RustBuffer to, uint32_t expiry, RustBuffer meta, RustCallStatus *_Nonnull out_status
@@ -319,6 +321,9 @@ uint16_t uniffi_sphinxrs_checksum_func_handle(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_send(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_keysend(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_make_media_token(void

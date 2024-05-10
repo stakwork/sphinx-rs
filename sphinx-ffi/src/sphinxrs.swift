@@ -486,10 +486,11 @@ public struct Msg {
     public var `timestamp`: UInt64?
     public var `sentTo`: String?
     public var `fromMe`: Bool?
+    public var `paymentHash`: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(`message`: String?, `type`: UInt8?, `uuid`: String?, `tag`: String?, `index`: String?, `sender`: String?, `msat`: UInt64?, `timestamp`: UInt64?, `sentTo`: String?, `fromMe`: Bool?) {
+    public init(`message`: String?, `type`: UInt8?, `uuid`: String?, `tag`: String?, `index`: String?, `sender`: String?, `msat`: UInt64?, `timestamp`: UInt64?, `sentTo`: String?, `fromMe`: Bool?, `paymentHash`: String?) {
         self.`message` = `message`
         self.`type` = `type`
         self.`uuid` = `uuid`
@@ -500,6 +501,7 @@ public struct Msg {
         self.`timestamp` = `timestamp`
         self.`sentTo` = `sentTo`
         self.`fromMe` = `fromMe`
+        self.`paymentHash` = `paymentHash`
     }
 }
 
@@ -536,6 +538,9 @@ extension Msg: Equatable, Hashable {
         if lhs.`fromMe` != rhs.`fromMe` {
             return false
         }
+        if lhs.`paymentHash` != rhs.`paymentHash` {
+            return false
+        }
         return true
     }
 
@@ -550,6 +555,7 @@ extension Msg: Equatable, Hashable {
         hasher.combine(`timestamp`)
         hasher.combine(`sentTo`)
         hasher.combine(`fromMe`)
+        hasher.combine(`paymentHash`)
     }
 }
 
@@ -566,7 +572,8 @@ public struct FfiConverterTypeMsg: FfiConverterRustBuffer {
             `msat`: FfiConverterOptionUInt64.read(from: &buf), 
             `timestamp`: FfiConverterOptionUInt64.read(from: &buf), 
             `sentTo`: FfiConverterOptionString.read(from: &buf), 
-            `fromMe`: FfiConverterOptionBool.read(from: &buf)
+            `fromMe`: FfiConverterOptionBool.read(from: &buf), 
+            `paymentHash`: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -581,6 +588,7 @@ public struct FfiConverterTypeMsg: FfiConverterRustBuffer {
         FfiConverterOptionUInt64.write(value.`timestamp`, into: &buf)
         FfiConverterOptionString.write(value.`sentTo`, into: &buf)
         FfiConverterOptionBool.write(value.`fromMe`, into: &buf)
+        FfiConverterOptionString.write(value.`paymentHash`, into: &buf)
     }
 }
 
@@ -1899,6 +1907,20 @@ public func `send`(`seed`: String, `uniqueTime`: String, `to`: String, `msgType`
     )
 }
 
+public func `keysend`(`seed`: String, `uniqueTime`: String, `to`: String, `state`: Data, `amtMsat`: UInt64, `data`: Data?) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_keysend(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterString.lower(`to`),
+        FfiConverterData.lower(`state`),
+        FfiConverterUInt64.lower(`amtMsat`),
+        FfiConverterOptionData.lower(`data`),$0)
+}
+    )
+}
+
 public func `makeMediaToken`(`seed`: String, `uniqueTime`: String, `state`: Data, `host`: String, `muid`: String, `to`: String, `expiry`: UInt32) throws -> String {
     return try  FfiConverterString.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
@@ -2356,6 +2378,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_send() != 56750) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_keysend() != 64232) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_make_media_token() != 53931) {
