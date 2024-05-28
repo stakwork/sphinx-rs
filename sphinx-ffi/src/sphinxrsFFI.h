@@ -131,11 +131,9 @@ RustBuffer uniffi_sphinxrs_fn_func_contact_pubkey_by_child_index(RustBuffer stat
 );
 RustBuffer uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(RustBuffer seed, RustBuffer state, RustBuffer child, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_get_subscription_topic(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
-);
 RustBuffer uniffi_sphinxrs_fn_func_get_tribe_management_topic(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_initial_setup(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_sphinxrs_fn_func_initial_setup(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer device, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_fetch_msgs(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t last_msg_idx, RustBuffer limit, RustCallStatus *_Nonnull out_status
 );
@@ -303,9 +301,6 @@ uint16_t uniffi_sphinxrs_checksum_func_contact_pubkey_by_child_index(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_contact_pubkey_by_encrypted_child(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_get_subscription_topic(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_get_tribe_management_topic(void

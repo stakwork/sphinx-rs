@@ -20,6 +20,7 @@ pub struct RunReturn {
     pub msgs: Vec<Msg>,
     pub msgs_total: Option<u64>,
     pub msgs_counts: Option<String>,
+    pub subscription_topics: Vec<String>,
     pub topics: Vec<String>,
     pub payloads: Vec<Vec<u8>>,
     pub state_mp: Option<Vec<u8>>,
@@ -137,17 +138,6 @@ pub fn contact_pubkey_by_encrypted_child(
     )
 }
 
-pub fn get_subscription_topic(
-    seed: String,
-    unique_time: String,
-    full_state: Vec<u8>,
-) -> Result<String> {
-    Ok(
-        bindings::get_subscription_topic(&seed, &unique_time, &full_state)
-            .map_err(|e| SphinxError::HandleFailed { r: e.to_string() })?,
-    )
-}
-
 pub fn get_tribe_management_topic(
     seed: String,
     unique_time: String,
@@ -159,8 +149,8 @@ pub fn get_tribe_management_topic(
     )
 }
 
-pub fn initial_setup(seed: String, unique_time: String, full_state: Vec<u8>) -> Result<RunReturn> {
-    Ok(bindings::initial_setup(&seed, &unique_time, &full_state)
+pub fn initial_setup(seed: String, unique_time: String, full_state: Vec<u8>, device: String) -> Result<RunReturn> {
+    Ok(bindings::initial_setup(&seed, &unique_time, &full_state, &device)
         .map_err(|e| SphinxError::HandleFailed { r: e.to_string() })?
         .into())
 }
@@ -655,6 +645,7 @@ impl From<bindings::RunReturn> for RunReturn {
             msgs: rr.msgs.into_iter().map(|m| m.into()).collect(),
             msgs_total: rr.msgs_total,
             msgs_counts: rr.msgs_counts,
+            subscription_topics: rr.subscription_topics,
             topics: rr.topics,
             payloads: rr.payloads,
             state_mp: rr.state_mp,
