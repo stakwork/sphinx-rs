@@ -52,6 +52,12 @@ pub fn set_network(net: String) -> Result<RunReturn> {
         .into())
 }
 
+pub fn set_device(dev: String) -> Result<RunReturn> {
+    Ok(bindings::set_device(&dev)
+        .map_err(|e| SphinxError::SetNetworkFailed { r: e.to_string() })?
+        .into())
+}
+
 pub fn set_blockheight(bh: u32) -> Result<RunReturn> {
     Ok(bindings::set_blockheight(bh)
         .map_err(|e| SphinxError::SetBlockheightFailed { r: e.to_string() })?
@@ -149,8 +155,8 @@ pub fn get_tribe_management_topic(
     )
 }
 
-pub fn initial_setup(seed: String, unique_time: String, full_state: Vec<u8>, device: String) -> Result<RunReturn> {
-    Ok(bindings::initial_setup(&seed, &unique_time, &full_state, &device)
+pub fn initial_setup(seed: String, unique_time: String, full_state: Vec<u8>) -> Result<RunReturn> {
+    Ok(bindings::initial_setup(&seed, &unique_time, &full_state)
         .map_err(|e| SphinxError::HandleFailed { r: e.to_string() })?
         .into())
 }

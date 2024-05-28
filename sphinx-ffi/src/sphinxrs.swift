@@ -1769,6 +1769,15 @@ public func `setNetwork`(`network`: String) throws -> RunReturn {
     )
 }
 
+public func `setDevice`(`device`: String) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_set_device(
+        FfiConverterString.lower(`device`),$0)
+}
+    )
+}
+
 public func `setBlockheight`(`blockheight`: UInt32) throws -> RunReturn {
     return try  FfiConverterTypeRunReturn.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
@@ -1847,14 +1856,13 @@ public func `getTribeManagementTopic`(`seed`: String, `uniqueTime`: String, `sta
     )
 }
 
-public func `initialSetup`(`seed`: String, `uniqueTime`: String, `state`: Data, `device`: String) throws -> RunReturn {
+public func `initialSetup`(`seed`: String, `uniqueTime`: String, `state`: Data) throws -> RunReturn {
     return try  FfiConverterTypeRunReturn.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_initial_setup(
         FfiConverterString.lower(`seed`),
         FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`device`),$0)
+        FfiConverterData.lower(`state`),$0)
 }
     )
 }
@@ -2342,6 +2350,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_set_network() != 65135) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_sphinxrs_checksum_func_set_device() != 19820) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_sphinxrs_checksum_func_set_blockheight() != 43943) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -2363,7 +2374,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_get_tribe_management_topic() != 29476) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_initial_setup() != 30402) {
+    if (uniffi_sphinxrs_checksum_func_initial_setup() != 63727) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_fetch_msgs() != 12460) {
