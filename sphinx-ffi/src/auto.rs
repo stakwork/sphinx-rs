@@ -155,10 +155,17 @@ pub fn get_tribe_management_topic(
     )
 }
 
-pub fn initial_setup(seed: String, unique_time: String, full_state: Vec<u8>) -> Result<RunReturn> {
-    Ok(bindings::initial_setup(&seed, &unique_time, &full_state)
-        .map_err(|e| SphinxError::HandleFailed { r: e.to_string() })?
-        .into())
+pub fn initial_setup(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    device: String,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::initial_setup(&seed, &unique_time, &full_state, &device)
+            .map_err(|e| SphinxError::HandleFailed { r: e.to_string() })?
+            .into(),
+    )
 }
 
 pub fn fetch_msgs(
@@ -471,6 +478,12 @@ pub fn process_invite(
             .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
             .into(),
     )
+}
+
+pub fn parse_invite(invite_qr: String) -> Result<RunReturn> {
+    Ok(bindings::parse_invite(&invite_qr)
+        .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+        .into())
 }
 
 pub fn code_from_invite(invite_qr: String) -> Result<String> {

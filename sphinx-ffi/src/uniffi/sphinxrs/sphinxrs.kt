@@ -436,7 +436,7 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_get_tribe_management_topic(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_initial_setup(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
+    fun uniffi_sphinxrs_fn_func_initial_setup(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`device`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_fetch_msgs(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`lastMsgIdx`: Long,`limit`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
@@ -471,6 +471,8 @@ internal interface _UniFFILib : Library {
     fun uniffi_sphinxrs_fn_func_make_invite(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`host`: RustBuffer.ByValue,`amtMsat`: Long,`myAlias`: RustBuffer.ByValue,`tribeHost`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_process_invite(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`inviteQr`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_parse_invite(`inviteQr`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_code_from_invite(`inviteQr`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
@@ -611,6 +613,8 @@ internal interface _UniFFILib : Library {
     fun uniffi_sphinxrs_checksum_func_make_invite(
     ): Short
     fun uniffi_sphinxrs_checksum_func_process_invite(
+    ): Short
+    fun uniffi_sphinxrs_checksum_func_parse_invite(
     ): Short
     fun uniffi_sphinxrs_checksum_func_code_from_invite(
     ): Short
@@ -761,7 +765,7 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
     if (lib.uniffi_sphinxrs_checksum_func_get_tribe_management_topic() != 29476.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_sphinxrs_checksum_func_initial_setup() != 63727.toShort()) {
+    if (lib.uniffi_sphinxrs_checksum_func_initial_setup() != 30402.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_fetch_msgs() != 12460.toShort()) {
@@ -813,6 +817,9 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_process_invite() != 52237.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_sphinxrs_checksum_func_parse_invite() != 20297.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_code_from_invite() != 40279.toShort()) {
@@ -2480,10 +2487,10 @@ fun `getTribeManagementTopic`(`seed`: String, `uniqueTime`: String, `state`: Byt
 
 @Throws(SphinxException::class)
 
-fun `initialSetup`(`seed`: String, `uniqueTime`: String, `state`: ByteArray): RunReturn {
+fun `initialSetup`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `device`: String): RunReturn {
     return FfiConverterTypeRunReturn.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_initial_setup(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_initial_setup(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`device`),_status)
 })
 }
 
@@ -2637,6 +2644,15 @@ fun `processInvite`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `i
     return FfiConverterTypeRunReturn.lift(
     rustCallWithError(SphinxException) { _status ->
     _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_process_invite(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`inviteQr`),_status)
+})
+}
+
+@Throws(SphinxException::class)
+
+fun `parseInvite`(`inviteQr`: String): RunReturn {
+    return FfiConverterTypeRunReturn.lift(
+    rustCallWithError(SphinxException) { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_parse_invite(FfiConverterString.lower(`inviteQr`),_status)
 })
 }
 

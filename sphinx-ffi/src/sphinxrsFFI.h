@@ -135,7 +135,7 @@ RustBuffer uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(RustBuffer 
 );
 RustBuffer uniffi_sphinxrs_fn_func_get_tribe_management_topic(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_initial_setup(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_sphinxrs_fn_func_initial_setup(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer device, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_fetch_msgs(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t last_msg_idx, RustBuffer limit, RustCallStatus *_Nonnull out_status
 );
@@ -170,6 +170,8 @@ RustBuffer uniffi_sphinxrs_fn_func_list_tribe_members(RustBuffer seed, RustBuffe
 RustBuffer uniffi_sphinxrs_fn_func_make_invite(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer host, uint64_t amt_msat, RustBuffer my_alias, RustBuffer tribe_host, RustBuffer tribe_pubkey, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_process_invite(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer invite_qr, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_parse_invite(RustBuffer invite_qr, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_code_from_invite(RustBuffer invite_qr, RustCallStatus *_Nonnull out_status
 );
@@ -363,6 +365,9 @@ uint16_t uniffi_sphinxrs_checksum_func_make_invite(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_process_invite(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_parse_invite(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_code_from_invite(void

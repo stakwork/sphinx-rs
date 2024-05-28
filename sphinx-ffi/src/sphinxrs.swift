@@ -1856,13 +1856,14 @@ public func `getTribeManagementTopic`(`seed`: String, `uniqueTime`: String, `sta
     )
 }
 
-public func `initialSetup`(`seed`: String, `uniqueTime`: String, `state`: Data) throws -> RunReturn {
+public func `initialSetup`(`seed`: String, `uniqueTime`: String, `state`: Data, `device`: String) throws -> RunReturn {
     return try  FfiConverterTypeRunReturn.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_initial_setup(
         FfiConverterString.lower(`seed`),
         FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),$0)
+        FfiConverterData.lower(`state`),
+        FfiConverterString.lower(`device`),$0)
 }
     )
 }
@@ -2098,6 +2099,15 @@ public func `processInvite`(`seed`: String, `uniqueTime`: String, `state`: Data,
         FfiConverterString.lower(`seed`),
         FfiConverterString.lower(`uniqueTime`),
         FfiConverterData.lower(`state`),
+        FfiConverterString.lower(`inviteQr`),$0)
+}
+    )
+}
+
+public func `parseInvite`(`inviteQr`: String) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_parse_invite(
         FfiConverterString.lower(`inviteQr`),$0)
 }
     )
@@ -2374,7 +2384,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_get_tribe_management_topic() != 29476) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_initial_setup() != 63727) {
+    if (uniffi_sphinxrs_checksum_func_initial_setup() != 30402) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_fetch_msgs() != 12460) {
@@ -2426,6 +2436,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_process_invite() != 52237) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_parse_invite() != 20297) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_code_from_invite() != 40279) {

@@ -160,7 +160,7 @@ namespace sphinxrs {
   [Throws=SphinxError]
   string get_tribe_management_topic(string seed, string unique_time, bytes state);
   [Throws=SphinxError]
-  RunReturn initial_setup(string seed, string unique_time, bytes state);
+  RunReturn initial_setup(string seed, string unique_time, bytes state, string device);
   [Throws=SphinxError]
   RunReturn fetch_msgs(string seed, string unique_time, bytes state, u64 last_msg_idx, u32? limit);
   [Throws=SphinxError]
@@ -195,6 +195,8 @@ namespace sphinxrs {
   RunReturn make_invite(string seed, string unique_time, bytes state, string host, u64 amt_msat, string my_alias, string? tribe_host, string? tribe_pubkey);
   [Throws=SphinxError]
   RunReturn process_invite(string seed, string unique_time, bytes state, string invite_qr);
+  [Throws=SphinxError]
+  RunReturn parse_invite(string invite_qr);
   [Throws=SphinxError]
   string code_from_invite(string invite_qr);
   [Throws=SphinxError]
