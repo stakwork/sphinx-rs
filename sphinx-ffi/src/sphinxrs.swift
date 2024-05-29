@@ -602,6 +602,85 @@ public func FfiConverterTypeMsg_lower(_ value: Msg) -> RustBuffer {
 }
 
 
+public struct ParsedInvite {
+    public var `code`: String
+    public var `inviterContactInfo`: String?
+    public var `inviterAlias`: String?
+    public var `initialTribe`: String?
+    public var `lspHost`: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(`code`: String, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?) {
+        self.`code` = `code`
+        self.`inviterContactInfo` = `inviterContactInfo`
+        self.`inviterAlias` = `inviterAlias`
+        self.`initialTribe` = `initialTribe`
+        self.`lspHost` = `lspHost`
+    }
+}
+
+
+extension ParsedInvite: Equatable, Hashable {
+    public static func ==(lhs: ParsedInvite, rhs: ParsedInvite) -> Bool {
+        if lhs.`code` != rhs.`code` {
+            return false
+        }
+        if lhs.`inviterContactInfo` != rhs.`inviterContactInfo` {
+            return false
+        }
+        if lhs.`inviterAlias` != rhs.`inviterAlias` {
+            return false
+        }
+        if lhs.`initialTribe` != rhs.`initialTribe` {
+            return false
+        }
+        if lhs.`lspHost` != rhs.`lspHost` {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(`code`)
+        hasher.combine(`inviterContactInfo`)
+        hasher.combine(`inviterAlias`)
+        hasher.combine(`initialTribe`)
+        hasher.combine(`lspHost`)
+    }
+}
+
+
+public struct FfiConverterTypeParsedInvite: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ParsedInvite {
+        return try ParsedInvite(
+            `code`: FfiConverterString.read(from: &buf), 
+            `inviterContactInfo`: FfiConverterOptionString.read(from: &buf), 
+            `inviterAlias`: FfiConverterOptionString.read(from: &buf), 
+            `initialTribe`: FfiConverterOptionString.read(from: &buf), 
+            `lspHost`: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ParsedInvite, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.`code`, into: &buf)
+        FfiConverterOptionString.write(value.`inviterContactInfo`, into: &buf)
+        FfiConverterOptionString.write(value.`inviterAlias`, into: &buf)
+        FfiConverterOptionString.write(value.`initialTribe`, into: &buf)
+        FfiConverterOptionString.write(value.`lspHost`, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeParsedInvite_lift(_ buf: RustBuffer) throws -> ParsedInvite {
+    return try FfiConverterTypeParsedInvite.lift(buf)
+}
+
+public func FfiConverterTypeParsedInvite_lower(_ value: ParsedInvite) -> RustBuffer {
+    return FfiConverterTypeParsedInvite.lower(value)
+}
+
+
 public struct RunReturn {
     public var `msgs`: [Msg]
     public var `msgsTotal`: UInt64?
@@ -1856,14 +1935,15 @@ public func `getTribeManagementTopic`(`seed`: String, `uniqueTime`: String, `sta
     )
 }
 
-public func `initialSetup`(`seed`: String, `uniqueTime`: String, `state`: Data, `device`: String) throws -> RunReturn {
+public func `initialSetup`(`seed`: String, `uniqueTime`: String, `state`: Data, `device`: String, `inviteCode`: String?) throws -> RunReturn {
     return try  FfiConverterTypeRunReturn.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_initial_setup(
         FfiConverterString.lower(`seed`),
         FfiConverterString.lower(`uniqueTime`),
         FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`device`),$0)
+        FfiConverterString.lower(`device`),
+        FfiConverterOptionString.lower(`inviteCode`),$0)
 }
     )
 }
@@ -2104,8 +2184,8 @@ public func `processInvite`(`seed`: String, `uniqueTime`: String, `state`: Data,
     )
 }
 
-public func `parseInvite`(`inviteQr`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
+public func `parseInvite`(`inviteQr`: String) throws -> ParsedInvite {
+    return try  FfiConverterTypeParsedInvite.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_parse_invite(
         FfiConverterString.lower(`inviteQr`),$0)
@@ -2384,7 +2464,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_get_tribe_management_topic() != 29476) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_initial_setup() != 30402) {
+    if (uniffi_sphinxrs_checksum_func_initial_setup() != 44485) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_fetch_msgs() != 12460) {
@@ -2438,7 +2518,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_process_invite() != 52237) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_parse_invite() != 20297) {
+    if (uniffi_sphinxrs_checksum_func_parse_invite() != 63135) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_code_from_invite() != 40279) {

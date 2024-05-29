@@ -16,6 +16,14 @@ pub struct Msg {
     pub payment_hash: Option<String>,
 }
 
+pub struct ParsedInvite {
+    pub code: String,
+    pub inviter_contact_info: Option<String>,
+    pub inviter_alias: Option<String>,
+    pub initial_tribe: Option<String>,
+    pub lsp_host: Option<String>,
+}
+
 pub struct RunReturn {
     pub msgs: Vec<Msg>,
     pub msgs_total: Option<u64>,
@@ -160,9 +168,10 @@ pub fn initial_setup(
     unique_time: String,
     full_state: Vec<u8>,
     device: String,
+    code: Option<String>,
 ) -> Result<RunReturn> {
     Ok(
-        bindings::initial_setup(&seed, &unique_time, &full_state, &device)
+        bindings::initial_setup(&seed, &unique_time, &full_state, &device, code)
             .map_err(|e| SphinxError::HandleFailed { r: e.to_string() })?
             .into(),
     )
@@ -380,7 +389,8 @@ pub fn payment_hash_from_invoice(bolt11: String) -> Result<String> {
 
 pub fn parse_invoice(bolt11: String) -> Result<String> {
     Ok(bindings::parse_invoice(&bolt11)
-        .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?)
+        .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+        .into())
 }
 
 pub fn create_tribe(
@@ -480,7 +490,7 @@ pub fn process_invite(
     )
 }
 
-pub fn parse_invite(invite_qr: String) -> Result<RunReturn> {
+pub fn parse_invite(invite_qr: String) -> Result<ParsedInvite> {
     Ok(bindings::parse_invite(&invite_qr)
         .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
         .into())
@@ -654,6 +664,18 @@ impl From<bindings::Msg> for Msg {
             sent_to: rr.sent_to,
             from_me: rr.from_me,
             payment_hash: rr.payment_hash,
+        }
+    }
+}
+
+impl From<bindings::ParsedInvite> for ParsedInvite {
+    fn from(rr: bindings::ParsedInvite) -> Self {
+        ParsedInvite {
+            code: rr.code,
+            inviter_contact_info: rr.inviter_contact_info,
+            inviter_alias: rr.inviter_alias,
+            initial_tribe: rr.initial_tribe,
+            lsp_host: rr.lsp_host,
         }
     }
 }
