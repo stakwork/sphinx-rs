@@ -29,6 +29,8 @@ pub struct RunReturn {
     pub msgs_total: Option<u64>,
     pub msgs_counts: Option<String>,
     pub subscription_topics: Vec<String>,
+    pub settle_topic: Option<String>,
+    pub settle_payload: Option<Vec<u8>>,
     pub topics: Vec<String>,
     pub payloads: Vec<Vec<u8>>,
     pub state_mp: Option<Vec<u8>>,
@@ -68,6 +70,16 @@ pub fn set_device(dev: String) -> Result<RunReturn> {
 
 pub fn set_blockheight(bh: u32) -> Result<RunReturn> {
     Ok(bindings::set_blockheight(bh)
+        .map_err(|e| SphinxError::SetBlockheightFailed { r: e.to_string() })?
+        .into())
+}
+
+pub fn get_blockheight(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+) -> Result<RunReturn> {
+    Ok(bindings::get_blockheight(&seed, &unique_time, &full_state)
         .map_err(|e| SphinxError::SetBlockheightFailed { r: e.to_string() })?
         .into())
 }
@@ -687,6 +699,8 @@ impl From<bindings::RunReturn> for RunReturn {
             msgs_total: rr.msgs_total,
             msgs_counts: rr.msgs_counts,
             subscription_topics: rr.subscription_topics,
+            settle_topic: rr.settle_topic,
+            settle_payload: rr.settle_payload,
             topics: rr.topics,
             payloads: rr.payloads,
             state_mp: rr.state_mp,

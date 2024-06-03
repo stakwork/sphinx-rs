@@ -70,6 +70,8 @@ dictionary RunReturn {
     u64? msgs_total;
     string? msgs_counts;
     sequence<string> subscription_topics;
+    string? settle_topic;
+    bytes? settle_payload;
     sequence<string> topics;
     sequence<bytes> payloads;
     bytes? state_mp;
@@ -155,6 +157,8 @@ namespace sphinxrs {
   RunReturn set_device(string device);
   [Throws=SphinxError]
   RunReturn set_blockheight(u32 blockheight);
+  [Throws=SphinxError]
+  RunReturn get_blockheight(string seed, string unique_time, bytes state);
   [Throws=SphinxError]
   RunReturn add_contact(string seed, string unique_time, bytes state, string to_pubkey, string route_hint, string my_alias, string my_img, u64 amt_msat, string? invite_code, string? their_alias);
   [Throws=SphinxError]

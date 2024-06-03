@@ -686,6 +686,8 @@ public struct RunReturn {
     public var `msgsTotal`: UInt64?
     public var `msgsCounts`: String?
     public var `subscriptionTopics`: [String]
+    public var `settleTopic`: String?
+    public var `settlePayload`: Data?
     public var `topics`: [String]
     public var `payloads`: [Data]
     public var `stateMp`: Data?
@@ -712,11 +714,13 @@ public struct RunReturn {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(`msgs`: [Msg], `msgsTotal`: UInt64?, `msgsCounts`: String?, `subscriptionTopics`: [String], `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?, `route`: String?, `node`: String?, `lastRead`: String?, `muteLevels`: String?, `payments`: String?, `paymentsTotal`: UInt64?) {
+    public init(`msgs`: [Msg], `msgsTotal`: UInt64?, `msgsCounts`: String?, `subscriptionTopics`: [String], `settleTopic`: String?, `settlePayload`: Data?, `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?, `route`: String?, `node`: String?, `lastRead`: String?, `muteLevels`: String?, `payments`: String?, `paymentsTotal`: UInt64?) {
         self.`msgs` = `msgs`
         self.`msgsTotal` = `msgsTotal`
         self.`msgsCounts` = `msgsCounts`
         self.`subscriptionTopics` = `subscriptionTopics`
+        self.`settleTopic` = `settleTopic`
+        self.`settlePayload` = `settlePayload`
         self.`topics` = `topics`
         self.`payloads` = `payloads`
         self.`stateMp` = `stateMp`
@@ -756,6 +760,12 @@ extension RunReturn: Equatable, Hashable {
             return false
         }
         if lhs.`subscriptionTopics` != rhs.`subscriptionTopics` {
+            return false
+        }
+        if lhs.`settleTopic` != rhs.`settleTopic` {
+            return false
+        }
+        if lhs.`settlePayload` != rhs.`settlePayload` {
             return false
         }
         if lhs.`topics` != rhs.`topics` {
@@ -835,6 +845,8 @@ extension RunReturn: Equatable, Hashable {
         hasher.combine(`msgsTotal`)
         hasher.combine(`msgsCounts`)
         hasher.combine(`subscriptionTopics`)
+        hasher.combine(`settleTopic`)
+        hasher.combine(`settlePayload`)
         hasher.combine(`topics`)
         hasher.combine(`payloads`)
         hasher.combine(`stateMp`)
@@ -869,6 +881,8 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
             `msgsTotal`: FfiConverterOptionUInt64.read(from: &buf), 
             `msgsCounts`: FfiConverterOptionString.read(from: &buf), 
             `subscriptionTopics`: FfiConverterSequenceString.read(from: &buf), 
+            `settleTopic`: FfiConverterOptionString.read(from: &buf), 
+            `settlePayload`: FfiConverterOptionData.read(from: &buf), 
             `topics`: FfiConverterSequenceString.read(from: &buf), 
             `payloads`: FfiConverterSequenceData.read(from: &buf), 
             `stateMp`: FfiConverterOptionData.read(from: &buf), 
@@ -900,6 +914,8 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
         FfiConverterOptionUInt64.write(value.`msgsTotal`, into: &buf)
         FfiConverterOptionString.write(value.`msgsCounts`, into: &buf)
         FfiConverterSequenceString.write(value.`subscriptionTopics`, into: &buf)
+        FfiConverterOptionString.write(value.`settleTopic`, into: &buf)
+        FfiConverterOptionData.write(value.`settlePayload`, into: &buf)
         FfiConverterSequenceString.write(value.`topics`, into: &buf)
         FfiConverterSequenceData.write(value.`payloads`, into: &buf)
         FfiConverterOptionData.write(value.`stateMp`, into: &buf)
@@ -1866,6 +1882,17 @@ public func `setBlockheight`(`blockheight`: UInt32) throws -> RunReturn {
     )
 }
 
+public func `getBlockheight`(`seed`: String, `uniqueTime`: String, `state`: Data) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_get_blockheight(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),$0)
+}
+    )
+}
+
 public func `addContact`(`seed`: String, `uniqueTime`: String, `state`: Data, `toPubkey`: String, `routeHint`: String, `myAlias`: String, `myImg`: String, `amtMsat`: UInt64, `inviteCode`: String?, `theirAlias`: String?) throws -> RunReturn {
     return try  FfiConverterTypeRunReturn.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
@@ -2444,6 +2471,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_set_blockheight() != 43943) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_get_blockheight() != 25615) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_add_contact() != 30931) {
