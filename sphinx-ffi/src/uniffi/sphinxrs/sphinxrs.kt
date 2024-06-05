@@ -500,6 +500,8 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_fetch_payments(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`since`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,`scid`: RustBuffer.ByValue,`remoteOnly`: RustBuffer.ByValue,`minMsat`: RustBuffer.ByValue,`reverse`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_get_tags(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tags`: RustBuffer.ByValue,`pubkey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
+    ): RustBuffer.ByValue
     fun ffi_sphinxrs_rustbuffer_alloc(`size`: Int,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun ffi_sphinxrs_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,_uniffi_out_err: RustCallStatus, 
@@ -643,6 +645,8 @@ internal interface _UniFFILib : Library {
     fun uniffi_sphinxrs_checksum_func_fetch_first_msgs_per_key(
     ): Short
     fun uniffi_sphinxrs_checksum_func_fetch_payments(
+    ): Short
+    fun uniffi_sphinxrs_checksum_func_get_tags(
     ): Short
     fun ffi_sphinxrs_uniffi_contract_version(
     ): Int
@@ -863,6 +867,9 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_fetch_payments() != 58291.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_sphinxrs_checksum_func_get_tags() != 42493.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -1199,7 +1206,8 @@ data class RunReturn (
     var `lastRead`: String?, 
     var `muteLevels`: String?, 
     var `payments`: String?, 
-    var `paymentsTotal`: ULong?
+    var `paymentsTotal`: ULong?, 
+    var `tags`: String?
 ) {
     
 }
@@ -1236,6 +1244,7 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalULong.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -1268,7 +1277,8 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalString.allocationSize(value.`lastRead`) +
             FfiConverterOptionalString.allocationSize(value.`muteLevels`) +
             FfiConverterOptionalString.allocationSize(value.`payments`) +
-            FfiConverterOptionalULong.allocationSize(value.`paymentsTotal`)
+            FfiConverterOptionalULong.allocationSize(value.`paymentsTotal`) +
+            FfiConverterOptionalString.allocationSize(value.`tags`)
     )
 
     override fun write(value: RunReturn, buf: ByteBuffer) {
@@ -1301,6 +1311,7 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalString.write(value.`muteLevels`, buf)
             FfiConverterOptionalString.write(value.`payments`, buf)
             FfiConverterOptionalULong.write(value.`paymentsTotal`, buf)
+            FfiConverterOptionalString.write(value.`tags`, buf)
     }
 }
 
@@ -2826,6 +2837,15 @@ fun `fetchPayments`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `s
     return FfiConverterTypeRunReturn.lift(
     rustCallWithError(SphinxException) { _status ->
     _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_fetch_payments(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterOptionalULong.lower(`since`),FfiConverterOptionalUInt.lower(`limit`),FfiConverterOptionalULong.lower(`scid`),FfiConverterOptionalBoolean.lower(`remoteOnly`),FfiConverterOptionalULong.lower(`minMsat`),FfiConverterOptionalBoolean.lower(`reverse`),_status)
+})
+}
+
+@Throws(SphinxException::class)
+
+fun `getTags`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `tags`: List<String>, `pubkey`: String?): RunReturn {
+    return FfiConverterTypeRunReturn.lift(
+    rustCallWithError(SphinxException) { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_get_tags(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterSequenceString.lower(`tags`),FfiConverterOptionalString.lower(`pubkey`),_status)
 })
 }
 

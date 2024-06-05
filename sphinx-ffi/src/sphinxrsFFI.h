@@ -199,6 +199,8 @@ RustBuffer uniffi_sphinxrs_fn_func_fetch_first_msgs_per_key(RustBuffer seed, Rus
 );
 RustBuffer uniffi_sphinxrs_fn_func_fetch_payments(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer since, RustBuffer limit, RustBuffer scid, RustBuffer remote_only, RustBuffer min_msat, RustBuffer reverse, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_get_tags(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tags, RustBuffer pubkey, RustCallStatus *_Nonnull out_status
+);
 RustBuffer ffi_sphinxrs_rustbuffer_alloc(int32_t size, RustCallStatus *_Nonnull out_status
 );
 RustBuffer ffi_sphinxrs_rustbuffer_from_bytes(ForeignBytes bytes, RustCallStatus *_Nonnull out_status
@@ -409,6 +411,9 @@ uint16_t uniffi_sphinxrs_checksum_func_fetch_first_msgs_per_key(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_fetch_payments(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_get_tags(void
     
 );
 uint32_t ffi_sphinxrs_uniffi_contract_version(void

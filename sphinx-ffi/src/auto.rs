@@ -54,6 +54,7 @@ pub struct RunReturn {
     pub mute_levels: Option<String>,
     pub payments: Option<String>,
     pub payments_total: Option<u64>,
+    pub tags: Option<String>,
 }
 
 pub fn set_network(net: String) -> Result<RunReturn> {
@@ -662,6 +663,20 @@ pub fn fetch_payments(
     .into())
 }
 
+pub fn get_tags(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    tags: Vec<String>,
+    pubkey: Option<String>,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::get_tags(&seed, &unique_time, &full_state, tags, pubkey)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
 impl From<bindings::Msg> for Msg {
     fn from(rr: bindings::Msg) -> Self {
         Msg {
@@ -724,6 +739,7 @@ impl From<bindings::RunReturn> for RunReturn {
             mute_levels: rr.mute_levels,
             payments: rr.payments,
             payments_total: rr.payments_total,
+            tags: rr.tags,
         }
     }
 }
