@@ -96,6 +96,7 @@ dictionary RunReturn {
     string? payments;
     u64? payments_total;
     string? tags;
+    string? deleted_msgs;
 };
 
 namespace sphinxrs {
@@ -236,4 +237,6 @@ namespace sphinxrs {
   RunReturn fetch_payments(string seed, string unique_time, bytes state, u64? since, u32? limit, u64? scid, boolean? remote_only, u64? min_msat, boolean? reverse);
   [Throws=SphinxError]
   RunReturn get_tags(string seed, string unique_time, bytes state, sequence<string> tags, string? pubkey);
+  [Throws=SphinxError]
+  RunReturn delete_msgs(string seed, string unique_time, bytes state, string? pubkey, sequence<u64>? msg_idxs);
 };

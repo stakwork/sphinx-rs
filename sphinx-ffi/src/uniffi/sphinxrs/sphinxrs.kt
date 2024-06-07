@@ -502,6 +502,8 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_get_tags(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tags`: RustBuffer.ByValue,`pubkey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_delete_msgs(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pubkey`: RustBuffer.ByValue,`msgIdxs`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
+    ): RustBuffer.ByValue
     fun ffi_sphinxrs_rustbuffer_alloc(`size`: Int,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun ffi_sphinxrs_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,_uniffi_out_err: RustCallStatus, 
@@ -647,6 +649,8 @@ internal interface _UniFFILib : Library {
     fun uniffi_sphinxrs_checksum_func_fetch_payments(
     ): Short
     fun uniffi_sphinxrs_checksum_func_get_tags(
+    ): Short
+    fun uniffi_sphinxrs_checksum_func_delete_msgs(
     ): Short
     fun ffi_sphinxrs_uniffi_contract_version(
     ): Int
@@ -870,6 +874,9 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_get_tags() != 42493.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_sphinxrs_checksum_func_delete_msgs() != 39403.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -1207,7 +1214,8 @@ data class RunReturn (
     var `muteLevels`: String?, 
     var `payments`: String?, 
     var `paymentsTotal`: ULong?, 
-    var `tags`: String?
+    var `tags`: String?, 
+    var `deletedMsgs`: String?
 ) {
     
 }
@@ -1245,6 +1253,7 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalULong.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -1278,7 +1287,8 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalString.allocationSize(value.`muteLevels`) +
             FfiConverterOptionalString.allocationSize(value.`payments`) +
             FfiConverterOptionalULong.allocationSize(value.`paymentsTotal`) +
-            FfiConverterOptionalString.allocationSize(value.`tags`)
+            FfiConverterOptionalString.allocationSize(value.`tags`) +
+            FfiConverterOptionalString.allocationSize(value.`deletedMsgs`)
     )
 
     override fun write(value: RunReturn, buf: ByteBuffer) {
@@ -1312,6 +1322,7 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalString.write(value.`payments`, buf)
             FfiConverterOptionalULong.write(value.`paymentsTotal`, buf)
             FfiConverterOptionalString.write(value.`tags`, buf)
+            FfiConverterOptionalString.write(value.`deletedMsgs`, buf)
     }
 }
 
@@ -2158,6 +2169,60 @@ public object FfiConverterOptionalByteArray: FfiConverterRustBuffer<ByteArray?> 
 
 
 
+public object FfiConverterOptionalSequenceULong: FfiConverterRustBuffer<List<ULong>?> {
+    override fun read(buf: ByteBuffer): List<ULong>? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterSequenceULong.read(buf)
+    }
+
+    override fun allocationSize(value: List<ULong>?): Int {
+        if (value == null) {
+            return 1
+        } else {
+            return 1 + FfiConverterSequenceULong.allocationSize(value)
+        }
+    }
+
+    override fun write(value: List<ULong>?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterSequenceULong.write(value, buf)
+        }
+    }
+}
+
+
+
+
+public object FfiConverterSequenceULong: FfiConverterRustBuffer<List<ULong>> {
+    override fun read(buf: ByteBuffer): List<ULong> {
+        val len = buf.getInt()
+        return List<ULong>(len) {
+            FfiConverterULong.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<ULong>): Int {
+        val sizeForLength = 4
+        val sizeForItems = value.map { FfiConverterULong.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<ULong>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.forEach {
+            FfiConverterULong.write(it, buf)
+        }
+    }
+}
+
+
+
+
 public object FfiConverterSequenceString: FfiConverterRustBuffer<List<String>> {
     override fun read(buf: ByteBuffer): List<String> {
         val len = buf.getInt()
@@ -2846,6 +2911,15 @@ fun `getTags`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `tags`: 
     return FfiConverterTypeRunReturn.lift(
     rustCallWithError(SphinxException) { _status ->
     _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_get_tags(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterSequenceString.lower(`tags`),FfiConverterOptionalString.lower(`pubkey`),_status)
+})
+}
+
+@Throws(SphinxException::class)
+
+fun `deleteMsgs`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `pubkey`: String?, `msgIdxs`: List<ULong>?): RunReturn {
+    return FfiConverterTypeRunReturn.lift(
+    rustCallWithError(SphinxException) { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_delete_msgs(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterOptionalString.lower(`pubkey`),FfiConverterOptionalSequenceULong.lower(`msgIdxs`),_status)
 })
 }
 

@@ -201,6 +201,8 @@ RustBuffer uniffi_sphinxrs_fn_func_fetch_payments(RustBuffer seed, RustBuffer un
 );
 RustBuffer uniffi_sphinxrs_fn_func_get_tags(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tags, RustBuffer pubkey, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_delete_msgs(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer pubkey, RustBuffer msg_idxs, RustCallStatus *_Nonnull out_status
+);
 RustBuffer ffi_sphinxrs_rustbuffer_alloc(int32_t size, RustCallStatus *_Nonnull out_status
 );
 RustBuffer ffi_sphinxrs_rustbuffer_from_bytes(ForeignBytes bytes, RustCallStatus *_Nonnull out_status
@@ -414,6 +416,9 @@ uint16_t uniffi_sphinxrs_checksum_func_fetch_payments(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_get_tags(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_delete_msgs(void
     
 );
 uint32_t ffi_sphinxrs_uniffi_contract_version(void

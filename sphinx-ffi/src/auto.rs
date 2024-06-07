@@ -55,6 +55,7 @@ pub struct RunReturn {
     pub payments: Option<String>,
     pub payments_total: Option<u64>,
     pub tags: Option<String>,
+    pub deleted_msgs: Option<String>,
 }
 
 pub fn set_network(net: String) -> Result<RunReturn> {
@@ -677,6 +678,20 @@ pub fn get_tags(
     )
 }
 
+pub fn delete_msgs(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    pubkey: Option<String>,
+    msg_idxs: Option<Vec<u64>>,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::delete_msgs(&seed, &unique_time, &full_state, pubkey, msg_idxs)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
 impl From<bindings::Msg> for Msg {
     fn from(rr: bindings::Msg) -> Self {
         Msg {
@@ -740,6 +755,7 @@ impl From<bindings::RunReturn> for RunReturn {
             payments: rr.payments,
             payments_total: rr.payments_total,
             tags: rr.tags,
+            deleted_msgs: rr.deleted_msgs,
         }
     }
 }
