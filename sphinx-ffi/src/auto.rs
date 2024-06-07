@@ -425,6 +425,42 @@ pub fn create_tribe(
     .into())
 }
 
+pub fn update_tribe(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    tribe_server_pubkey: String,
+    tribe_json: String,
+) -> Result<RunReturn> {
+    Ok(bindings::update_tribe(
+        &seed,
+        &unique_time,
+        &full_state,
+        &tribe_server_pubkey,
+        &tribe_json,
+    )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
+}
+
+pub fn delete_tribe(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    tribe_server_pubkey: String,
+    tribe_pubkey: String,
+) -> Result<RunReturn> {
+    Ok(bindings::delete_tribe(
+        &seed,
+        &unique_time,
+        &full_state,
+        &tribe_server_pubkey,
+        &tribe_pubkey,
+    )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
+}
+
 pub fn join_tribe(
     seed: String,
     unique_time: String,

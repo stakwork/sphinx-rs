@@ -239,4 +239,8 @@ namespace sphinxrs {
   RunReturn get_tags(string seed, string unique_time, bytes state, sequence<string> tags, string? pubkey);
   [Throws=SphinxError]
   RunReturn delete_msgs(string seed, string unique_time, bytes state, string? pubkey, sequence<u64>? msg_idxs);
+  [Throws=SphinxError]
+  RunReturn update_tribe(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_json);
+  [Throws=SphinxError]
+  RunReturn delete_tribe(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_pubkey);
 };
