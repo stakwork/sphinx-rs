@@ -243,4 +243,8 @@ namespace sphinxrs {
   RunReturn update_tribe(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_json);
   [Throws=SphinxError]
   RunReturn delete_tribe(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_pubkey);
+  [Throws=SphinxError]
+  RunReturn add_node(string node);
+  [Throws=SphinxError]
+  RunReturn concat_route(bytes state, string end_hops, string router_pubkey, u64 amt_msat);
 };

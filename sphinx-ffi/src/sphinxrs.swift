@@ -2479,6 +2479,27 @@ public func `deleteTribe`(`seed`: String, `uniqueTime`: String, `state`: Data, `
     )
 }
 
+public func `addNode`(`node`: String) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_add_node(
+        FfiConverterString.lower(`node`),$0)
+}
+    )
+}
+
+public func `concatRoute`(`state`: Data, `endHops`: String, `routerPubkey`: String, `amtMsat`: UInt64) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_concat_route(
+        FfiConverterData.lower(`state`),
+        FfiConverterString.lower(`endHops`),
+        FfiConverterString.lower(`routerPubkey`),
+        FfiConverterUInt64.lower(`amtMsat`),$0)
+}
+    )
+}
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch
@@ -2708,6 +2729,12 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_delete_tribe() != 11926) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_add_node() != 49737) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_concat_route() != 19565) {
         return InitializationResult.apiChecksumMismatch
     }
 

@@ -728,6 +728,25 @@ pub fn delete_msgs(
     )
 }
 
+pub fn add_node(node: String) -> Result<RunReturn> {
+    Ok(bindings::add_node(&node)
+        .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+        .into())
+}
+
+pub fn concat_route(
+    full_state: Vec<u8>,
+    end_hops: String,
+    router_pubkey: String,
+    amt_msat: u64,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::concat_route(&full_state, &end_hops, &router_pubkey, amt_msat)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
 impl From<bindings::Msg> for Msg {
     fn from(rr: bindings::Msg) -> Self {
         Msg {
