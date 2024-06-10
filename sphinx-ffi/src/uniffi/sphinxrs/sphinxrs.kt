@@ -1117,7 +1117,8 @@ data class Msg (
     var `timestamp`: ULong?, 
     var `sentTo`: String?, 
     var `fromMe`: Boolean?, 
-    var `paymentHash`: String?
+    var `paymentHash`: String?, 
+    var `error`: String?
 ) {
     
 }
@@ -1136,6 +1137,7 @@ public object FfiConverterTypeMsg: FfiConverterRustBuffer<Msg> {
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -1150,7 +1152,8 @@ public object FfiConverterTypeMsg: FfiConverterRustBuffer<Msg> {
             FfiConverterOptionalULong.allocationSize(value.`timestamp`) +
             FfiConverterOptionalString.allocationSize(value.`sentTo`) +
             FfiConverterOptionalBoolean.allocationSize(value.`fromMe`) +
-            FfiConverterOptionalString.allocationSize(value.`paymentHash`)
+            FfiConverterOptionalString.allocationSize(value.`paymentHash`) +
+            FfiConverterOptionalString.allocationSize(value.`error`)
     )
 
     override fun write(value: Msg, buf: ByteBuffer) {
@@ -1165,6 +1168,7 @@ public object FfiConverterTypeMsg: FfiConverterRustBuffer<Msg> {
             FfiConverterOptionalString.write(value.`sentTo`, buf)
             FfiConverterOptionalBoolean.write(value.`fromMe`, buf)
             FfiConverterOptionalString.write(value.`paymentHash`, buf)
+            FfiConverterOptionalString.write(value.`error`, buf)
     }
 }
 
