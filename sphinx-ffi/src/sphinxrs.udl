@@ -55,6 +55,7 @@ dictionary Msg {
     string? sent_to;
     boolean? from_me;
     string? payment_hash;
+    string? error;
 };
 
 dictionary ParsedInvite {

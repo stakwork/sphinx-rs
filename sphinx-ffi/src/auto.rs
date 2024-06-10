@@ -14,6 +14,7 @@ pub struct Msg {
     pub sent_to: Option<String>,
     pub from_me: Option<bool>,
     pub payment_hash: Option<String>,
+    pub error: Option<String>,
 }
 
 pub struct ParsedInvite {
@@ -761,6 +762,7 @@ impl From<bindings::Msg> for Msg {
             sent_to: rr.sent_to,
             from_me: rr.from_me,
             payment_hash: rr.payment_hash,
+            error: rr.error,
         }
     }
 }

@@ -25,7 +25,7 @@ sphinx-signer = { path = "../signer", default-features = false, features = [
     "no-native",
 ] }
 sphinx-glyph = { path = "../glyph", default-features = false }
-sphinx = { git = "https://github.com/stakwork/sphinx", rev = "b51771ba9a8b5e4742cc8818136410a8f719ba17", features = [
+sphinx = { git = "https://github.com/stakwork/sphinx", rev = "2735386f05f10d8dac3b7db414d3fc6ac4f3b210", features = [
     "msg",
     "bindings",
 ] }

@@ -487,10 +487,11 @@ public struct Msg {
     public var `sentTo`: String?
     public var `fromMe`: Bool?
     public var `paymentHash`: String?
+    public var `error`: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(`message`: String?, `type`: UInt8?, `uuid`: String?, `tag`: String?, `index`: String?, `sender`: String?, `msat`: UInt64?, `timestamp`: UInt64?, `sentTo`: String?, `fromMe`: Bool?, `paymentHash`: String?) {
+    public init(`message`: String?, `type`: UInt8?, `uuid`: String?, `tag`: String?, `index`: String?, `sender`: String?, `msat`: UInt64?, `timestamp`: UInt64?, `sentTo`: String?, `fromMe`: Bool?, `paymentHash`: String?, `error`: String?) {
         self.`message` = `message`
         self.`type` = `type`
         self.`uuid` = `uuid`
@@ -502,6 +503,7 @@ public struct Msg {
         self.`sentTo` = `sentTo`
         self.`fromMe` = `fromMe`
         self.`paymentHash` = `paymentHash`
+        self.`error` = `error`
     }
 }
 
@@ -541,6 +543,9 @@ extension Msg: Equatable, Hashable {
         if lhs.`paymentHash` != rhs.`paymentHash` {
             return false
         }
+        if lhs.`error` != rhs.`error` {
+            return false
+        }
         return true
     }
 
@@ -556,6 +561,7 @@ extension Msg: Equatable, Hashable {
         hasher.combine(`sentTo`)
         hasher.combine(`fromMe`)
         hasher.combine(`paymentHash`)
+        hasher.combine(`error`)
     }
 }
 
@@ -573,7 +579,8 @@ public struct FfiConverterTypeMsg: FfiConverterRustBuffer {
             `timestamp`: FfiConverterOptionUInt64.read(from: &buf), 
             `sentTo`: FfiConverterOptionString.read(from: &buf), 
             `fromMe`: FfiConverterOptionBool.read(from: &buf), 
-            `paymentHash`: FfiConverterOptionString.read(from: &buf)
+            `paymentHash`: FfiConverterOptionString.read(from: &buf), 
+            `error`: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -589,6 +596,7 @@ public struct FfiConverterTypeMsg: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.`sentTo`, into: &buf)
         FfiConverterOptionBool.write(value.`fromMe`, into: &buf)
         FfiConverterOptionString.write(value.`paymentHash`, into: &buf)
+        FfiConverterOptionString.write(value.`error`, into: &buf)
     }
 }
 
