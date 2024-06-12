@@ -73,6 +73,8 @@ dictionary RunReturn {
     sequence<string> subscription_topics;
     string? settle_topic;
     bytes? settle_payload;
+    string? asyncpay_topic;
+    bytes? asyncpay_payload;
     sequence<string> topics;
     sequence<bytes> payloads;
     bytes? state_mp;
@@ -81,6 +83,7 @@ dictionary RunReturn {
     string? my_contact_info;
     string? sent_status;
     string? settled_status;
+    string? asyncpay_tag;
     string? error;
     string? new_tribe;
     string? tribe_members;

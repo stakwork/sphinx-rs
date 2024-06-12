@@ -696,6 +696,8 @@ public struct RunReturn {
     public var `subscriptionTopics`: [String]
     public var `settleTopic`: String?
     public var `settlePayload`: Data?
+    public var `asyncpayTopic`: String?
+    public var `asyncpayPayload`: Data?
     public var `topics`: [String]
     public var `payloads`: [Data]
     public var `stateMp`: Data?
@@ -704,6 +706,7 @@ public struct RunReturn {
     public var `myContactInfo`: String?
     public var `sentStatus`: String?
     public var `settledStatus`: String?
+    public var `asyncpayTag`: String?
     public var `error`: String?
     public var `newTribe`: String?
     public var `tribeMembers`: String?
@@ -724,13 +727,15 @@ public struct RunReturn {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(`msgs`: [Msg], `msgsTotal`: UInt64?, `msgsCounts`: String?, `subscriptionTopics`: [String], `settleTopic`: String?, `settlePayload`: Data?, `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?, `route`: String?, `node`: String?, `lastRead`: String?, `muteLevels`: String?, `payments`: String?, `paymentsTotal`: UInt64?, `tags`: String?, `deletedMsgs`: String?) {
+    public init(`msgs`: [Msg], `msgsTotal`: UInt64?, `msgsCounts`: String?, `subscriptionTopics`: [String], `settleTopic`: String?, `settlePayload`: Data?, `asyncpayTopic`: String?, `asyncpayPayload`: Data?, `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `asyncpayTag`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?, `route`: String?, `node`: String?, `lastRead`: String?, `muteLevels`: String?, `payments`: String?, `paymentsTotal`: UInt64?, `tags`: String?, `deletedMsgs`: String?) {
         self.`msgs` = `msgs`
         self.`msgsTotal` = `msgsTotal`
         self.`msgsCounts` = `msgsCounts`
         self.`subscriptionTopics` = `subscriptionTopics`
         self.`settleTopic` = `settleTopic`
         self.`settlePayload` = `settlePayload`
+        self.`asyncpayTopic` = `asyncpayTopic`
+        self.`asyncpayPayload` = `asyncpayPayload`
         self.`topics` = `topics`
         self.`payloads` = `payloads`
         self.`stateMp` = `stateMp`
@@ -739,6 +744,7 @@ public struct RunReturn {
         self.`myContactInfo` = `myContactInfo`
         self.`sentStatus` = `sentStatus`
         self.`settledStatus` = `settledStatus`
+        self.`asyncpayTag` = `asyncpayTag`
         self.`error` = `error`
         self.`newTribe` = `newTribe`
         self.`tribeMembers` = `tribeMembers`
@@ -780,6 +786,12 @@ extension RunReturn: Equatable, Hashable {
         if lhs.`settlePayload` != rhs.`settlePayload` {
             return false
         }
+        if lhs.`asyncpayTopic` != rhs.`asyncpayTopic` {
+            return false
+        }
+        if lhs.`asyncpayPayload` != rhs.`asyncpayPayload` {
+            return false
+        }
         if lhs.`topics` != rhs.`topics` {
             return false
         }
@@ -802,6 +814,9 @@ extension RunReturn: Equatable, Hashable {
             return false
         }
         if lhs.`settledStatus` != rhs.`settledStatus` {
+            return false
+        }
+        if lhs.`asyncpayTag` != rhs.`asyncpayTag` {
             return false
         }
         if lhs.`error` != rhs.`error` {
@@ -865,6 +880,8 @@ extension RunReturn: Equatable, Hashable {
         hasher.combine(`subscriptionTopics`)
         hasher.combine(`settleTopic`)
         hasher.combine(`settlePayload`)
+        hasher.combine(`asyncpayTopic`)
+        hasher.combine(`asyncpayPayload`)
         hasher.combine(`topics`)
         hasher.combine(`payloads`)
         hasher.combine(`stateMp`)
@@ -873,6 +890,7 @@ extension RunReturn: Equatable, Hashable {
         hasher.combine(`myContactInfo`)
         hasher.combine(`sentStatus`)
         hasher.combine(`settledStatus`)
+        hasher.combine(`asyncpayTag`)
         hasher.combine(`error`)
         hasher.combine(`newTribe`)
         hasher.combine(`tribeMembers`)
@@ -903,6 +921,8 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
             `subscriptionTopics`: FfiConverterSequenceString.read(from: &buf), 
             `settleTopic`: FfiConverterOptionString.read(from: &buf), 
             `settlePayload`: FfiConverterOptionData.read(from: &buf), 
+            `asyncpayTopic`: FfiConverterOptionString.read(from: &buf), 
+            `asyncpayPayload`: FfiConverterOptionData.read(from: &buf), 
             `topics`: FfiConverterSequenceString.read(from: &buf), 
             `payloads`: FfiConverterSequenceData.read(from: &buf), 
             `stateMp`: FfiConverterOptionData.read(from: &buf), 
@@ -911,6 +931,7 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
             `myContactInfo`: FfiConverterOptionString.read(from: &buf), 
             `sentStatus`: FfiConverterOptionString.read(from: &buf), 
             `settledStatus`: FfiConverterOptionString.read(from: &buf), 
+            `asyncpayTag`: FfiConverterOptionString.read(from: &buf), 
             `error`: FfiConverterOptionString.read(from: &buf), 
             `newTribe`: FfiConverterOptionString.read(from: &buf), 
             `tribeMembers`: FfiConverterOptionString.read(from: &buf), 
@@ -938,6 +959,8 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.`subscriptionTopics`, into: &buf)
         FfiConverterOptionString.write(value.`settleTopic`, into: &buf)
         FfiConverterOptionData.write(value.`settlePayload`, into: &buf)
+        FfiConverterOptionString.write(value.`asyncpayTopic`, into: &buf)
+        FfiConverterOptionData.write(value.`asyncpayPayload`, into: &buf)
         FfiConverterSequenceString.write(value.`topics`, into: &buf)
         FfiConverterSequenceData.write(value.`payloads`, into: &buf)
         FfiConverterOptionData.write(value.`stateMp`, into: &buf)
@@ -946,6 +969,7 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.`myContactInfo`, into: &buf)
         FfiConverterOptionString.write(value.`sentStatus`, into: &buf)
         FfiConverterOptionString.write(value.`settledStatus`, into: &buf)
+        FfiConverterOptionString.write(value.`asyncpayTag`, into: &buf)
         FfiConverterOptionString.write(value.`error`, into: &buf)
         FfiConverterOptionString.write(value.`newTribe`, into: &buf)
         FfiConverterOptionString.write(value.`tribeMembers`, into: &buf)
