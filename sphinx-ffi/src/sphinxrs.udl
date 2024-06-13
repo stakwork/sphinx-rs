@@ -75,6 +75,8 @@ dictionary RunReturn {
     bytes? settle_payload;
     string? asyncpay_topic;
     bytes? asyncpay_payload;
+    string? register_topic;
+    bytes? register_payload;
     sequence<string> topics;
     sequence<bytes> payloads;
     bytes? state_mp;
@@ -83,6 +85,7 @@ dictionary RunReturn {
     string? my_contact_info;
     string? sent_status;
     string? settled_status;
+    string? register_response;
     string? asyncpay_tag;
     string? error;
     string? new_tribe;
