@@ -104,6 +104,7 @@ dictionary RunReturn {
     u64? payments_total;
     string? tags;
     string? deleted_msgs;
+    u64? new_child_idx;
 };
 
 namespace sphinxrs {

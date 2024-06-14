@@ -63,6 +63,7 @@ pub struct RunReturn {
     pub payments_total: Option<u64>,
     pub tags: Option<String>,
     pub deleted_msgs: Option<String>,
+    pub new_child_idx: Option<u64>,
 }
 
 pub fn set_network(net: String) -> Result<RunReturn> {
@@ -825,6 +826,7 @@ impl From<bindings::RunReturn> for RunReturn {
             payments_total: rr.payments_total,
             tags: rr.tags,
             deleted_msgs: rr.deleted_msgs,
+            new_child_idx: rr.new_child_idx,
         }
     }
 }

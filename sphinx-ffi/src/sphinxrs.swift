@@ -727,10 +727,11 @@ public struct RunReturn {
     public var `paymentsTotal`: UInt64?
     public var `tags`: String?
     public var `deletedMsgs`: String?
+    public var `newChildIdx`: UInt64?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(`msgs`: [Msg], `msgsTotal`: UInt64?, `msgsCounts`: String?, `subscriptionTopics`: [String], `settleTopic`: String?, `settlePayload`: Data?, `asyncpayTopic`: String?, `asyncpayPayload`: Data?, `registerTopic`: String?, `registerPayload`: Data?, `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `registerResponse`: String?, `asyncpayTag`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?, `route`: String?, `node`: String?, `lastRead`: String?, `muteLevels`: String?, `payments`: String?, `paymentsTotal`: UInt64?, `tags`: String?, `deletedMsgs`: String?) {
+    public init(`msgs`: [Msg], `msgsTotal`: UInt64?, `msgsCounts`: String?, `subscriptionTopics`: [String], `settleTopic`: String?, `settlePayload`: Data?, `asyncpayTopic`: String?, `asyncpayPayload`: Data?, `registerTopic`: String?, `registerPayload`: Data?, `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `registerResponse`: String?, `asyncpayTag`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?, `route`: String?, `node`: String?, `lastRead`: String?, `muteLevels`: String?, `payments`: String?, `paymentsTotal`: UInt64?, `tags`: String?, `deletedMsgs`: String?, `newChildIdx`: UInt64?) {
         self.`msgs` = `msgs`
         self.`msgsTotal` = `msgsTotal`
         self.`msgsCounts` = `msgsCounts`
@@ -768,6 +769,7 @@ public struct RunReturn {
         self.`paymentsTotal` = `paymentsTotal`
         self.`tags` = `tags`
         self.`deletedMsgs` = `deletedMsgs`
+        self.`newChildIdx` = `newChildIdx`
     }
 }
 
@@ -885,6 +887,9 @@ extension RunReturn: Equatable, Hashable {
         if lhs.`deletedMsgs` != rhs.`deletedMsgs` {
             return false
         }
+        if lhs.`newChildIdx` != rhs.`newChildIdx` {
+            return false
+        }
         return true
     }
 
@@ -926,6 +931,7 @@ extension RunReturn: Equatable, Hashable {
         hasher.combine(`paymentsTotal`)
         hasher.combine(`tags`)
         hasher.combine(`deletedMsgs`)
+        hasher.combine(`newChildIdx`)
     }
 }
 
@@ -969,7 +975,8 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
             `payments`: FfiConverterOptionString.read(from: &buf), 
             `paymentsTotal`: FfiConverterOptionUInt64.read(from: &buf), 
             `tags`: FfiConverterOptionString.read(from: &buf), 
-            `deletedMsgs`: FfiConverterOptionString.read(from: &buf)
+            `deletedMsgs`: FfiConverterOptionString.read(from: &buf), 
+            `newChildIdx`: FfiConverterOptionUInt64.read(from: &buf)
         )
     }
 
@@ -1011,6 +1018,7 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
         FfiConverterOptionUInt64.write(value.`paymentsTotal`, into: &buf)
         FfiConverterOptionString.write(value.`tags`, into: &buf)
         FfiConverterOptionString.write(value.`deletedMsgs`, into: &buf)
+        FfiConverterOptionUInt64.write(value.`newChildIdx`, into: &buf)
     }
 }
 
