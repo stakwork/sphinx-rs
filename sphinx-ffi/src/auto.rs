@@ -755,6 +755,12 @@ pub fn concat_route(
     )
 }
 
+pub fn signed_timestamp(seed: String, idx: u64, time: String, network: String) -> Result<String> {
+    Ok(bindings::signed_timestamp(&seed, idx, &time, &network)
+        .map_err(|e| SphinxError::BadCiper { r: e.to_string() })?
+        .into())
+}
+
 impl From<bindings::Msg> for Msg {
     fn from(rr: bindings::Msg) -> Self {
         Msg {

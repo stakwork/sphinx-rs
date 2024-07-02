@@ -52,6 +52,26 @@ pub fn sign_bytes(
     Ok(hex::encode(sig))
 }
 
+pub fn sign_base64(
+    seed: String,
+    idx: u64,
+    time: String,
+    network: String,
+    msg64: String,
+) -> Result<String> {
+    let idx = idx_to_idx(idx)?;
+    let km = make_keys_manager(&seed, idx, &time, &network)?;
+    let msg = sphinx::base64::base64_decode(&msg64).map_err(|_| SphinxError::BadCiper {
+        r: "bad base64".to_string(),
+    })?;
+    let sig = sphinx::sig::sign_message(&msg, &km.get_node_secret()).map_err(|_| {
+        SphinxError::BadCiper {
+            r: "sign failed".to_string(),
+        }
+    })?;
+    Ok(sphinx::base64::base64_encode(&sig))
+}
+
 pub fn pubkey_from_seed(seed: String, idx: u64, time: String, network: String) -> Result<String> {
     let idx = idx_to_idx(idx)?;
     let km = make_keys_manager(&seed, idx, &time, &network)?;
@@ -218,7 +238,7 @@ pub fn peel_payment_msg(
     Ok(msg)
 }
 
-fn idx_to_idx(idx: u64) -> Result<Option<i64>> {
+pub fn idx_to_idx(idx: u64) -> Result<Option<i64>> {
     Ok(Some(idx.try_into().map_err(|_| {
         SphinxError::BadChildIndex {
             r: "infallible".to_string(),
@@ -226,7 +246,7 @@ fn idx_to_idx(idx: u64) -> Result<Option<i64>> {
     })?))
 }
 
-fn make_keys_manager(
+pub fn make_keys_manager(
     seed: &str,
     idx: Option<i64>,
     time: &str,

@@ -109,7 +109,11 @@ RustBuffer uniffi_sphinxrs_fn_func_peel_payment_msg(RustBuffer seed, uint64_t id
 );
 RustBuffer uniffi_sphinxrs_fn_func_sign_ms(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_signed_timestamp(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
+);
 RustBuffer uniffi_sphinxrs_fn_func_sign_bytes(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer msg, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_sign_base64(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer msg, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_pubkey_from_seed(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
 );
@@ -288,7 +292,13 @@ uint16_t uniffi_sphinxrs_checksum_func_peel_payment_msg(void
 uint16_t uniffi_sphinxrs_checksum_func_sign_ms(void
     
 );
+uint16_t uniffi_sphinxrs_checksum_func_signed_timestamp(void
+    
+);
 uint16_t uniffi_sphinxrs_checksum_func_sign_bytes(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_sign_base64(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_pubkey_from_seed(void

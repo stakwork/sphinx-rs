@@ -1931,6 +1931,18 @@ public func `signMs`(`seed`: String, `idx`: UInt64, `time`: String, `network`: S
     )
 }
 
+public func `signedTimestamp`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_signed_timestamp(
+        FfiConverterString.lower(`seed`),
+        FfiConverterUInt64.lower(`idx`),
+        FfiConverterString.lower(`time`),
+        FfiConverterString.lower(`network`),$0)
+}
+    )
+}
+
 public func `signBytes`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String, `msg`: Data) throws -> String {
     return try  FfiConverterString.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
@@ -1940,6 +1952,19 @@ public func `signBytes`(`seed`: String, `idx`: UInt64, `time`: String, `network`
         FfiConverterString.lower(`time`),
         FfiConverterString.lower(`network`),
         FfiConverterData.lower(`msg`),$0)
+}
+    )
+}
+
+public func `signBase64`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String, `msg`: String) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_sign_base64(
+        FfiConverterString.lower(`seed`),
+        FfiConverterUInt64.lower(`idx`),
+        FfiConverterString.lower(`time`),
+        FfiConverterString.lower(`network`),
+        FfiConverterString.lower(`msg`),$0)
 }
     )
 }
@@ -2648,7 +2673,13 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_sign_ms() != 10078) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_sphinxrs_checksum_func_signed_timestamp() != 14238) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_sphinxrs_checksum_func_sign_bytes() != 53352) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_sign_base64() != 25886) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_pubkey_from_seed() != 23394) {

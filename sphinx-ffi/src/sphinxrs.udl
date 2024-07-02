@@ -154,7 +154,11 @@ namespace sphinxrs {
   [Throws=SphinxError]
   string sign_ms(string seed, u64 idx, string time, string network);
   [Throws=SphinxError]
+  string signed_timestamp(string seed, u64 idx, string time, string network);
+  [Throws=SphinxError]
   string sign_bytes(string seed, u64 idx, string time, string network, bytes msg);
+  [Throws=SphinxError]
+  string sign_base64(string seed, u64 idx, string time, string network, string msg);
   [Throws=SphinxError]
   string pubkey_from_seed(string seed, u64 idx, string time, string network);
   [Throws=SphinxError]
