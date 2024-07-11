@@ -105,6 +105,7 @@ dictionary RunReturn {
     string? tags;
     string? deleted_msgs;
     u64? new_child_idx;
+    string? ping;
 };
 
 namespace sphinxrs {
@@ -259,4 +260,8 @@ namespace sphinxrs {
   RunReturn add_node(string node);
   [Throws=SphinxError]
   RunReturn concat_route(bytes state, string end_hops, string router_pubkey, u64 amt_msat);
+  [Throws=SphinxError]
+  RunReturn ping_done(string seed, string unique_time, bytes state, u64 ping_ts);
+  [Throws=SphinxError]
+  RunReturn fetch_pings(string seed, string unique_time, bytes state);
 };

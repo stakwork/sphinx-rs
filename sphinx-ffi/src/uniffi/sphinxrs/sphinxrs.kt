@@ -516,6 +516,10 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_concat_route(`state`: RustBuffer.ByValue,`endHops`: RustBuffer.ByValue,`routerPubkey`: RustBuffer.ByValue,`amtMsat`: Long,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_ping_done(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pingTs`: Long,_uniffi_out_err: RustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_fetch_pings(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
+    ): RustBuffer.ByValue
     fun ffi_sphinxrs_rustbuffer_alloc(`size`: Int,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun ffi_sphinxrs_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,_uniffi_out_err: RustCallStatus, 
@@ -675,6 +679,10 @@ internal interface _UniFFILib : Library {
     fun uniffi_sphinxrs_checksum_func_add_node(
     ): Short
     fun uniffi_sphinxrs_checksum_func_concat_route(
+    ): Short
+    fun uniffi_sphinxrs_checksum_func_ping_done(
+    ): Short
+    fun uniffi_sphinxrs_checksum_func_fetch_pings(
     ): Short
     fun ffi_sphinxrs_uniffi_contract_version(
     ): Int
@@ -919,6 +927,12 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_concat_route() != 19565.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_sphinxrs_checksum_func_ping_done() != 13787.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_sphinxrs_checksum_func_fetch_pings() != 13806.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -1268,7 +1282,8 @@ data class RunReturn (
     var `paymentsTotal`: ULong?, 
     var `tags`: String?, 
     var `deletedMsgs`: String?, 
-    var `newChildIdx`: ULong?
+    var `newChildIdx`: ULong?, 
+    var `ping`: String?
 ) {
     
 }
@@ -1314,6 +1329,7 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalULong.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -1355,7 +1371,8 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalULong.allocationSize(value.`paymentsTotal`) +
             FfiConverterOptionalString.allocationSize(value.`tags`) +
             FfiConverterOptionalString.allocationSize(value.`deletedMsgs`) +
-            FfiConverterOptionalULong.allocationSize(value.`newChildIdx`)
+            FfiConverterOptionalULong.allocationSize(value.`newChildIdx`) +
+            FfiConverterOptionalString.allocationSize(value.`ping`)
     )
 
     override fun write(value: RunReturn, buf: ByteBuffer) {
@@ -1397,6 +1414,7 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
             FfiConverterOptionalString.write(value.`tags`, buf)
             FfiConverterOptionalString.write(value.`deletedMsgs`, buf)
             FfiConverterOptionalULong.write(value.`newChildIdx`, buf)
+            FfiConverterOptionalString.write(value.`ping`, buf)
     }
 }
 
@@ -3048,6 +3066,24 @@ fun `concatRoute`(`state`: ByteArray, `endHops`: String, `routerPubkey`: String,
     return FfiConverterTypeRunReturn.lift(
     rustCallWithError(SphinxException) { _status ->
     _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_concat_route(FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`endHops`),FfiConverterString.lower(`routerPubkey`),FfiConverterULong.lower(`amtMsat`),_status)
+})
+}
+
+@Throws(SphinxException::class)
+
+fun `pingDone`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `pingTs`: ULong): RunReturn {
+    return FfiConverterTypeRunReturn.lift(
+    rustCallWithError(SphinxException) { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_ping_done(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`pingTs`),_status)
+})
+}
+
+@Throws(SphinxException::class)
+
+fun `fetchPings`(`seed`: String, `uniqueTime`: String, `state`: ByteArray): RunReturn {
+    return FfiConverterTypeRunReturn.lift(
+    rustCallWithError(SphinxException) { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_fetch_pings(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
 })
 }
 

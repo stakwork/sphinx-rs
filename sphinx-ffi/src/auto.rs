@@ -64,6 +64,7 @@ pub struct RunReturn {
     pub tags: Option<String>,
     pub deleted_msgs: Option<String>,
     pub new_child_idx: Option<u64>,
+    pub ping: Option<String>,
 }
 
 pub fn set_network(net: String) -> Result<RunReturn> {
@@ -211,6 +212,25 @@ pub fn fetch_msgs(
             .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
             .into(),
     )
+}
+
+pub fn ping_done(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    ping_ts: u64,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::ping_done(&seed, &unique_time, &full_state, ping_ts)
+            .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
+pub fn fetch_pings(seed: String, unique_time: String, full_state: Vec<u8>) -> Result<RunReturn> {
+    Ok(bindings::fetch_pings(&seed, &unique_time, &full_state)
+        .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
+        .into())
 }
 
 pub fn handle(
@@ -833,6 +853,7 @@ impl From<bindings::RunReturn> for RunReturn {
             tags: rr.tags,
             deleted_msgs: rr.deleted_msgs,
             new_child_idx: rr.new_child_idx,
+            ping: rr.ping,
         }
     }
 }

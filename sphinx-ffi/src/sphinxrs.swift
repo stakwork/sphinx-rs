@@ -728,10 +728,11 @@ public struct RunReturn {
     public var `tags`: String?
     public var `deletedMsgs`: String?
     public var `newChildIdx`: UInt64?
+    public var `ping`: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(`msgs`: [Msg], `msgsTotal`: UInt64?, `msgsCounts`: String?, `subscriptionTopics`: [String], `settleTopic`: String?, `settlePayload`: Data?, `asyncpayTopic`: String?, `asyncpayPayload`: Data?, `registerTopic`: String?, `registerPayload`: Data?, `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `registerResponse`: String?, `asyncpayTag`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?, `route`: String?, `node`: String?, `lastRead`: String?, `muteLevels`: String?, `payments`: String?, `paymentsTotal`: UInt64?, `tags`: String?, `deletedMsgs`: String?, `newChildIdx`: UInt64?) {
+    public init(`msgs`: [Msg], `msgsTotal`: UInt64?, `msgsCounts`: String?, `subscriptionTopics`: [String], `settleTopic`: String?, `settlePayload`: Data?, `asyncpayTopic`: String?, `asyncpayPayload`: Data?, `registerTopic`: String?, `registerPayload`: Data?, `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `registerResponse`: String?, `asyncpayTag`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?, `route`: String?, `node`: String?, `lastRead`: String?, `muteLevels`: String?, `payments`: String?, `paymentsTotal`: UInt64?, `tags`: String?, `deletedMsgs`: String?, `newChildIdx`: UInt64?, `ping`: String?) {
         self.`msgs` = `msgs`
         self.`msgsTotal` = `msgsTotal`
         self.`msgsCounts` = `msgsCounts`
@@ -770,6 +771,7 @@ public struct RunReturn {
         self.`tags` = `tags`
         self.`deletedMsgs` = `deletedMsgs`
         self.`newChildIdx` = `newChildIdx`
+        self.`ping` = `ping`
     }
 }
 
@@ -890,6 +892,9 @@ extension RunReturn: Equatable, Hashable {
         if lhs.`newChildIdx` != rhs.`newChildIdx` {
             return false
         }
+        if lhs.`ping` != rhs.`ping` {
+            return false
+        }
         return true
     }
 
@@ -932,6 +937,7 @@ extension RunReturn: Equatable, Hashable {
         hasher.combine(`tags`)
         hasher.combine(`deletedMsgs`)
         hasher.combine(`newChildIdx`)
+        hasher.combine(`ping`)
     }
 }
 
@@ -976,7 +982,8 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
             `paymentsTotal`: FfiConverterOptionUInt64.read(from: &buf), 
             `tags`: FfiConverterOptionString.read(from: &buf), 
             `deletedMsgs`: FfiConverterOptionString.read(from: &buf), 
-            `newChildIdx`: FfiConverterOptionUInt64.read(from: &buf)
+            `newChildIdx`: FfiConverterOptionUInt64.read(from: &buf), 
+            `ping`: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -1019,6 +1026,7 @@ public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.`tags`, into: &buf)
         FfiConverterOptionString.write(value.`deletedMsgs`, into: &buf)
         FfiConverterOptionUInt64.write(value.`newChildIdx`, into: &buf)
+        FfiConverterOptionString.write(value.`ping`, into: &buf)
     }
 }
 
@@ -2589,6 +2597,29 @@ public func `concatRoute`(`state`: Data, `endHops`: String, `routerPubkey`: Stri
     )
 }
 
+public func `pingDone`(`seed`: String, `uniqueTime`: String, `state`: Data, `pingTs`: UInt64) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_ping_done(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),
+        FfiConverterUInt64.lower(`pingTs`),$0)
+}
+    )
+}
+
+public func `fetchPings`(`seed`: String, `uniqueTime`: String, `state`: Data) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_fetch_pings(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),$0)
+}
+    )
+}
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch
@@ -2830,6 +2861,12 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_concat_route() != 19565) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_ping_done() != 13787) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_fetch_pings() != 13806) {
         return InitializationResult.apiChecksumMismatch
     }
 
