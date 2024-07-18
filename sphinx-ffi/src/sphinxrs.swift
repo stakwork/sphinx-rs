@@ -2620,6 +2620,15 @@ public func `fetchPings`(`seed`: String, `uniqueTime`: String, `state`: Data) th
     )
 }
 
+public func `idFromMacaroon`(`macaroon`: String) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_id_from_macaroon(
+        FfiConverterString.lower(`macaroon`),$0)
+}
+    )
+}
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch
@@ -2867,6 +2876,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_fetch_pings() != 13806) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_id_from_macaroon() != 36424) {
         return InitializationResult.apiChecksumMismatch
     }
 

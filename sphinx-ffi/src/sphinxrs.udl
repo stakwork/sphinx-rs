@@ -264,4 +264,6 @@ namespace sphinxrs {
   RunReturn ping_done(string seed, string unique_time, bytes state, u64 ping_ts);
   [Throws=SphinxError]
   RunReturn fetch_pings(string seed, string unique_time, bytes state);
+  [Throws=SphinxError]
+  string id_from_macaroon(string macaroon);
 };

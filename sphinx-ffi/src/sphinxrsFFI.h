@@ -219,6 +219,8 @@ RustBuffer uniffi_sphinxrs_fn_func_ping_done(RustBuffer seed, RustBuffer unique_
 );
 RustBuffer uniffi_sphinxrs_fn_func_fetch_pings(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_id_from_macaroon(RustBuffer macaroon, RustCallStatus *_Nonnull out_status
+);
 RustBuffer ffi_sphinxrs_rustbuffer_alloc(int32_t size, RustCallStatus *_Nonnull out_status
 );
 RustBuffer ffi_sphinxrs_rustbuffer_from_bytes(ForeignBytes bytes, RustCallStatus *_Nonnull out_status
@@ -459,6 +461,9 @@ uint16_t uniffi_sphinxrs_checksum_func_ping_done(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_fetch_pings(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_id_from_macaroon(void
     
 );
 uint32_t ffi_sphinxrs_uniffi_contract_version(void

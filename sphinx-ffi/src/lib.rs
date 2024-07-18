@@ -133,6 +133,14 @@ pub fn decrypt(ciphertext: String, secret: String) -> Result<String> {
     Ok(hex::encode(plain))
 }
 
+pub fn id_from_macaroon(mac: String) -> Result<String> {
+    Ok(
+        sphinx::mac::macaroon_identifier(&mac).map_err(|e| SphinxError::Decrypt {
+            r: format!("{:?}", e),
+        })?,
+    )
+}
+
 pub struct Keys {
     pub secret: String,
     pub pubkey: String,
