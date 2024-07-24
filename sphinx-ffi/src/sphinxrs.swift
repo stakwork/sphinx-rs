@@ -2177,7 +2177,7 @@ public func `send`(`seed`: String, `uniqueTime`: String, `to`: String, `msgType`
     )
 }
 
-public func `keysend`(`seed`: String, `uniqueTime`: String, `to`: String, `state`: Data, `amtMsat`: UInt64, `data`: Data?) throws -> RunReturn {
+public func `keysend`(`seed`: String, `uniqueTime`: String, `to`: String, `state`: Data, `amtMsat`: UInt64, `data`: Data?, `routeHint`: String?) throws -> RunReturn {
     return try  FfiConverterTypeRunReturn.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_keysend(
@@ -2186,7 +2186,8 @@ public func `keysend`(`seed`: String, `uniqueTime`: String, `to`: String, `state
         FfiConverterString.lower(`to`),
         FfiConverterData.lower(`state`),
         FfiConverterUInt64.lower(`amtMsat`),
-        FfiConverterOptionData.lower(`data`),$0)
+        FfiConverterOptionData.lower(`data`),
+        FfiConverterOptionString.lower(`routeHint`),$0)
 }
     )
 }
@@ -2773,7 +2774,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_send() != 56750) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_keysend() != 64232) {
+    if (uniffi_sphinxrs_checksum_func_keysend() != 58116) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_make_media_token() != 53931) {

@@ -290,12 +290,19 @@ pub fn keysend(
     full_state: Vec<u8>,
     amt_msat: u64,
     data: Option<Vec<u8>>,
+    route_hint: Option<String>,
 ) -> Result<RunReturn> {
-    Ok(
-        bindings::keysend(&seed, &unique_time, &to, &full_state, amt_msat, data)
-            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
-            .into(),
+    Ok(bindings::keysend(
+        &seed,
+        &unique_time,
+        &to,
+        &full_state,
+        amt_msat,
+        data,
+        route_hint,
     )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
 }
 
 fn my_img_opt(my_img: &str) -> Option<&str> {
