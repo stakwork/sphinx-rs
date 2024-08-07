@@ -586,6 +586,19 @@ pub fn code_from_invite(invite_qr: String) -> Result<String> {
         .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?)
 }
 
+pub fn cancel_invite(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    invite_code: String,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::cancel_invite(&seed, &unique_time, &full_state, &invite_code)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
 pub fn read(
     seed: String,
     unique_time: String,

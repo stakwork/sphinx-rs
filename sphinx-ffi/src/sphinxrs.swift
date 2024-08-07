@@ -2386,6 +2386,18 @@ public func `codeFromInvite`(`inviteQr`: String) throws -> String {
     )
 }
 
+public func `cancelInvite`(`seed`: String, `uniqueTime`: String, `state`: Data, `inviteCode`: String) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_cancel_invite(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),
+        FfiConverterString.lower(`inviteCode`),$0)
+}
+    )
+}
+
 public func `getDefaultTribeServer`(`state`: Data) throws -> String {
     return try  FfiConverterString.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
@@ -2820,6 +2832,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_code_from_invite() != 40279) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_cancel_invite() != 49457) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_get_default_tribe_server() != 13603) {

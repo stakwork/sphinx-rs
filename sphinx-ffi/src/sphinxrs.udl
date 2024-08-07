@@ -227,6 +227,8 @@ namespace sphinxrs {
   [Throws=SphinxError]
   string code_from_invite(string invite_qr);
   [Throws=SphinxError]
+  RunReturn cancel_invite(string seed, string unique_time, bytes state, string invite_code);
+  [Throws=SphinxError]
   string get_default_tribe_server(bytes state);
   [Throws=SphinxError]
   RunReturn read(string seed, string unique_time, bytes state, string pubkey, u64 msg_idx);

@@ -181,6 +181,8 @@ RustBuffer uniffi_sphinxrs_fn_func_parse_invite(RustBuffer invite_qr, RustCallSt
 );
 RustBuffer uniffi_sphinxrs_fn_func_code_from_invite(RustBuffer invite_qr, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_cancel_invite(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer invite_code, RustCallStatus *_Nonnull out_status
+);
 RustBuffer uniffi_sphinxrs_fn_func_get_default_tribe_server(RustBuffer state, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_read(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer pubkey, uint64_t msg_idx, RustCallStatus *_Nonnull out_status
@@ -404,6 +406,9 @@ uint16_t uniffi_sphinxrs_checksum_func_parse_invite(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_code_from_invite(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_cancel_invite(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_get_default_tribe_server(void
