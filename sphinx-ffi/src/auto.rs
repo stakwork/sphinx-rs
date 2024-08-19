@@ -801,6 +801,35 @@ pub fn signed_timestamp(seed: String, idx: u64, time: String, network: String) -
         .into())
 }
 
+pub fn contact_for_encrypted_child_key(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    encrypted_child_idx: String,
+) -> Result<String> {
+    Ok(bindings::contact_for_encrypted_child_key(
+        &seed,
+        &unique_time,
+        &full_state,
+        &encrypted_child_idx,
+    )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
+}
+
+pub fn find_route(
+    full_state: Vec<u8>,
+    to_pubkey: String,
+    to_route_hint: Option<String>,
+    amt_msat: u64,
+) -> Result<String> {
+    Ok(
+        bindings::find_route(&full_state, &to_pubkey, to_route_hint, amt_msat)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
 impl From<bindings::Msg> for Msg {
     fn from(rr: bindings::Msg) -> Self {
         Msg {

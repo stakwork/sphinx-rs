@@ -2642,6 +2642,30 @@ public func `idFromMacaroon`(`macaroon`: String) throws -> String {
     )
 }
 
+public func `contactForEncryptedChildKey`(`seed`: String, `uniqueTime`: String, `state`: Data, `encryptedChildKey`: String) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_contact_for_encrypted_child_key(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),
+        FfiConverterString.lower(`encryptedChildKey`),$0)
+}
+    )
+}
+
+public func `findRoute`(`state`: Data, `toPubkey`: String, `routeHint`: String?, `amtMsat`: UInt64) throws -> String {
+    return try  FfiConverterString.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_find_route(
+        FfiConverterData.lower(`state`),
+        FfiConverterString.lower(`toPubkey`),
+        FfiConverterOptionString.lower(`routeHint`),
+        FfiConverterUInt64.lower(`amtMsat`),$0)
+}
+    )
+}
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch
@@ -2895,6 +2919,12 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_id_from_macaroon() != 36424) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_contact_for_encrypted_child_key() != 36351) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_find_route() != 27285) {
         return InitializationResult.apiChecksumMismatch
     }
 

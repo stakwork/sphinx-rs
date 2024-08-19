@@ -268,4 +268,8 @@ namespace sphinxrs {
   RunReturn fetch_pings(string seed, string unique_time, bytes state);
   [Throws=SphinxError]
   string id_from_macaroon(string macaroon);
+  [Throws=SphinxError]
+  string contact_for_encrypted_child_key(string seed, string unique_time, bytes state, string encrypted_child_key);
+  [Throws=SphinxError]
+  string find_route(bytes state, string to_pubkey, string? route_hint, u64 amt_msat);
 };
