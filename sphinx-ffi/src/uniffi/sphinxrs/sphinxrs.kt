@@ -524,8 +524,6 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_id_from_macaroon(`macaroon`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_contact_for_encrypted_child_key(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`encryptedChildKey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_find_route(`state`: RustBuffer.ByValue,`toPubkey`: RustBuffer.ByValue,`routeHint`: RustBuffer.ByValue,`amtMsat`: Long,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun ffi_sphinxrs_rustbuffer_alloc(`size`: Int,_uniffi_out_err: RustCallStatus, 
@@ -695,8 +693,6 @@ internal interface _UniFFILib : Library {
     fun uniffi_sphinxrs_checksum_func_fetch_pings(
     ): Short
     fun uniffi_sphinxrs_checksum_func_id_from_macaroon(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_contact_for_encrypted_child_key(
     ): Short
     fun uniffi_sphinxrs_checksum_func_find_route(
     ): Short
@@ -955,9 +951,6 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_id_from_macaroon() != 36424.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_contact_for_encrypted_child_key() != 36351.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_find_route() != 27285.toShort()) {
@@ -3130,15 +3123,6 @@ fun `idFromMacaroon`(`macaroon`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
     _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_id_from_macaroon(FfiConverterString.lower(`macaroon`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `contactForEncryptedChildKey`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `encryptedChildKey`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_contact_for_encrypted_child_key(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`encryptedChildKey`),_status)
 })
 }
 

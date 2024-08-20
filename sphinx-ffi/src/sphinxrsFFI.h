@@ -223,8 +223,6 @@ RustBuffer uniffi_sphinxrs_fn_func_fetch_pings(RustBuffer seed, RustBuffer uniqu
 );
 RustBuffer uniffi_sphinxrs_fn_func_id_from_macaroon(RustBuffer macaroon, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_contact_for_encrypted_child_key(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer encrypted_child_key, RustCallStatus *_Nonnull out_status
-);
 RustBuffer uniffi_sphinxrs_fn_func_find_route(RustBuffer state, RustBuffer to_pubkey, RustBuffer route_hint, uint64_t amt_msat, RustCallStatus *_Nonnull out_status
 );
 RustBuffer ffi_sphinxrs_rustbuffer_alloc(int32_t size, RustCallStatus *_Nonnull out_status
@@ -473,9 +471,6 @@ uint16_t uniffi_sphinxrs_checksum_func_fetch_pings(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_id_from_macaroon(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_contact_for_encrypted_child_key(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_find_route(void
