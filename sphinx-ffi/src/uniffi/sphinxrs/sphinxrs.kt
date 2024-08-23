@@ -494,8 +494,10 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_get_mutes(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_set_push_token(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pushToken`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
+    fun uniffi_sphinxrs_fn_func_set_push_token(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pushToken`: RustBuffer.ByValue,`pushKey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_decrypt_child_index(`encryptedChild`: RustBuffer.ByValue,`pushKey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
+    ): Long
     fun uniffi_sphinxrs_fn_func_get_msgs_counts(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_fetch_msgs_batch(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`lastMsgIdx`: Long,`limit`: RustBuffer.ByValue,`reverse`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
@@ -665,6 +667,8 @@ internal interface _UniFFILib : Library {
     fun uniffi_sphinxrs_checksum_func_get_mutes(
     ): Short
     fun uniffi_sphinxrs_checksum_func_set_push_token(
+    ): Short
+    fun uniffi_sphinxrs_checksum_func_decrypt_child_index(
     ): Short
     fun uniffi_sphinxrs_checksum_func_get_msgs_counts(
     ): Short
@@ -908,7 +912,10 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
     if (lib.uniffi_sphinxrs_checksum_func_get_mutes() != 4885.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_sphinxrs_checksum_func_set_push_token() != 7668.toShort()) {
+    if (lib.uniffi_sphinxrs_checksum_func_set_push_token() != 52747.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_sphinxrs_checksum_func_decrypt_child_index() != 2032.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_get_msgs_counts() != 29743.toShort()) {
@@ -2993,10 +3000,19 @@ fun `getMutes`(`seed`: String, `uniqueTime`: String, `state`: ByteArray): RunRet
 
 @Throws(SphinxException::class)
 
-fun `setPushToken`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `pushToken`: String): RunReturn {
+fun `setPushToken`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `pushToken`: String, `pushKey`: String): RunReturn {
     return FfiConverterTypeRunReturn.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_set_push_token(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`pushToken`),_status)
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_set_push_token(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`pushToken`),FfiConverterString.lower(`pushKey`),_status)
+})
+}
+
+@Throws(SphinxException::class)
+
+fun `decryptChildIndex`(`encryptedChild`: String, `pushKey`: String): ULong {
+    return FfiConverterULong.lift(
+    rustCallWithError(SphinxException) { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_decrypt_child_index(FfiConverterString.lower(`encryptedChild`),FfiConverterString.lower(`pushKey`),_status)
 })
 }
 

@@ -2455,14 +2455,25 @@ public func `getMutes`(`seed`: String, `uniqueTime`: String, `state`: Data) thro
     )
 }
 
-public func `setPushToken`(`seed`: String, `uniqueTime`: String, `state`: Data, `pushToken`: String) throws -> RunReturn {
+public func `setPushToken`(`seed`: String, `uniqueTime`: String, `state`: Data, `pushToken`: String, `pushKey`: String) throws -> RunReturn {
     return try  FfiConverterTypeRunReturn.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_set_push_token(
         FfiConverterString.lower(`seed`),
         FfiConverterString.lower(`uniqueTime`),
         FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`pushToken`),$0)
+        FfiConverterString.lower(`pushToken`),
+        FfiConverterString.lower(`pushKey`),$0)
+}
+    )
+}
+
+public func `decryptChildIndex`(`encryptedChild`: String, `pushKey`: String) throws -> UInt64 {
+    return try  FfiConverterUInt64.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_decrypt_child_index(
+        FfiConverterString.lower(`encryptedChild`),
+        FfiConverterString.lower(`pushKey`),$0)
 }
     )
 }
@@ -2864,7 +2875,10 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_get_mutes() != 4885) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_set_push_token() != 7668) {
+    if (uniffi_sphinxrs_checksum_func_set_push_token() != 52747) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_decrypt_child_index() != 2032) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_get_msgs_counts() != 29743) {

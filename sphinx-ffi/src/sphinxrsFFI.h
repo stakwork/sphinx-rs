@@ -60,6 +60,7 @@ typedef struct RustCallStatus {
 #endif // def UNIFFI_SHARED_H
 
 // Callbacks for UniFFI Futures
+typedef void (*UniFfiFutureCallbackUInt64)(const void * _Nonnull, uint64_t, RustCallStatus);
 typedef void (*UniFfiFutureCallbackRustBuffer)(const void * _Nonnull, RustBuffer, RustCallStatus);
 
 // Scaffolding functions
@@ -193,7 +194,9 @@ RustBuffer uniffi_sphinxrs_fn_func_mute(RustBuffer seed, RustBuffer unique_time,
 );
 RustBuffer uniffi_sphinxrs_fn_func_get_mutes(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_set_push_token(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer push_token, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_sphinxrs_fn_func_set_push_token(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer push_token, RustBuffer push_key, RustCallStatus *_Nonnull out_status
+);
+uint64_t uniffi_sphinxrs_fn_func_decrypt_child_index(RustBuffer encrypted_child, RustBuffer push_key, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_get_msgs_counts(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
 );
@@ -429,6 +432,9 @@ uint16_t uniffi_sphinxrs_checksum_func_get_mutes(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_set_push_token(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_decrypt_child_index(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_get_msgs_counts(void

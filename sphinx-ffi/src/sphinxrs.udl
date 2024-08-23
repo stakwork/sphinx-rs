@@ -239,7 +239,9 @@ namespace sphinxrs {
   [Throws=SphinxError]
   RunReturn get_mutes(string seed, string unique_time, bytes state);
   [Throws=SphinxError]
-  RunReturn set_push_token(string seed, string unique_time, bytes state, string push_token);
+  RunReturn set_push_token(string seed, string unique_time, bytes state, string push_token, string push_key);
+  [Throws=SphinxError]
+  u64 decrypt_child_index(string encrypted_child, string push_key);
   [Throws=SphinxError]
   RunReturn get_msgs_counts(string seed, string unique_time, bytes state);
   [Throws=SphinxError]

@@ -639,14 +639,23 @@ pub fn get_mutes(seed: String, unique_time: String, full_state: Vec<u8>) -> Resu
         .into())
 }
 
+pub fn decrypt_child_index(encrypted_child: String, push_key: String) -> Result<u64> {
+    Ok(
+        bindings::decode_encrypted_child_idx(&encrypted_child, &push_key)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
 pub fn set_push_token(
     seed: String,
     unique_time: String,
     full_state: Vec<u8>,
     push_token: String,
+    push_key: String,
 ) -> Result<RunReturn> {
     Ok(
-        bindings::set_push_token(&seed, &unique_time, &full_state, &push_token)
+        bindings::set_push_token(&seed, &unique_time, &full_state, &push_token, &push_key)
             .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
             .into(),
     )
