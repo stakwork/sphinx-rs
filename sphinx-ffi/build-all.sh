@@ -1,3 +1,4 @@
 ./build-ios.sh
 ./build-mac.sh
-./build-kotlin.sh
+./build-android.sh
+./build-windows.sh

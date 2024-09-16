@@ -149,6 +149,16 @@ mod tests {
         let pk2 = t.recover().expect("failed to verify");
         assert_eq!(public_key, pk2);
     }
+
+    #[test]
+    fn test_rec_tok() {
+        let tok = "ZtiimCAbrMtzEO5sUeQQmCqPjFb7jujSaaKCUEECAlPYz3x2jgA6CKfCfW_8v9TpMkpTfTSpRE46yORvE53qxjcrlpIk";
+        let t = Token::from_base64(tok).expect("couldnt parse base64");
+        println!("TOKEN {:?}", t);
+        let pk2 = t.recover().expect("failed to verify");
+        println!("PK2 {}", pk2);
+    }
+
     #[test]
     fn test_recover_within() {
         let sk = secret_key();
