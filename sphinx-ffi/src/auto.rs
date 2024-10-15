@@ -305,6 +305,17 @@ pub fn keysend(
     .into())
 }
 
+pub fn pay(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    bolt11: String,
+) -> Result<RunReturn> {
+    Ok(bindings::pay(&seed, &unique_time, &full_state, &bolt11)
+        .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+        .into())
+}
+
 fn my_img_opt(my_img: &str) -> Option<&str> {
     match my_img {
         "" => None,

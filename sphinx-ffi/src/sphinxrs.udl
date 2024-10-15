@@ -197,6 +197,8 @@ namespace sphinxrs {
   [Throws=SphinxError]
   RunReturn keysend(string seed, string unique_time, string to, bytes state, u64 amt_msat, bytes? data, string? route_hint);
   [Throws=SphinxError]
+  RunReturn pay(string seed, string unique_time, bytes state, string bolt11);
+  [Throws=SphinxError]
   string make_media_token(string seed, string unique_time, bytes state, string host, string muid, string to, u32 expiry);
   [Throws=SphinxError]
   string make_media_token_with_meta(string seed, string unique_time, bytes state, string host, string muid, string to, u32 expiry, string meta);
