@@ -15,9 +15,13 @@ echo "=> renaming files"
 mkdir -p target/windows
 mkdir -p target/windows/x86_64
 mkdir -p target/windows/i686
+mkdir -p target/windows/aarch64
 
 mv target/x86_64-pc-windows-gnu/release/sphinxrs.dll target/windows/x86_64/sphinxrs.dll
 mv target/i686-pc-windows-gnu/release/sphinxrs.dll target/windows/i686/sphinxrs.dll
+
+mv target/x86_64-apple-darwin/release/libsphinxrs.dylib target/windows/x86_64/sphinxrs.dylib
+mv target/aarch64-apple-darwin/release/libsphinxrs.dylib target/windows/aarch64/sphinxrs.dylib
 
 zip -r target/windows-libraries.zip target/windows
 
