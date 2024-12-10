@@ -558,6 +558,8 @@ pub fn make_invite(
     my_alias: String,
     tribe_host: Option<String>,
     tribe_pubkey: Option<String>,
+    inviter_pubkey: Option<String>,
+    inviter_route_hint: Option<String>,
 ) -> Result<RunReturn> {
     Ok(bindings::make_invite(
         &seed,
@@ -568,6 +570,8 @@ pub fn make_invite(
         &my_alias,
         tribe_host.as_deref(),
         tribe_pubkey.as_deref(),
+        inviter_pubkey.as_deref(),
+        inviter_route_hint.as_deref(),
     )
     .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
     .into())
