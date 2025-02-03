@@ -14,9 +14,23 @@ doctest = false
 default = ["fspersist", "persist", "std"]
 fspersist = ["fsdb"]
 persist = ["vls-persist"]
-std = ["vls-persist/std", "vls-protocol-signer/std", "vls-protocol/std", "lss-connector/std", "rand/std", "anyhow/std", "sphinx-glyph/std", "hex/std"]
+std = [
+    "vls-persist/std",
+    "vls-protocol-signer/std",
+    "vls-protocol/std",
+    "lss-connector/std",
+    "rand/std",
+    "anyhow/std",
+    "sphinx-glyph/std",
+    "hex/std",
+]
 broker-test = ["lss-connector/broker"]
-no-std = ["vls-protocol-signer/no-std", "vls-persist/no-std", "lss-connector/no-std", "sphinx-glyph/no-std"]
+no-std = [
+    "vls-protocol-signer/no-std",
+    "vls-persist/no-std",
+    "lss-connector/no-std",
+    "sphinx-glyph/no-std",
+]
 no-native = ["lss-connector/no-native"]
 lowmemory = []
 
@@ -34,9 +48,14 @@ fsdb = { git = "https://github.com/Evanfeenstra/fsdb.git", rev = "7d0db454133bf3
 thiserror = "1.0.44"
 rmp-serde = "1.1.2"
 # vls
-vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "6672ee99904c59e635a2f96b06339b9ce656af12", default-features = false, features = ["secp-lowmemory", "tracker_size_workaround"] }
+vls-protocol-signer = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "6672ee99904c59e635a2f96b06339b9ce656af12", default-features = false, features = [
+    "secp-lowmemory",
+    "tracker_size_workaround",
+] }
 vls-protocol = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "6672ee99904c59e635a2f96b06339b9ce656af12", default-features = false }
-vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "6672ee99904c59e635a2f96b06339b9ce656af12", default-features = false, features = ["kvv"], optional = true }
+vls-persist = { git = "https://gitlab.com/lightning-signer/validating-lightning-signer.git", rev = "6672ee99904c59e635a2f96b06339b9ce656af12", default-features = false, features = [
+    "kvv",
+], optional = true }
 # local
 # vls-protocol-signer = { path = "../../vls/vls-protocol-signer", default-features = false, features = ["secp-lowmemory", "tracker_size_workaround"] }
 # vls-protocol = { path = "../../vls/vls-protocol", default-features = false }

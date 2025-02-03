@@ -25,7 +25,7 @@ sphinx-signer = { path = "../signer", default-features = false, features = [
     "no-native",
 ] }
 sphinx-glyph = { path = "../glyph", default-features = false }
-sphinx = { git = "https://github.com/stakwork/sphinx", rev = "28810b7c9652bad1b54345fe26899b9da1f727ed", features = [
+sphinx = { git = "https://github.com/stakwork/sphinx", rev = "871bcce8ceb0421e0d3cfcba94f2b1de262b9caa", features = [
     "msg",
     "bindings",
     "macaroon",
@@ -35,6 +35,7 @@ uniffi = { version = "0.24.1", optional = true }
 hex = { version = "0.4.3", default-features = false }
 thiserror = "1.0.31"
 rmp-utils = { version = "0.1.0", path = "../rmp-utils" }
+time = "0.3.37"
 
 [build-dependencies]
 uniffi = { version = "0.24.1", optional = true, features = ["build"] }
@@ -48,3 +49,4 @@ debug = true      # Enable debug symbols. For example, we can use `dwarfdump` to
 [[bin]]
 name = "uniffi-bindgen"
 path = "uniffi-bindgen.rs"
+
