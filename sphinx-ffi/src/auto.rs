@@ -706,6 +706,28 @@ pub fn fetch_msgs_batch(
     .into())
 }
 
+pub fn fetch_msgs_batch_per_contact(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    last_msg_idx: u64,
+    limit: Option<u32>,
+    reverse: Option<bool>,
+    contact: String,
+) -> Result<RunReturn> {
+    Ok(bindings::fetch_msgs_batch_per_contact(
+        &seed,
+        &unique_time,
+        &full_state,
+        last_msg_idx,
+        limit,
+        reverse,
+        &contact,
+    )
+    .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
+    .into())
+}
+
 pub fn fetch_msgs_batch_okkey(
     seed: String,
     unique_time: String,

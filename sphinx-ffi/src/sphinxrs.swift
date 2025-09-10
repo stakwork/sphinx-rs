@@ -2517,6 +2517,21 @@ public func `fetchMsgsBatch`(`seed`: String, `uniqueTime`: String, `state`: Data
     )
 }
 
+public func `fetchMsgsBatchPerContact`(`seed`: String, `uniqueTime`: String, `state`: Data, `lastMsgIdx`: UInt64, `limit`: UInt32?, `reverse`: Bool?, `contact`: String) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_fetch_msgs_batch_per_contact(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),
+        FfiConverterUInt64.lower(`lastMsgIdx`),
+        FfiConverterOptionUInt32.lower(`limit`),
+        FfiConverterOptionBool.lower(`reverse`),
+        FfiConverterString.lower(`contact`),$0)
+}
+    )
+}
+
 public func `fetchMsgsBatchOkkey`(`seed`: String, `uniqueTime`: String, `state`: Data, `lastMsgIdx`: UInt64, `limit`: UInt32?, `reverse`: Bool?) throws -> RunReturn {
     return try  FfiConverterTypeRunReturn.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
@@ -2902,6 +2917,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_fetch_msgs_batch() != 22256) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_fetch_msgs_batch_per_contact() != 46524) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_fetch_msgs_batch_okkey() != 330) {
