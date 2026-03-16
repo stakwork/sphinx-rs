@@ -1,3 +1,4 @@
+use crate::chunk;
 use crate::{Result, SphinxError};
 use sphinx::bindings;
 use sphinx::serde_json;
@@ -242,7 +243,7 @@ pub fn handle(
     my_alias: String,
     my_img: String,
 ) -> Result<RunReturn> {
-    Ok(bindings::handle(
+    let rr: RunReturn = bindings::handle(
         &topic,
         &payload,
         &seed,
@@ -252,7 +253,8 @@ pub fn handle(
         &my_img_opt(&my_img),
     )
     .map_err(|e| SphinxError::HandleFailed { r: e.to_string() })?
-    .into())
+    .into();
+    chunk::handle_chunks(rr, &full_state)
 }
 
 pub fn send(
@@ -267,6 +269,20 @@ pub fn send(
     amt_msat: u64,
     is_tribe: bool,
 ) -> Result<RunReturn> {
+    if msg_json.len() > chunk::CHUNK_CONTENT_THRESHOLD {
+        return chunk::split_and_send(
+            &seed,
+            &unique_time,
+            &to,
+            msg_type,
+            &msg_json,
+            full_state,
+            &my_alias,
+            &my_img_opt(&my_img),
+            amt_msat,
+            is_tribe,
+        );
+    }
     Ok(bindings::send(
         &seed,
         &unique_time,

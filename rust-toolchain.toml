@@ -2,4 +2,4 @@
 
 # channel = "nightly-2023-01-30"
 
-channel = "stable"
+channel = "1.88.0"
