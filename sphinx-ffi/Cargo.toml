@@ -17,6 +17,7 @@ wasm = []
 
 [patch.crates-io]
 lightning = { git = "https://github.com/Evanfeenstra/rust-lightning", rev = "3f562dd5c6feb8413cf9a1ac02caef2b8ef59a84" }
+core2 = { git = "https://github.com/bbqsrc/core2", rev = "7bf2611bd9a5" }
 
 [dependencies]
 sphinx-crypter = { path = "../crypter" }
