@@ -1,8 +1,8 @@
 name: Build All FFI
 
 on:
-  pull_request:
-    branches: [master, main]
+  release:
+    types: [published]
 
 env:
   CARGO_NET_GIT_FETCH_WITH_CLI: "true"
@@ -189,3 +189,21 @@ jobs:
         with:
           name: windows-libraries
           path: sphinx-ffi/target/windows-libraries.zip
+
+  upload-release:
+    runs-on: ubuntu-latest
+    needs: [build-apple, build-android, build-windows]
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Upload artifacts to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/ios-universal/universal-sphinxrs.a
+            artifacts/macos-universal/universal-sphinxrs-mac.a
+            artifacts/android-libraries/kotlin-libraries.zip
+            artifacts/windows-libraries/windows-libraries.zip
