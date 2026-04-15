@@ -1,0 +1,81 @@
+name: Build All FFI
+
+on:
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: sphinx-ffi
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Install Rust targets (Apple)
+        run: |
+          rustup target add x86_64-apple-ios
+          rustup target add aarch64-apple-ios
+          rustup target add x86_64-apple-darwin
+          rustup target add aarch64-apple-darwin
+
+      - name: Build iOS
+        run: bash build-ios.sh
+
+      - name: Build macOS
+        run: bash build-mac.sh
+
+      - name: Build Android
+        run: bash build-android.sh
+
+      - name: Build Windows
+        run: bash build-windows.sh
+
+      - name: Upload iOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-universal
+          path: sphinx-ffi/target/universal-sphinxrs.a
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: sphinx-ffi/target/universal-sphinxrs-mac.a
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-libraries
+          path: sphinx-ffi/target/kotlin-libraries.zip
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-libraries
+          path: sphinx-ffi/target/windows-libraries.zip
+
+      - name: Upload Swift bindings
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-bindings
+          path: |
+            sphinx-ffi/src/sphinxrs.swift
+            sphinx-ffi/src/sphinxrsFFI.modulemap
+            sphinx-ffi/src/sphinxrsFFI.h
+
+      - name: Upload Kotlin bindings
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-bindings
+          path: sphinx-ffi/src/uniffi/sphinxrs/sphinxrs.kt
+
+
