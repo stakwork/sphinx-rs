@@ -64,13 +64,18 @@ jobs:
           name: macos-universal
           path: sphinx-ffi/target/universal-sphinxrs-mac.a
 
+      - name: Stage macOS dylibs
+        run: |
+          mkdir -p target/dylibs/x86_64
+          mkdir -p target/dylibs/aarch64
+          cp target/x86_64-apple-darwin/release/libsphinxrs.dylib target/dylibs/x86_64/libsphinxrs.dylib
+          cp target/aarch64-apple-darwin/release/libsphinxrs.dylib target/dylibs/aarch64/libsphinxrs.dylib
+
       - name: Upload macOS dylibs
         uses: actions/upload-artifact@v4
         with:
           name: macos-dylibs
-          path: |
-            sphinx-ffi/target/x86_64-apple-darwin/release/libsphinxrs.dylib
-            sphinx-ffi/target/aarch64-apple-darwin/release/libsphinxrs.dylib
+          path: sphinx-ffi/target/dylibs
 
       - name: Upload Swift bindings
         uses: actions/upload-artifact@v4
@@ -175,8 +180,8 @@ jobs:
           mkdir -p target/windows/aarch64
           mv target/x86_64-pc-windows-gnu/release/sphinxrs.dll target/windows/x86_64/sphinxrs.dll
           mv target/i686-pc-windows-gnu/release/sphinxrs.dll target/windows/i686/sphinxrs.dll
-          mv macos-dylibs/sphinx-ffi/target/x86_64-apple-darwin/release/libsphinxrs.dylib target/windows/x86_64/sphinxrs.dylib
-          mv macos-dylibs/sphinx-ffi/target/aarch64-apple-darwin/release/libsphinxrs.dylib target/windows/aarch64/sphinxrs.dylib
+          mv macos-dylibs/x86_64/libsphinxrs.dylib target/windows/x86_64/sphinxrs.dylib
+          mv macos-dylibs/aarch64/libsphinxrs.dylib target/windows/aarch64/sphinxrs.dylib
           cd target && zip -r windows-libraries.zip windows
 
       - name: Upload Windows artifacts
