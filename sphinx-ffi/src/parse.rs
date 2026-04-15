@@ -2,7 +2,7 @@ use crate::{Result, SphinxError};
 
 use sphinx_crypter::chacha::{KEY_LEN, NONCE_LEN, PAYLOAD_LEN};
 use sphinx_crypter::ecdh::PUBLIC_KEY_LEN;
-use sphinx_signer::derive::ENTROPY_LEN;
+use sphinx_derive::ENTROPY_LEN;
 use std::convert::TryInto;
 
 pub(crate) fn parse_secret_string(sk: String) -> Result<[u8; KEY_LEN]> {

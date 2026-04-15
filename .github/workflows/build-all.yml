@@ -1,0 +1,209 @@
+name: Build All FFI
+
+on:
+  release:
+    types: [published]
+
+env:
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+
+jobs:
+  build-apple:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: sphinx-ffi
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure git for private repos
+        run: git config --global url."https://x-access-token:${{ secrets.PRIVATE_REPO_PAT }}@github.com/".insteadOf "https://github.com/"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-ios,aarch64-apple-ios,x86_64-apple-darwin,aarch64-apple-darwin
+
+      - name: Generate Swift bindings
+        run: |
+          cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language swift
+          sed -i '' 's/module\ sphinxrsFFI/framework\ module\ sphinxrsFFI/' src/sphinxrsFFI.modulemap
+
+      - name: Build iOS (x86_64)
+        run: cargo build --features=uniffi/cli --target=x86_64-apple-ios --release
+
+      - name: Build iOS (aarch64)
+        run: cargo build --features=uniffi/cli --target=aarch64-apple-ios --release
+
+      - name: Create iOS universal lib
+        run: lipo -create target/x86_64-apple-ios/release/libsphinxrs.a target/aarch64-apple-ios/release/libsphinxrs.a -output target/universal-sphinxrs.a
+
+      - name: Build macOS (x86_64)
+        run: cargo build --features=uniffi/cli --target=x86_64-apple-darwin --release
+
+      - name: Build macOS (aarch64)
+        run: cargo build --features=uniffi/cli --target=aarch64-apple-darwin --release
+
+      - name: Create macOS universal lib
+        run: lipo -create target/x86_64-apple-darwin/release/libsphinxrs.a target/aarch64-apple-darwin/release/libsphinxrs.a -output target/universal-sphinxrs-mac.a
+
+      - name: Create macOS dylib universal
+        run: |
+          lipo -create target/x86_64-apple-darwin/release/libsphinxrs.dylib target/aarch64-apple-darwin/release/libsphinxrs.dylib -output target/universal-sphinxrs-mac.dylib || true
+
+      - name: Upload iOS universal lib
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-universal
+          path: sphinx-ffi/target/universal-sphinxrs.a
+
+      - name: Upload macOS universal lib
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: sphinx-ffi/target/universal-sphinxrs-mac.a
+
+      - name: Stage macOS dylibs
+        run: |
+          mkdir -p target/dylibs/x86_64
+          mkdir -p target/dylibs/aarch64
+          cp target/x86_64-apple-darwin/release/libsphinxrs.dylib target/dylibs/x86_64/libsphinxrs.dylib
+          cp target/aarch64-apple-darwin/release/libsphinxrs.dylib target/dylibs/aarch64/libsphinxrs.dylib
+
+      - name: Upload macOS dylibs
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dylibs
+          path: sphinx-ffi/target/dylibs
+
+      - name: Upload Swift bindings
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-bindings
+          path: |
+            sphinx-ffi/src/sphinxrs.swift
+            sphinx-ffi/src/sphinxrsFFI.modulemap
+            sphinx-ffi/src/sphinxrsFFI.h
+
+  build-android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sphinx-ffi
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure git for private repos
+        run: git config --global url."https://x-access-token:${{ secrets.PRIVATE_REPO_PAT }}@github.com/".insteadOf "https://github.com/"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Generate Kotlin bindings
+        run: |
+          cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language kotlin
+          sed -i 's/return "uniffi_sphinxrs"/return "sphinxrs"/' src/uniffi/sphinxrs/sphinxrs.kt
+
+      - name: Build Android targets
+        run: |
+          cross build --features=uniffi/cli --target i686-linux-android --release
+          cross build --features=uniffi/cli --target aarch64-linux-android --release
+          cross build --features=uniffi/cli --target arm-linux-androideabi --release
+          cross build --features=uniffi/cli --target armv7-linux-androideabi --release
+          cross build --features=uniffi/cli --target x86_64-linux-android --release
+
+      - name: Package Android libraries
+        run: |
+          mkdir -p target/out/x86
+          mkdir -p target/out/arm64-v8a
+          mkdir -p target/out/armeabi
+          mkdir -p target/out/armeabi-v7a
+          mkdir -p target/out/x86_64
+          mv target/i686-linux-android/release/libsphinxrs.so target/out/x86/libsphinxrs.so
+          mv target/aarch64-linux-android/release/libsphinxrs.so target/out/arm64-v8a/libsphinxrs.so
+          mv target/arm-linux-androideabi/release/libsphinxrs.so target/out/armeabi/libsphinxrs.so
+          mv target/armv7-linux-androideabi/release/libsphinxrs.so target/out/armeabi-v7a/libsphinxrs.so
+          mv target/x86_64-linux-android/release/libsphinxrs.so target/out/x86_64/libsphinxrs.so
+          cd target && zip -r kotlin-libraries.zip out
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-libraries
+          path: sphinx-ffi/target/kotlin-libraries.zip
+
+      - name: Upload Kotlin bindings
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-bindings
+          path: sphinx-ffi/src/uniffi/sphinxrs/sphinxrs.kt
+
+  build-windows:
+    runs-on: ubuntu-latest
+    needs: build-apple
+    defaults:
+      run:
+        working-directory: sphinx-ffi
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure git for private repos
+        run: git config --global url."https://x-access-token:${{ secrets.PRIVATE_REPO_PAT }}@github.com/".insteadOf "https://github.com/"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build Windows targets
+        run: |
+          cross build --features=uniffi/cli --target x86_64-pc-windows-gnu --release
+          cross build --features=uniffi/cli --target i686-pc-windows-gnu --release
+
+      - name: Download macOS dylibs
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-dylibs
+          path: sphinx-ffi/macos-dylibs
+
+      - name: Package Windows libraries
+        run: |
+          mkdir -p target/windows/x86_64
+          mkdir -p target/windows/i686
+          mkdir -p target/windows/aarch64
+          mv target/x86_64-pc-windows-gnu/release/sphinxrs.dll target/windows/x86_64/sphinxrs.dll
+          mv target/i686-pc-windows-gnu/release/sphinxrs.dll target/windows/i686/sphinxrs.dll
+          mv macos-dylibs/x86_64/libsphinxrs.dylib target/windows/x86_64/sphinxrs.dylib
+          mv macos-dylibs/aarch64/libsphinxrs.dylib target/windows/aarch64/sphinxrs.dylib
+          cd target && zip -r windows-libraries.zip windows
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-libraries
+          path: sphinx-ffi/target/windows-libraries.zip
+
+  upload-release:
+    runs-on: ubuntu-latest
+    needs: [build-apple, build-android, build-windows]
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Upload artifacts to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/ios-universal/universal-sphinxrs.a
+            artifacts/macos-universal/universal-sphinxrs-mac.a
+            artifacts/android-libraries/kotlin-libraries.zip
+            artifacts/windows-libraries/windows-libraries.zip

@@ -13,4 +13,5 @@ exclude = [
     "sphinx-frost",
     "sphinx-wasm",
     "rmp-utils",
+    "derive",
 ]

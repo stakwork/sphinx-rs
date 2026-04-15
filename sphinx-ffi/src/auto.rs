@@ -387,6 +387,19 @@ pub fn make_media_token_with_price(
     .into())
 }
 
+pub fn request_invoice(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    amt_msat: u64,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::request_invoice(&seed, &unique_time, &full_state, amt_msat)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
 pub fn make_invoice(
     seed: String,
     unique_time: String,

@@ -9,23 +9,15 @@ name = "sphinxrs"
 crate-type = ["staticlib", "cdylib"]
 
 [features]
-default = ["ffi", "std"]
+default = ["ffi"]
 ffi = ["uniffi"]
-std = ["sphinx-signer/std", "sphinx-glyph/std"]
-no-std = ["sphinx-signer/no-std", "sphinx-glyph/no-std"]
 wasm = []
-
-[patch.crates-io]
-lightning = { git = "https://github.com/Evanfeenstra/rust-lightning", rev = "3f562dd5c6feb8413cf9a1ac02caef2b8ef59a84" }
 
 [dependencies]
 sphinx-crypter = { path = "../crypter" }
-sphinx-signer = { path = "../signer", default-features = false, features = [
-    "persist",
-    "no-native",
-] }
-sphinx-glyph = { path = "../glyph", default-features = false }
-sphinx = { git = "https://github.com/stakwork/sphinx", rev = "ba1b5e31e4e79f64bf8936a9247e352b01766a43", features = [
+sphinx-derive = { path = "../derive" }
+sphinx-glyph = { path = "../glyph", default-features = false, features = ["std"] }
+sphinx = { git = "https://github.com/stakwork/sphinx", rev = "a1bdba9bfd9b", features = [
     "msg",
     "bindings",
     "macaroon",
@@ -34,7 +26,6 @@ sphinx = { git = "https://github.com/stakwork/sphinx", rev = "ba1b5e31e4e79f64bf
 uniffi = { version = "0.24.1", optional = true }
 hex = { version = "0.4.3", default-features = false }
 thiserror = "1.0.31"
-rmp-utils = { version = "0.1.0", path = "../rmp-utils" }
 time = "0.3.37"
 
 [build-dependencies]
