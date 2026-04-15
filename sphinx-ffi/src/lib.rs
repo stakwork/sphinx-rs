@@ -2,11 +2,8 @@ mod auto;
 mod control;
 mod onion;
 mod parse;
-mod signer;
 
 pub use control::*;
-
-pub use signer::*;
 
 pub use onion::*;
 
@@ -15,7 +12,7 @@ pub use auto::*;
 use sphinx_crypter::chacha::{decrypt as chacha_decrypt, encrypt as chacha_encrypt};
 use sphinx_crypter::ecdh::derive_shared_secret_from_slice;
 use sphinx_crypter::secp256k1::{PublicKey, Secp256k1, SecretKey};
-use sphinx_signer::{derive, lightning_signer::bitcoin::Network};
+use sphinx::Network;
 use std::str::FromStr;
 
 #[cfg(not(feature = "wasm"))]
@@ -47,20 +44,8 @@ pub enum SphinxError {
     BadRequest { r: String },
     #[error("Bad Response: {r}")]
     BadResponse { r: String },
-    #[error("Bad Topic: {r}")]
-    BadTopic { r: String },
     #[error("Bad Args: {r}")]
     BadArgs { r: String },
-    #[error("Bad State: {r}")]
-    BadState { r: String },
-    #[error("Bad Velocity: {r}")]
-    BadVelocity { r: String },
-    #[error("Init Failed: {r}")]
-    InitFailed { r: String },
-    #[error("LSS Failed: {r}")]
-    LssFailed { r: String },
-    #[error("VLS Failed: {r}")]
-    VlsFailed { r: String },
     #[error("Bad Child Index: {r}")]
     BadChildIndex { r: String },
     #[error("Bad Msg: {r}")]
@@ -151,7 +136,7 @@ pub fn node_keys(net: String, seed: String) -> Result<Keys> {
     let network: Network = Network::from_str(&net).map_err(|e| SphinxError::InvalidNetwork {
         r: format!("{:?}", e),
     })?;
-    let ks = derive::node_keys(&network, &seed[..]);
+    let ks = sphinx_derive::node_keys(&network, &seed[..]);
     Ok(Keys {
         secret: hex::encode(ks.1.secret_bytes()),
         pubkey: ks.0.to_string(),
@@ -160,21 +145,21 @@ pub fn node_keys(net: String, seed: String) -> Result<Keys> {
 
 pub fn mnemonic_from_entropy(entropy: String) -> Result<String> {
     let entropy = parse::parse_entropy_string(entropy)?;
-    let ret = derive::mnemonic_from_entropy(&entropy[..]).map_err(|e| SphinxError::BadSecret {
+    let ret = sphinx_derive::mnemonic_from_entropy(&entropy[..]).map_err(|e| SphinxError::BadSecret {
         r: format!("{:?}", e),
     })?;
     Ok(ret)
 }
 
 pub fn entropy_from_mnemonic(mnemonic: String) -> Result<String> {
-    let m = derive::entropy_from_mnemonic(&mnemonic).map_err(|e| SphinxError::BadSecret {
+    let m = sphinx_derive::entropy_from_mnemonic(&mnemonic).map_err(|e| SphinxError::BadSecret {
         r: format!("{:?}", e),
     })?;
     Ok(hex::encode(m))
 }
 
 pub fn mnemonic_to_seed(mnemonic: String) -> Result<String> {
-    let m = derive::mnemonic_to_seed(&mnemonic).map_err(|e| SphinxError::BadSecret {
+    let m = sphinx_derive::mnemonic_to_seed(&mnemonic).map_err(|e| SphinxError::BadSecret {
         r: format!("{:?}", e),
     })?;
     Ok(hex::encode(m))
@@ -182,7 +167,7 @@ pub fn mnemonic_to_seed(mnemonic: String) -> Result<String> {
 
 pub fn entropy_to_seed(entropy: String) -> Result<String> {
     let entropy = parse::parse_entropy_string(entropy)?;
-    let m = derive::entropy_to_seed(&entropy[..]).map_err(|e| SphinxError::BadSecret {
+    let m = sphinx_derive::entropy_to_seed(&entropy[..]).map_err(|e| SphinxError::BadSecret {
         r: format!("{:?}", e),
     })?;
     Ok(hex::encode(m))

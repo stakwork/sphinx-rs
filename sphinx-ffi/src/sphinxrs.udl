@@ -11,13 +11,7 @@ interface SphinxError {
   InvalidNetwork(string r);
   BadRequest(string r);
   BadResponse(string r);
-  BadTopic(string r);
   BadArgs(string r);
-  BadState(string r);
-  BadVelocity(string r);
-  InitFailed(string r);
-  LssFailed(string r);
-  VlsFailed(string r);
   BadChildIndex(string r);
   BadMsg(string r);
   AddContactFailed(string r);
@@ -33,14 +27,6 @@ interface SphinxError {
 dictionary Keys {
     string secret;
     string pubkey;
-};
-
-dictionary VlsResponse {
-    string topic;
-    bytes bytes;
-    u16 sequence;
-    string cmd;
-    bytes state;
 };
 
 dictionary Msg {
@@ -133,8 +119,6 @@ namespace sphinxrs {
   string parse_response(string res);
   [Throws=SphinxError]
   string make_auth_token(u32 ts, string secret);
-  [Throws=SphinxError]
-  VlsResponse run(string topic, string args, bytes state, bytes msg1, u16? expected_sequence);
   string sha_256(bytes msg);
   [Throws=SphinxError]
   bytes create_onion(string seed, u64 idx, string time, string network, string hops, bytes payload);
@@ -204,6 +188,8 @@ namespace sphinxrs {
   string make_media_token_with_meta(string seed, string unique_time, bytes state, string host, string muid, string to, u32 expiry, string meta);
   [Throws=SphinxError]
   string make_media_token_with_price(string seed, string unique_time, bytes state, string host, string muid, string to, u32 expiry, u64 price);
+  [Throws=SphinxError]
+  RunReturn request_invoice(string seed, string unique_time, bytes state, u64 amt_msat);
   [Throws=SphinxError]
   RunReturn make_invoice(string seed, string unique_time, bytes state, u64 amt_msat, string description);
   [Throws=SphinxError]

@@ -6,7 +6,6 @@ on:
 
 env:
   CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-  RUST_VERSION: "1.82.0"
 
 jobs:
   build-apple:
@@ -22,9 +21,8 @@ jobs:
         run: git config --global url."https://x-access-token:${{ secrets.PRIVATE_REPO_PAT }}@github.com/".insteadOf "https://github.com/"
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ env.RUST_VERSION }}
           targets: x86_64-apple-ios,aarch64-apple-ios,x86_64-apple-darwin,aarch64-apple-darwin
 
       - name: Generate Swift bindings
@@ -33,19 +31,19 @@ jobs:
           sed -i '' 's/module\ sphinxrsFFI/framework\ module\ sphinxrsFFI/' src/sphinxrsFFI.modulemap
 
       - name: Build iOS (x86_64)
-        run: cargo build --locked --features=uniffi/cli --target=x86_64-apple-ios --release
+        run: cargo build --features=uniffi/cli --target=x86_64-apple-ios --release
 
       - name: Build iOS (aarch64)
-        run: cargo build --locked --features=uniffi/cli --target=aarch64-apple-ios --release
+        run: cargo build --features=uniffi/cli --target=aarch64-apple-ios --release
 
       - name: Create iOS universal lib
         run: lipo -create target/x86_64-apple-ios/release/libsphinxrs.a target/aarch64-apple-ios/release/libsphinxrs.a -output target/universal-sphinxrs.a
 
       - name: Build macOS (x86_64)
-        run: cargo build --locked --features=uniffi/cli --target=x86_64-apple-darwin --release
+        run: cargo build --features=uniffi/cli --target=x86_64-apple-darwin --release
 
       - name: Build macOS (aarch64)
-        run: cargo build --locked --features=uniffi/cli --target=aarch64-apple-darwin --release
+        run: cargo build --features=uniffi/cli --target=aarch64-apple-darwin --release
 
       - name: Create macOS universal lib
         run: lipo -create target/x86_64-apple-darwin/release/libsphinxrs.a target/aarch64-apple-darwin/release/libsphinxrs.a -output target/universal-sphinxrs-mac.a
@@ -96,9 +94,7 @@ jobs:
         run: git config --global url."https://x-access-token:${{ secrets.PRIVATE_REPO_PAT }}@github.com/".insteadOf "https://github.com/"
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install cross
         run: cargo install cross --git https://github.com/cross-rs/cross
@@ -110,11 +106,11 @@ jobs:
 
       - name: Build Android targets
         run: |
-          cross build --locked --features=uniffi/cli --target i686-linux-android --release
-          cross build --locked --features=uniffi/cli --target aarch64-linux-android --release
-          cross build --locked --features=uniffi/cli --target arm-linux-androideabi --release
-          cross build --locked --features=uniffi/cli --target armv7-linux-androideabi --release
-          cross build --locked --features=uniffi/cli --target x86_64-linux-android --release
+          cross build --features=uniffi/cli --target i686-linux-android --release
+          cross build --features=uniffi/cli --target aarch64-linux-android --release
+          cross build --features=uniffi/cli --target arm-linux-androideabi --release
+          cross build --features=uniffi/cli --target armv7-linux-androideabi --release
+          cross build --features=uniffi/cli --target x86_64-linux-android --release
 
       - name: Package Android libraries
         run: |
@@ -156,17 +152,15 @@ jobs:
         run: git config --global url."https://x-access-token:${{ secrets.PRIVATE_REPO_PAT }}@github.com/".insteadOf "https://github.com/"
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install cross
         run: cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Build Windows targets
         run: |
-          cross build --locked --features=uniffi/cli --target x86_64-pc-windows-gnu --release
-          cross build --locked --features=uniffi/cli --target i686-pc-windows-gnu --release
+          cross build --features=uniffi/cli --target x86_64-pc-windows-gnu --release
+          cross build --features=uniffi/cli --target i686-pc-windows-gnu --release
 
       - name: Download macOS dylibs
         uses: actions/download-artifact@v4
