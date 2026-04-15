@@ -14,6 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Configure git for private repos
+        run: git config --global url."https://x-access-token:${{ secrets.PRIVATE_REPO_PAT }}@github.com/".insteadOf "https://github.com/"
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
