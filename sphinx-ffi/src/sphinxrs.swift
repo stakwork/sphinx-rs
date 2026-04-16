@@ -306,19 +306,6 @@ fileprivate struct FfiConverterUInt8: FfiConverterPrimitive {
     }
 }
 
-fileprivate struct FfiConverterUInt16: FfiConverterPrimitive {
-    typealias FfiType = UInt16
-    typealias SwiftType = UInt16
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt16 {
-        return try lift(readInt(&buf))
-    }
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        writeInt(&buf, lower(value))
-    }
-}
-
 fileprivate struct FfiConverterUInt32: FfiConverterPrimitive {
     typealias FfiType = UInt32
     typealias SwiftType = UInt32
@@ -1039,85 +1026,6 @@ public func FfiConverterTypeRunReturn_lower(_ value: RunReturn) -> RustBuffer {
     return FfiConverterTypeRunReturn.lower(value)
 }
 
-
-public struct VlsResponse {
-    public var `topic`: String
-    public var `bytes`: Data
-    public var `sequence`: UInt16
-    public var `cmd`: String
-    public var `state`: Data
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(`topic`: String, `bytes`: Data, `sequence`: UInt16, `cmd`: String, `state`: Data) {
-        self.`topic` = `topic`
-        self.`bytes` = `bytes`
-        self.`sequence` = `sequence`
-        self.`cmd` = `cmd`
-        self.`state` = `state`
-    }
-}
-
-
-extension VlsResponse: Equatable, Hashable {
-    public static func ==(lhs: VlsResponse, rhs: VlsResponse) -> Bool {
-        if lhs.`topic` != rhs.`topic` {
-            return false
-        }
-        if lhs.`bytes` != rhs.`bytes` {
-            return false
-        }
-        if lhs.`sequence` != rhs.`sequence` {
-            return false
-        }
-        if lhs.`cmd` != rhs.`cmd` {
-            return false
-        }
-        if lhs.`state` != rhs.`state` {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(`topic`)
-        hasher.combine(`bytes`)
-        hasher.combine(`sequence`)
-        hasher.combine(`cmd`)
-        hasher.combine(`state`)
-    }
-}
-
-
-public struct FfiConverterTypeVlsResponse: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> VlsResponse {
-        return try VlsResponse(
-            `topic`: FfiConverterString.read(from: &buf), 
-            `bytes`: FfiConverterData.read(from: &buf), 
-            `sequence`: FfiConverterUInt16.read(from: &buf), 
-            `cmd`: FfiConverterString.read(from: &buf), 
-            `state`: FfiConverterData.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: VlsResponse, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.`topic`, into: &buf)
-        FfiConverterData.write(value.`bytes`, into: &buf)
-        FfiConverterUInt16.write(value.`sequence`, into: &buf)
-        FfiConverterString.write(value.`cmd`, into: &buf)
-        FfiConverterData.write(value.`state`, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeVlsResponse_lift(_ buf: RustBuffer) throws -> VlsResponse {
-    return try FfiConverterTypeVlsResponse.lift(buf)
-}
-
-public func FfiConverterTypeVlsResponse_lower(_ value: VlsResponse) -> RustBuffer {
-    return FfiConverterTypeVlsResponse.lower(value)
-}
-
 public enum SphinxError {
 
     
@@ -1133,13 +1041,7 @@ public enum SphinxError {
     case InvalidNetwork(`r`: String)
     case BadRequest(`r`: String)
     case BadResponse(`r`: String)
-    case BadTopic(`r`: String)
     case BadArgs(`r`: String)
-    case BadState(`r`: String)
-    case BadVelocity(`r`: String)
-    case InitFailed(`r`: String)
-    case LssFailed(`r`: String)
-    case VlsFailed(`r`: String)
     case BadChildIndex(`r`: String)
     case BadMsg(`r`: String)
     case AddContactFailed(`r`: String)
@@ -1200,55 +1102,37 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
         case 11: return .BadResponse(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 12: return .BadTopic(
+        case 12: return .BadArgs(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 13: return .BadArgs(
+        case 13: return .BadChildIndex(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 14: return .BadState(
+        case 14: return .BadMsg(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 15: return .BadVelocity(
+        case 15: return .AddContactFailed(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 16: return .InitFailed(
+        case 16: return .GetContactFailed(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 17: return .LssFailed(
+        case 17: return .HandleFailed(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 18: return .VlsFailed(
+        case 18: return .FetchMsgsFailed(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 19: return .BadChildIndex(
+        case 19: return .SendFailed(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 20: return .BadMsg(
+        case 20: return .SetNetworkFailed(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 21: return .AddContactFailed(
+        case 21: return .SetBlockheightFailed(
             `r`: try FfiConverterString.read(from: &buf)
             )
-        case 22: return .GetContactFailed(
-            `r`: try FfiConverterString.read(from: &buf)
-            )
-        case 23: return .HandleFailed(
-            `r`: try FfiConverterString.read(from: &buf)
-            )
-        case 24: return .FetchMsgsFailed(
-            `r`: try FfiConverterString.read(from: &buf)
-            )
-        case 25: return .SendFailed(
-            `r`: try FfiConverterString.read(from: &buf)
-            )
-        case 26: return .SetNetworkFailed(
-            `r`: try FfiConverterString.read(from: &buf)
-            )
-        case 27: return .SetBlockheightFailed(
-            `r`: try FfiConverterString.read(from: &buf)
-            )
-        case 28: return .ParseStateFailed(
+        case 22: return .ParseStateFailed(
             `r`: try FfiConverterString.read(from: &buf)
             )
 
@@ -1318,88 +1202,58 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .BadTopic(`r`):
+        case let .BadArgs(`r`):
             writeInt(&buf, Int32(12))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .BadArgs(`r`):
+        case let .BadChildIndex(`r`):
             writeInt(&buf, Int32(13))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .BadState(`r`):
+        case let .BadMsg(`r`):
             writeInt(&buf, Int32(14))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .BadVelocity(`r`):
+        case let .AddContactFailed(`r`):
             writeInt(&buf, Int32(15))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .InitFailed(`r`):
+        case let .GetContactFailed(`r`):
             writeInt(&buf, Int32(16))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .LssFailed(`r`):
+        case let .HandleFailed(`r`):
             writeInt(&buf, Int32(17))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .VlsFailed(`r`):
+        case let .FetchMsgsFailed(`r`):
             writeInt(&buf, Int32(18))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .BadChildIndex(`r`):
+        case let .SendFailed(`r`):
             writeInt(&buf, Int32(19))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .BadMsg(`r`):
+        case let .SetNetworkFailed(`r`):
             writeInt(&buf, Int32(20))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .AddContactFailed(`r`):
+        case let .SetBlockheightFailed(`r`):
             writeInt(&buf, Int32(21))
             FfiConverterString.write(`r`, into: &buf)
             
         
-        case let .GetContactFailed(`r`):
-            writeInt(&buf, Int32(22))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .HandleFailed(`r`):
-            writeInt(&buf, Int32(23))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .FetchMsgsFailed(`r`):
-            writeInt(&buf, Int32(24))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .SendFailed(`r`):
-            writeInt(&buf, Int32(25))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .SetNetworkFailed(`r`):
-            writeInt(&buf, Int32(26))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .SetBlockheightFailed(`r`):
-            writeInt(&buf, Int32(27))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
         case let .ParseStateFailed(`r`):
-            writeInt(&buf, Int32(28))
+            writeInt(&buf, Int32(22))
             FfiConverterString.write(`r`, into: &buf)
             
         }
@@ -1427,27 +1281,6 @@ fileprivate struct FfiConverterOptionUInt8: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterUInt8.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-fileprivate struct FfiConverterOptionUInt16: FfiConverterRustBuffer {
-    typealias SwiftType = UInt16?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterUInt16.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterUInt16.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -1779,19 +1612,6 @@ public func `makeAuthToken`(`ts`: UInt32, `secret`: String) throws -> String {
     uniffi_sphinxrs_fn_func_make_auth_token(
         FfiConverterUInt32.lower(`ts`),
         FfiConverterString.lower(`secret`),$0)
-}
-    )
-}
-
-public func `run`(`topic`: String, `args`: String, `state`: Data, `msg1`: Data, `expectedSequence`: UInt16?) throws -> VlsResponse {
-    return try  FfiConverterTypeVlsResponse.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_run(
-        FfiConverterString.lower(`topic`),
-        FfiConverterString.lower(`args`),
-        FfiConverterData.lower(`state`),
-        FfiConverterData.lower(`msg1`),
-        FfiConverterOptionUInt16.lower(`expectedSequence`),$0)
 }
     )
 }
@@ -2247,6 +2067,18 @@ public func `makeMediaTokenWithPrice`(`seed`: String, `uniqueTime`: String, `sta
         FfiConverterString.lower(`to`),
         FfiConverterUInt32.lower(`expiry`),
         FfiConverterUInt64.lower(`price`),$0)
+}
+    )
+}
+
+public func `requestInvoice`(`seed`: String, `uniqueTime`: String, `state`: Data, `amtMsat`: UInt64) throws -> RunReturn {
+    return try  FfiConverterTypeRunReturn.lift(
+        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
+    uniffi_sphinxrs_fn_func_request_invoice(
+        FfiConverterString.lower(`seed`),
+        FfiConverterString.lower(`uniqueTime`),
+        FfiConverterData.lower(`state`),
+        FfiConverterUInt64.lower(`amtMsat`),$0)
 }
     )
 }
@@ -2745,9 +2577,6 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_make_auth_token() != 13236) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_run() != 47350) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_sphinxrs_checksum_func_sha_256() != 54805) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -2851,6 +2680,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_make_media_token_with_price() != 53555) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sphinxrs_checksum_func_request_invoice() != 9912) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_make_invoice() != 12949) {
