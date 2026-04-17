@@ -392,9 +392,10 @@ pub fn request_invoice(
     unique_time: String,
     full_state: Vec<u8>,
     amt_msat: u64,
+    description: Option<String>,
 ) -> Result<RunReturn> {
     Ok(
-        bindings::request_invoice(&seed, &unique_time, &full_state, amt_msat)
+        bindings::request_invoice(&seed, &unique_time, &full_state, amt_msat, description)
             .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
             .into(),
     )

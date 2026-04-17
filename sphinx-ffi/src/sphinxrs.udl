@@ -189,7 +189,7 @@ namespace sphinxrs {
   [Throws=SphinxError]
   string make_media_token_with_price(string seed, string unique_time, bytes state, string host, string muid, string to, u32 expiry, u64 price);
   [Throws=SphinxError]
-  RunReturn request_invoice(string seed, string unique_time, bytes state, u64 amt_msat);
+  RunReturn request_invoice(string seed, string unique_time, bytes state, u64 amt_msat, string? description);
   [Throws=SphinxError]
   RunReturn make_invoice(string seed, string unique_time, bytes state, u64 amt_msat, string description);
   [Throws=SphinxError]
