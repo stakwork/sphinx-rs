@@ -458,7 +458,7 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_make_media_token_with_price(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`host`: RustBuffer.ByValue,`muid`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,`expiry`: Int,`price`: Long,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_request_invoice(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`amtMsat`: Long,_uniffi_out_err: RustCallStatus, 
+    fun uniffi_sphinxrs_fn_func_request_invoice(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`amtMsat`: Long,`description`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_make_invoice(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`amtMsat`: Long,`description`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
@@ -866,7 +866,7 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
     if (lib.uniffi_sphinxrs_checksum_func_make_media_token_with_price() != 53555.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_sphinxrs_checksum_func_request_invoice() != 9912.toShort()) {
+    if (lib.uniffi_sphinxrs_checksum_func_request_invoice() != 4786.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_make_invoice() != 12949.toShort()) {
@@ -2642,10 +2642,10 @@ fun `makeMediaTokenWithPrice`(`seed`: String, `uniqueTime`: String, `state`: Byt
 
 @Throws(SphinxException::class)
 
-fun `requestInvoice`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `amtMsat`: ULong): RunReturn {
+fun `requestInvoice`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `amtMsat`: ULong, `description`: String?): RunReturn {
     return FfiConverterTypeRunReturn.lift(
     rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_request_invoice(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`amtMsat`),_status)
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_request_invoice(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`amtMsat`),FfiConverterOptionalString.lower(`description`),_status)
 })
 }
 

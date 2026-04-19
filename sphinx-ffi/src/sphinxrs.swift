@@ -2071,14 +2071,15 @@ public func `makeMediaTokenWithPrice`(`seed`: String, `uniqueTime`: String, `sta
     )
 }
 
-public func `requestInvoice`(`seed`: String, `uniqueTime`: String, `state`: Data, `amtMsat`: UInt64) throws -> RunReturn {
+public func `requestInvoice`(`seed`: String, `uniqueTime`: String, `state`: Data, `amtMsat`: UInt64, `description`: String?) throws -> RunReturn {
     return try  FfiConverterTypeRunReturn.lift(
         try rustCallWithError(FfiConverterTypeSphinxError.lift) {
     uniffi_sphinxrs_fn_func_request_invoice(
         FfiConverterString.lower(`seed`),
         FfiConverterString.lower(`uniqueTime`),
         FfiConverterData.lower(`state`),
-        FfiConverterUInt64.lower(`amtMsat`),$0)
+        FfiConverterUInt64.lower(`amtMsat`),
+        FfiConverterOptionString.lower(`description`),$0)
 }
     )
 }
@@ -2682,7 +2683,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_sphinxrs_checksum_func_make_media_token_with_price() != 53555) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_request_invoice() != 9912) {
+    if (uniffi_sphinxrs_checksum_func_request_invoice() != 4786) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sphinxrs_checksum_func_make_invoice() != 12949) {

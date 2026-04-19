@@ -158,7 +158,7 @@ RustBuffer uniffi_sphinxrs_fn_func_make_media_token_with_meta(RustBuffer seed, R
 );
 RustBuffer uniffi_sphinxrs_fn_func_make_media_token_with_price(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer host, RustBuffer muid, RustBuffer to, uint32_t expiry, uint64_t price, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_request_invoice(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t amt_msat, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_sphinxrs_fn_func_request_invoice(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t amt_msat, RustBuffer description, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_make_invoice(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t amt_msat, RustBuffer description, RustCallStatus *_Nonnull out_status
 );
