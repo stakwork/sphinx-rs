@@ -25,6 +25,7 @@ sphinx = { git = "https://github.com/stakwork/sphinx", rev = "b764cdfd660ee09fee
 # sphinx = { path = "../../sphinx/sphinx" }
 uniffi = { version = "0.24.1", optional = true }
 hex = { version = "0.4.3", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0.31"
 time = "0.3.37"
 
