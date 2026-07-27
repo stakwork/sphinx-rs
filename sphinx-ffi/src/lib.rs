@@ -1,4 +1,5 @@
 mod auto;
+mod chunk;
 mod control;
 mod onion;
 mod parse;
