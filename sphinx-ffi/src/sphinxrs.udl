@@ -22,6 +22,7 @@ interface SphinxError {
   SetNetworkFailed(string r);
   SetBlockheightFailed(string r);
   ParseStateFailed(string r);
+  BadState(string r);
 };
 
 dictionary Keys {

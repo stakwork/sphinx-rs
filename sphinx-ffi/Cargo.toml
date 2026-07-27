@@ -15,6 +15,7 @@ wasm = []
 
 [dependencies]
 sphinx-crypter = { path = "../crypter" }
+rmp-utils = { version = "0.1.0", path = "../rmp-utils" }
 sphinx-derive = { path = "../derive" }
 sphinx-glyph = { path = "../glyph", default-features = false, features = ["std"] }
 sphinx = { git = "https://github.com/stakwork/sphinx", rev = "b764cdfd660ee09feee370281b688a57c7ad4bab", features = [

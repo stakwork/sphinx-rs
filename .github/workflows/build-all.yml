@@ -25,6 +25,9 @@ jobs:
         with:
           targets: x86_64-apple-ios,aarch64-apple-ios,x86_64-apple-darwin,aarch64-apple-darwin
 
+      - name: Add Apple targets
+        run: rustup target add x86_64-apple-ios aarch64-apple-ios x86_64-apple-darwin aarch64-apple-darwin
+
       - name: Generate Swift bindings
         run: |
           cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language swift

@@ -67,6 +67,8 @@ pub enum SphinxError {
     SetBlockheightFailed { r: String },
     #[error("ParseStateFailed: {r}")]
     ParseStateFailed { r: String },
+    #[error("Bad state: {r}")]
+    BadState { r: String },
 }
 
 pub fn pubkey_from_secret_key(my_secret_key: String) -> Result<String> {
