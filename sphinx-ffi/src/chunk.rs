@@ -91,6 +91,9 @@ pub fn split_and_send(
     let n = (content_bytes.len() + CHUNK_CONTENT_THRESHOLD - 1) / CHUNK_CONTENT_THRESHOLD;
     let total_chunks = n as u16;
 
+    debug_assert!(n < 1000, "chunk count {} exceeds 3-digit suffix capacity", n);
+    debug_assert!(unique_time.len() <= 16, "unique_time '{}' exceeds u64 digit budget", unique_time);
+
     let mut current_state = full_state;
     let mut all_topics: Vec<String> = Vec::new();
     let mut all_payloads: Vec<Vec<u8>> = Vec::new();
@@ -115,7 +118,7 @@ pub fn split_and_send(
             r: format!("chunk serialization failed: {}", e),
         })?;
 
-        let chunk_unique_time = format!("{}_{}", unique_time, i);
+        let chunk_unique_time = format!("{}{:03}", unique_time, i);
 
         let raw_rr = bindings::send(
             seed,
@@ -612,7 +615,24 @@ mod tests {
         assert!(result.state_to_delete.contains(&key));
     }
 
-    // Test 6: chunk content concatenation preserves original msg_json exactly.
+    // Test 6: chunk_unique_time values are valid u64, correct length, and unique.
+    #[test]
+    fn test_chunk_unique_time_is_valid_u64() {
+        // Use a realistic 13-digit ms-precision value matching getTimeWithEntropy() callers.
+        let unique_time = "1706300000123";
+        let mut seen = std::collections::HashSet::new();
+        for i in 0usize..4 {
+            let t = format!("{}{:03}", unique_time, i);
+            // Must parse as u64.
+            assert!(t.parse::<u64>().is_ok(), "chunk_unique_time must parse as u64: {}", t);
+            // 13-digit ms timestamp + 3-digit suffix = 16 chars exactly.
+            assert_eq!(t.len(), 16, "expected 16-char chunk_unique_time, got: {}", t);
+            // Each value must be distinct.
+            assert!(seen.insert(t.clone()), "duplicate chunk_unique_time: {}", t);
+        }
+    }
+
+    // Test 7: chunk content concatenation preserves original msg_json exactly.
     #[test]
     fn test_content_roundtrip() {
         // Use a multi-byte UTF-8 string to verify char-boundary safety
