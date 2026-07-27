@@ -1052,6 +1052,7 @@ public enum SphinxError {
     case SetNetworkFailed(`r`: String)
     case SetBlockheightFailed(`r`: String)
     case ParseStateFailed(`r`: String)
+    case BadState(`r`: String)
 
     fileprivate static func uniffiErrorHandler(_ error: RustBuffer) throws -> Error {
         return try FfiConverterTypeSphinxError.lift(error)
@@ -1133,6 +1134,9 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
             `r`: try FfiConverterString.read(from: &buf)
             )
         case 22: return .ParseStateFailed(
+            `r`: try FfiConverterString.read(from: &buf)
+            )
+        case 23: return .BadState(
             `r`: try FfiConverterString.read(from: &buf)
             )
 
@@ -1254,6 +1258,11 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
         
         case let .ParseStateFailed(`r`):
             writeInt(&buf, Int32(22))
+            FfiConverterString.write(`r`, into: &buf)
+            
+        
+        case let .BadState(`r`):
+            writeInt(&buf, Int32(23))
             FfiConverterString.write(`r`, into: &buf)
             
         }
