@@ -6,10 +6,45 @@ use sphinx::serde_json;
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub const CHUNK_CONTENT_THRESHOLD: usize = 750;
+const MAX_MSG_LEN: usize = 869;
+
+/// Onion-layer crypto overhead added by the sphinx crate (sender/contact pubkeys,
+/// route hints, alias, encrypted tag, uuid, signature, plus JSON framing):
+/// ~250 B worst case, per the measured 150-250 B overhead range.
+const ONION_OVERHEAD_BYTES: usize = 250;
+
+/// Application-layer overhead in msg_json: outer `{"content":...,"metadata":...}`
+/// wrapper framing (~26 B) plus the double-encoded ChunkMeta string value
+/// (~117 B — raw ChunkMeta JSON is ~103 B, plus ~14 B of JSON string-escaping
+/// when embedded as a string value inside the outer object).
+const APP_OVERHEAD_BYTES: usize = 143;
+
+/// Total reserved overhead per chunk.
+const MAX_OVERHEAD_BYTES: usize = ONION_OVERHEAD_BYTES + APP_OVERHEAD_BYTES; // = 393
+
+/// Safe upper bound on content per chunk. Lowering this from 750 to 450 means messages
+/// in the 451-750 byte range that were previously single sends are now chunked into
+/// type-34 payloads. Both sender and receiver must run this updated code — a peer
+/// running the old handle_chunks-less code cannot reassemble chunks from an updated sender.
+pub const CHUNK_CONTENT_THRESHOLD: usize = 450; // 450 + 393 = 843 <= 869
+
+/// Compile-time guard: any future edit to these constants that violates the
+/// size invariant breaks the build immediately, before tests run.
+const _: () = assert!(CHUNK_CONTENT_THRESHOLD + MAX_OVERHEAD_BYTES <= MAX_MSG_LEN);
+
 const CHUNK_TYPE: u8 = 34;
 const CHUNK_TIMEOUT_SECS: u64 = 30;
 const CHUNK_STATE_PREFIX: &str = "chunkbuf_";
+
+/// Metadata-only struct carrying chunk coordinates on the wire.
+/// Serialized as a JSON string and embedded in the `metadata` field of the outer msg_json.
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ChunkMeta {
+    pub chunk_id: String,
+    pub chunk_index: u16,
+    pub total_chunks: u16,
+    pub original_msg_type: u8,
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ChunkPayload {
@@ -106,17 +141,22 @@ pub fn split_and_send(
         // we align to char boundaries. To be safe, use char-boundary aware slicing.
         let content = slice_utf8_safe(msg_json, start, end);
 
-        let payload = ChunkPayload {
+        let meta = ChunkMeta {
             chunk_id: chunk_id.clone(),
             chunk_index: i as u16,
             total_chunks,
             original_msg_type: msg_type,
-            content,
         };
-
-        let chunk_json = serde_json::to_string(&payload).map_err(|e| SphinxError::SendFailed {
-            r: format!("chunk serialization failed: {}", e),
-        })?;
+        // meta_json is a JSON string, intentionally double-serialized as an escaped
+        // string value inside chunk_msg_json so the receiver can recover both fields
+        // with one serde_json::Value parse of msg.message.
+        let meta_json = serde_json::to_string(&meta)
+            .map_err(|e| SphinxError::SendFailed { r: format!("chunk meta serialize: {}", e) })?;
+        let chunk_msg_json = serde_json::to_string(&serde_json::json!({
+            "content": content,
+            "metadata": meta_json,
+        }))
+        .map_err(|e| SphinxError::SendFailed { r: format!("chunk msg serialize: {}", e) })?;
 
         let chunk_unique_time = format!("{}{:03}", unique_time, i);
 
@@ -125,7 +165,7 @@ pub fn split_and_send(
             &chunk_unique_time,
             to,
             CHUNK_TYPE,
-            &chunk_json,
+            &chunk_msg_json,
             &current_state,
             my_alias,
             my_img,
@@ -290,11 +330,46 @@ fn process_chunk_msg(
     full_state: &[u8],
     now: u64,
 ) -> Result<ChunkResult> {
-    let message_str = msg.message.as_deref().unwrap_or("");
-    let chunk: ChunkPayload =
-        serde_json::from_str(message_str).map_err(|e| SphinxError::HandleFailed {
-            r: format!("chunk payload parse failed: {}", e),
-        })?;
+    let msg_text = msg.message.as_deref().unwrap_or("");
+
+    let (content, meta) = if let Ok(v) = serde_json::from_str::<serde_json::Value>(msg_text) {
+        if let (Some(content_str), Some(meta_str)) =
+            (v["content"].as_str(), v["metadata"].as_str())
+        {
+            // New wire format: metadata is a JSON-encoded string (double-serialized by the sender).
+            let meta: ChunkMeta = serde_json::from_str(meta_str).map_err(|e| {
+                SphinxError::HandleFailed { r: format!("chunk meta parse: {}", e) }
+            })?;
+            (content_str.to_string(), meta)
+        } else {
+            // Backward-compat: old format serialized the full ChunkPayload at the top level.
+            let p: ChunkPayload = serde_json::from_str(msg_text).map_err(|e| {
+                SphinxError::HandleFailed {
+                    r: format!("chunk payload parse (legacy): {}", e),
+                }
+            })?;
+            let meta = ChunkMeta {
+                chunk_id: p.chunk_id.clone(),
+                chunk_index: p.chunk_index,
+                total_chunks: p.total_chunks,
+                original_msg_type: p.original_msg_type,
+            };
+            (p.content, meta)
+        }
+    } else {
+        return Err(SphinxError::HandleFailed {
+            r: "chunk msg is not valid JSON".to_string(),
+        });
+    };
+
+    // Reconstruct a ChunkPayload for the existing ChunkBuffer logic below (unchanged).
+    let chunk = ChunkPayload {
+        chunk_id: meta.chunk_id,
+        chunk_index: meta.chunk_index,
+        total_chunks: meta.total_chunks,
+        original_msg_type: meta.original_msg_type,
+        content,
+    };
 
     let state_key = format!("{}{}", CHUNK_STATE_PREFIX, chunk.chunk_id);
 
@@ -442,9 +517,21 @@ mod tests {
     }
 
     fn make_chunk_msg(chunk: &ChunkPayload) -> Msg {
+        let meta = ChunkMeta {
+            chunk_id: chunk.chunk_id.clone(),
+            chunk_index: chunk.chunk_index,
+            total_chunks: chunk.total_chunks,
+            original_msg_type: chunk.original_msg_type,
+        };
+        let meta_json = serde_json::to_string(&meta).unwrap();
+        let msg_json = serde_json::json!({
+            "content": chunk.content.clone(),
+            "metadata": meta_json,
+        })
+        .to_string();
         Msg {
             r#type: Some(CHUNK_TYPE),
-            message: Some(serde_json::to_string(chunk).unwrap()),
+            message: Some(msg_json),
             sender: None,
             uuid: None,
             tag: None,
@@ -648,5 +735,87 @@ mod tests {
 
         let reassembled: String = pieces.iter().map(|s| s.as_str()).collect();
         assert_eq!(reassembled, original, "content roundtrip should preserve original");
+    }
+
+    // Test 8: new wire format round-trips chunk coordinates correctly through process_chunk_msg.
+    #[test]
+    fn test_chunk_metadata_roundtrip() {
+        let cp = ChunkPayload {
+            chunk_id: "meta_roundtrip_id".to_string(),
+            chunk_index: 2,
+            total_chunks: 5,
+            original_msg_type: 7,
+            content: "some content slice".to_string(),
+        };
+
+        let msg = make_chunk_msg(&cp);
+        let now = now_secs();
+        let result = process_chunk_msg(msg, &[], now).unwrap();
+
+        // With total_chunks=5 and only 1 received, the result must be Incomplete.
+        match result {
+            ChunkResult::Incomplete { state_key, buffer_bytes } => {
+                assert_eq!(state_key, format!("{}meta_roundtrip_id", CHUNK_STATE_PREFIX));
+                // Deserialize the buffer and verify the stored chunk's coordinates.
+                let buf: ChunkBuffer = serde_json::from_slice(&buffer_bytes).unwrap();
+                assert_eq!(buf.received.len(), 1);
+                let stored = &buf.received[0];
+                assert_eq!(stored.chunk_id, cp.chunk_id);
+                assert_eq!(stored.chunk_index, cp.chunk_index);
+                assert_eq!(stored.total_chunks, cp.total_chunks);
+                assert_eq!(stored.original_msg_type, cp.original_msg_type);
+                assert_eq!(stored.content, cp.content);
+            }
+            _ => panic!("expected Incomplete result for a single chunk out of 5"),
+        }
+    }
+
+    // Test 9: legacy-format ChunkPayload JSON (pre-upgrade wire format) is handled by the
+    // backward-compat fallback path in process_chunk_msg.
+    #[test]
+    fn test_legacy_chunk_compat() {
+        let cp = ChunkPayload {
+            chunk_id: "legacy_id".to_string(),
+            chunk_index: 0,
+            total_chunks: 3,
+            original_msg_type: 4,
+            content: "legacy content".to_string(),
+        };
+
+        // Build a Msg using the OLD wire format: ChunkPayload fields at the top level.
+        let legacy_msg_json = serde_json::to_string(&cp).unwrap();
+        let legacy_msg = Msg {
+            r#type: Some(CHUNK_TYPE),
+            message: Some(legacy_msg_json),
+            sender: None,
+            uuid: None,
+            tag: None,
+            index: None,
+            msat: None,
+            timestamp: None,
+            sent_to: None,
+            from_me: None,
+            payment_hash: None,
+            error: None,
+        };
+
+        let now = now_secs();
+        let result = process_chunk_msg(legacy_msg, &[], now).unwrap();
+
+        // Expect Incomplete (total_chunks=3, only 1 received) — confirming the fallback parsed OK.
+        match result {
+            ChunkResult::Incomplete { state_key, buffer_bytes } => {
+                assert_eq!(state_key, format!("{}legacy_id", CHUNK_STATE_PREFIX));
+                let buf: ChunkBuffer = serde_json::from_slice(&buffer_bytes).unwrap();
+                assert_eq!(buf.received.len(), 1);
+                let stored = &buf.received[0];
+                assert_eq!(stored.chunk_id, cp.chunk_id);
+                assert_eq!(stored.chunk_index, cp.chunk_index);
+                assert_eq!(stored.total_chunks, cp.total_chunks);
+                assert_eq!(stored.original_msg_type, cp.original_msg_type);
+                assert_eq!(stored.content, cp.content);
+            }
+            _ => panic!("expected Incomplete result for legacy format chunk"),
+        }
     }
 }
