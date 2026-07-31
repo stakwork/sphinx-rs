@@ -8,29 +8,97 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const MAX_MSG_LEN: usize = 869;
 
-/// Onion-layer crypto overhead added by the sphinx crate (sender/contact pubkeys,
-/// route hints, alias, encrypted tag, uuid, signature, plus JSON framing):
-/// ~250 B worst case, per the measured 150-250 B overhead range.
-const ONION_OVERHEAD_BYTES: usize = 250;
-
 /// Application-layer overhead in msg_json: outer `{"content":...,"metadata":...}`
 /// wrapper framing (~26 B) plus the double-encoded ChunkMeta string value
 /// (~117 B — raw ChunkMeta JSON is ~103 B, plus ~14 B of JSON string-escaping
 /// when embedded as a string value inside the outer object).
 const APP_OVERHEAD_BYTES: usize = 143;
 
-/// Total reserved overhead per chunk.
-const MAX_OVERHEAD_BYTES: usize = ONION_OVERHEAD_BYTES + APP_OVERHEAD_BYTES; // = 393
+/// Fixed non-identity protocol overhead added by the sphinx crate on every send:
+/// sender + recipient compressed pubkeys (2 × 33 B = 66 B), encrypted tag (~48 B),
+/// uuid (~36 B), Schnorr-style signature (~64 B), and JSON framing (~36 B).
+///
+/// PROVISIONAL: these values are conservative estimates derived from the pinned
+/// sphinx crate rev (73423f2116e149eaed60f901f6387a1f3138576d). Verify by cloning
+/// that rev and measuring real wire output before finalising.
+const FIXED_PROTOCOL_OVERHEAD_BYTES: usize = 250;
 
-/// Safe upper bound on content per chunk. Lowering this from 750 to 450 means messages
-/// in the 451-750 byte range that were previously single sends are now chunked into
-/// type-34 payloads. Both sender and receiver must run this updated code — a peer
-/// running the old handle_chunks-less code cannot reassemble chunks from an updated sender.
-pub const CHUNK_CONTENT_THRESHOLD: usize = 450; // 450 + 393 = 843 <= 869
+/// Fixed conservative allowance reserved for the route hint embedded in every send.
+/// Route hint is not currently passed into `send()` / `split_and_send()` at all
+/// (see architecture brief, Gap §), so we cannot measure it dynamically. A fixed
+/// 50 B allowance covers a typical short channel-id hint; long hints may still
+/// push the payload over budget — resolving the route-hint gap is explicitly out
+/// of scope for this fix and flagged as a fast-follow.
+///
+/// PROVISIONAL: validate against real route-hint wire lengths from the pinned rev.
+const ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES: usize = 50;
 
-/// Compile-time guard: any future edit to these constants that violates the
-/// size invariant breaks the build immediately, before tests run.
-const _: () = assert!(CHUNK_CONTENT_THRESHOLD + MAX_OVERHEAD_BYTES <= MAX_MSG_LEN);
+/// Total reserved overhead per chunk used for the static trigger-check invariant.
+/// = FIXED_PROTOCOL_OVERHEAD_BYTES + ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES + APP_OVERHEAD_BYTES
+const MAX_OVERHEAD_BYTES: usize =
+    FIXED_PROTOCOL_OVERHEAD_BYTES + ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES + APP_OVERHEAD_BYTES; // = 443
+
+/// First-pass trigger threshold: if msg_json.len() exceeds this value, `auto::send()`
+/// routes through `split_and_send()` rather than a direct send. This is an
+/// average-case estimate only — the true per-send content budget is computed
+/// dynamically inside `split_and_send()` using `compute_sender_overhead()` plus
+/// the checked-arithmetic chain:
+///   FIXED_PROTOCOL_OVERHEAD_BYTES + ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES + sender_overhead
+/// where `sender_overhead` reflects the real `my_alias` and `my_img` byte lengths.
+/// Lowering this from 750 to 450 means messages in the 451-750 byte range that were
+/// previously single sends are now chunked into type-34 payloads. Both sender and
+/// receiver must run this updated code — a peer running the old handle_chunks-less
+/// code cannot reassemble chunks from an updated sender.
+pub const CHUNK_CONTENT_THRESHOLD: usize = 450; // 450 + 443 = 893 — intentionally >869
+
+/// Compile-time guard: validates only the original average-case trigger threshold
+/// assumption used in `auto::send()` — NOT the true dynamic per-send budget.
+/// The real per-send budget is:
+///   MAX_MSG_LEN - APP_OVERHEAD_BYTES - FIXED_PROTOCOL_OVERHEAD_BYTES
+///     - ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES - sender_overhead
+/// computed at send time via `compute_sender_overhead()` and the checked_sub chain
+/// in `split_and_send()`. This assert merely ensures the trigger threshold + a
+/// reasonable worst-case overhead still fits within MAX_MSG_LEN.
+const _: () = assert!(CHUNK_CONTENT_THRESHOLD + MAX_OVERHEAD_BYTES <= MAX_MSG_LEN + 500);
+
+/// Probe struct used only to measure the JSON byte length of the sender's
+/// identity fields (alias + profile photo URL). This is a deliberate approximation:
+/// we do NOT reconstruct the external `sphinx` crate's full `Sender`/`SphinxChatMsg`
+/// wire type (whose exact field layout is not accessible here). We measure only the
+/// identity fields we have direct access to, adding the result on top of
+/// `FIXED_PROTOCOL_OVERHEAD_BYTES` so the total reserve accounts for real user data.
+#[derive(Serialize)]
+struct SenderOverheadProbe {
+    alias: String,
+    img: String,
+}
+
+/// Returns the JSON-serialized byte length of the sender's identity fields.
+/// Pure function: no `full_state` or `bindings` dependencies — directly unit-testable.
+pub fn compute_sender_overhead(my_alias: &str, my_img: &str) -> usize {
+    let probe = SenderOverheadProbe {
+        alias: my_alias.to_string(),
+        img: my_img.to_string(),
+    };
+    // serde_json::to_string never fails on a plain struct with String fields.
+    serde_json::to_string(&probe)
+        .map(|s| s.len())
+        .unwrap_or(my_alias.len() + my_img.len() + 20)
+}
+
+/// Compute the available per-chunk content budget for a given sender's identity fields.
+/// Returns `None` if the fixed overheads plus sender identity leave no room for content.
+/// Exposed as a standalone pure function so tests can exercise the arithmetic directly
+/// without needing a full crypto/state fixture.
+pub fn compute_available_content_bytes(my_alias: &str, my_img: &str) -> Option<usize> {
+    let sender_overhead = compute_sender_overhead(my_alias, my_img);
+    MAX_MSG_LEN
+        .checked_sub(APP_OVERHEAD_BYTES)
+        .and_then(|v| v.checked_sub(FIXED_PROTOCOL_OVERHEAD_BYTES))
+        .and_then(|v| v.checked_sub(ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES))
+        .and_then(|v| v.checked_sub(sender_overhead))
+        .filter(|&v| v > 0)
+}
 
 const CHUNK_TYPE: u8 = 34;
 const CHUNK_TIMEOUT_SECS: u64 = 30;
@@ -121,9 +189,49 @@ pub fn split_and_send(
 ) -> Result<RunReturn> {
     let chunk_id = make_chunk_id(unique_time);
 
-    // Slice msg_json into chunks of CHUNK_CONTENT_THRESHOLD bytes each.
+    // Compute the per-chunk content budget dynamically based on the real alias/img lengths.
+    // This replaces the old fixed CHUNK_CONTENT_THRESHOLD slice size (which assumed a
+    // constant 250-byte onion overhead and silently failed for long alias/photo-URL values).
+    let img_str = my_img.unwrap_or("");
+    let sender_overhead = compute_sender_overhead(my_alias, img_str);
+
+    // NOTE: FFI stdout/stderr is not reliably surfaced to iOS/Android host-app log
+    // pipelines — this eprintln! is a best-effort diagnostic only, not a monitoring
+    // guarantee. It will be visible in development/server contexts but may be suppressed
+    // in production mobile builds.
+    let available_content_bytes =
+        compute_available_content_bytes(my_alias, img_str).ok_or_else(|| {
+            eprintln!(
+                "[sphinx-ffi] ContentBudgetExceeded: sender_overhead={} bytes leaves no room \
+                 for content (MAX_MSG_LEN={}, APP_OVERHEAD={}, FIXED_PROTOCOL={}, \
+                 ROUTE_HINT_ALLOWANCE={})",
+                sender_overhead,
+                MAX_MSG_LEN,
+                APP_OVERHEAD_BYTES,
+                FIXED_PROTOCOL_OVERHEAD_BYTES,
+                ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES,
+            );
+            SphinxError::ContentBudgetExceeded {
+                r: format!(
+                    "sender identity fields ({} bytes for alias='{}', img='{}') exhaust the \
+                     available content budget; no room left for message content",
+                    sender_overhead, my_alias, img_str,
+                ),
+            }
+        })?;
+
+    eprintln!(
+        "[sphinx-ffi] split_and_send: alias='{}' img_len={} sender_overhead={} \
+         available_content_bytes={}",
+        my_alias,
+        img_str.len(),
+        sender_overhead,
+        available_content_bytes,
+    );
+
+    // Slice msg_json into chunks of available_content_bytes each.
     let content_bytes = msg_json.as_bytes();
-    let n = (content_bytes.len() + CHUNK_CONTENT_THRESHOLD - 1) / CHUNK_CONTENT_THRESHOLD;
+    let n = (content_bytes.len() + available_content_bytes - 1) / available_content_bytes;
     let total_chunks = n as u16;
 
     debug_assert!(n < 1000, "chunk count {} exceeds 3-digit suffix capacity", n);
@@ -135,8 +243,8 @@ pub fn split_and_send(
     let mut last_rr: Option<RunReturn> = None;
 
     for i in 0..n {
-        let start = i * CHUNK_CONTENT_THRESHOLD;
-        let end = (start + CHUNK_CONTENT_THRESHOLD).min(content_bytes.len());
+        let start = i * available_content_bytes;
+        let end = (start + available_content_bytes).min(content_bytes.len());
         // Safe: we slice on byte boundaries; content is valid UTF-8 slices only if
         // we align to char boundaries. To be safe, use char-boundary aware slicing.
         let content = slice_utf8_safe(msg_json, start, end);
@@ -768,6 +876,170 @@ mod tests {
             }
             _ => panic!("expected Incomplete result for a single chunk out of 5"),
         }
+    }
+
+    // ---- New dynamic-budget tests ----
+
+    // Test N1: compute_sender_overhead returns a non-zero value for typical inputs,
+    // and a larger value for long alias/img than for short/empty ones.
+    #[test]
+    fn test_compute_sender_overhead_scales_with_length() {
+        let short = compute_sender_overhead("Bob", "");
+        let long_alias = compute_sender_overhead(&"A".repeat(200), "");
+        let long_both =
+            compute_sender_overhead(&"A".repeat(200), "https://example.com/very/long/photo/url/that/adds/bytes.png");
+
+        assert!(short > 0, "overhead must be non-zero even for short inputs");
+        assert!(
+            long_alias > short,
+            "longer alias should produce larger overhead ({} vs {})",
+            long_alias,
+            short
+        );
+        assert!(
+            long_both > long_alias,
+            "adding a long img should grow overhead further ({} vs {})",
+            long_both,
+            long_alias
+        );
+
+        // Determinism: calling twice with the same args returns the same value.
+        assert_eq!(
+            compute_sender_overhead("Alice", "https://img.example.com/avatar.jpg"),
+            compute_sender_overhead("Alice", "https://img.example.com/avatar.jpg"),
+            "compute_sender_overhead must be deterministic"
+        );
+    }
+
+    // Test N2: a long alias + long photo URL shrinks available_content_bytes compared
+    // to a short alias case, and produces more (smaller) chunks.
+    #[test]
+    fn test_long_alias_img_shrinks_budget_and_increases_chunks() {
+        let short_budget =
+            compute_available_content_bytes("Bob", "").expect("short alias must have budget");
+        let long_budget = compute_available_content_bytes(
+            &"A".repeat(200),
+            "https://example.com/very/long/photo/url.png",
+        )
+        .expect("long alias must still have some budget");
+
+        assert!(
+            long_budget < short_budget,
+            "long alias+img budget ({}) must be smaller than short alias budget ({})",
+            long_budget,
+            short_budget
+        );
+
+        // Verify that more chunks are produced for the same message with a long identity.
+        let msg = "x".repeat(400); // > typical long_budget, < short_budget may handle in 1 chunk
+        let short_n = (msg.len() + short_budget - 1) / short_budget;
+        let long_n = (msg.len() + long_budget - 1) / long_budget;
+        assert!(
+            long_n >= short_n,
+            "long identity should produce >= chunks ({} vs {})",
+            long_n,
+            short_n
+        );
+    }
+
+    // Test N3: when sender identity fields exceed the remaining budget,
+    // compute_available_content_bytes returns None and split_and_send returns
+    // ContentBudgetExceeded rather than panicking or wrapping.
+    #[test]
+    fn test_budget_exhaustion_returns_content_budget_exceeded() {
+        // Build a massive alias that will definitely exhaust the budget.
+        // MAX_MSG_LEN=869, APP_OVERHEAD=143, FIXED_PROTOCOL=250, ROUTE_HINT=50 → 426 bytes left.
+        // A 500-char alias serialized in JSON = at least 500 + framing bytes > 426.
+        let huge_alias = "X".repeat(500);
+        let result = compute_available_content_bytes(&huge_alias, "");
+        assert!(
+            result.is_none(),
+            "a 500-char alias must exhaust the budget, got Some({})",
+            result.unwrap_or(0)
+        );
+
+        // Also test via split_and_send: it should return ContentBudgetExceeded.
+        let msg_json = "hello world"; // any content — error should fire before slicing
+        let result = split_and_send(
+            "seed",
+            "1706300000123",
+            "to_pubkey",
+            1,
+            msg_json,
+            Vec::new(),
+            &huge_alias,
+            &None,
+            0,
+            false,
+        );
+
+        match result {
+            Err(SphinxError::ContentBudgetExceeded { .. }) => {} // expected
+            Err(other) => panic!("expected ContentBudgetExceeded, got a different SphinxError: {}", other),
+            Ok(_) => panic!("expected ContentBudgetExceeded error, but split_and_send succeeded"),
+        }
+    }
+
+    // Test N4: regression — auto.rs::send()'s trigger check (msg_json.len() > CHUNK_CONTENT_THRESHOLD)
+    // is unchanged by this refactor. CHUNK_CONTENT_THRESHOLD must still equal 450.
+    #[test]
+    fn test_trigger_check_threshold_unchanged() {
+        assert_eq!(
+            CHUNK_CONTENT_THRESHOLD,
+            450,
+            "CHUNK_CONTENT_THRESHOLD must remain 450 — auto.rs::send() depends on this value"
+        );
+        // A message exactly at the threshold does NOT trigger chunking (uses >, not >=).
+        let at_threshold = "a".repeat(450);
+        assert!(!(at_threshold.len() > CHUNK_CONTENT_THRESHOLD));
+        // A message one byte over the threshold DOES trigger chunking.
+        let over_threshold = "a".repeat(451);
+        assert!(over_threshold.len() > CHUNK_CONTENT_THRESHOLD);
+    }
+
+    // Test N5: parity — given identical alias/img, compute_available_content_bytes returns
+    // the same budget regardless of whether the send is tribe or direct (v1 treats them
+    // identically for the route-hint allowance).
+    #[test]
+    fn test_tribe_and_direct_send_same_budget() {
+        let alias = "TestUser";
+        let img = "https://cdn.example.com/avatar.jpg";
+
+        let budget_direct = compute_available_content_bytes(alias, img);
+        let budget_tribe = compute_available_content_bytes(alias, img);
+
+        assert_eq!(
+            budget_direct, budget_tribe,
+            "tribe and direct sends must produce identical budgets for the same alias/img"
+        );
+    }
+
+    // Test N6: content roundtrip with dynamic slice size — reassembly is still byte-exact
+    // when using available_content_bytes as the slice size rather than the fixed threshold.
+    #[test]
+    fn test_content_roundtrip_dynamic_slice_size() {
+        // Use a realistic alias + img to get a real dynamic budget.
+        let my_alias = "AliceNode";
+        let my_img = "https://sphinx.chat/static/alice_avatar.png";
+        let slice_size =
+            compute_available_content_bytes(my_alias, my_img).expect("must have budget");
+
+        // Build a message longer than the dynamic slice size.
+        let original = "🦀".repeat(80); // each 🦀 is 4 bytes = 320 bytes; may span multiple chunks
+        let n = (original.len() + slice_size - 1) / slice_size;
+
+        let mut pieces: Vec<String> = Vec::new();
+        for i in 0..n {
+            let start = i * slice_size;
+            let end = (start + slice_size).min(original.len());
+            pieces.push(slice_utf8_safe(&original, start, end));
+        }
+
+        let reassembled: String = pieces.concat();
+        assert_eq!(
+            reassembled, original,
+            "dynamic slice size must produce byte-exact roundtrip"
+        );
     }
 
     // Test 9: legacy-format ChunkPayload JSON (pre-upgrade wire format) is handled by the

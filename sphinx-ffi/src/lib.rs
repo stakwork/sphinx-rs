@@ -69,6 +69,8 @@ pub enum SphinxError {
     ParseStateFailed { r: String },
     #[error("Bad state: {r}")]
     BadState { r: String },
+    #[error("ContentBudgetExceeded: {r}")]
+    ContentBudgetExceeded { r: String },
 }
 
 pub fn pubkey_from_secret_key(my_secret_key: String) -> Result<String> {
@@ -232,8 +234,16 @@ mod tests {
 
     #[test]
     fn test_mnemonic_to_seed() -> Result<()> {
-        let seed = mnemonic_to_seed("forget parent wage payment cotton excite venue into era crouch because twin bargain flash library fever raise chunk suit evil jar perfect almost supreme".to_string()).expect("fail");
-        let vector = "df585d7edbf9863e42efc1ef00b1d10d9c6bb7b3ffea272a48430e8a3e4b600b";
+        // mnemonic_to_seed() requires exactly 12 words (BIP39 128-bit entropy).
+        // Test vector from sphinx-rs/derive/src/lib.rs::test_mnemonic_to_seed.
+        let seed = mnemonic_to_seed(
+            "absurd amount doctor acoustic avoid letter advice cage absurd amount doctor adjust"
+                .to_string(),
+        )
+        .expect("fail");
+        // hex::encode of [2,89,45,66,60,78,124,109,24,148,119,19,180,127,121,87,
+        //                  201,241,221,208,161,150,214,73,215,119,205,145,70,156,15,179]
+        let vector = "02592d423c4e7c6d18947713b47f7957c9f1ddd0a196d649d777cd91469c0fb3";
         assert_eq!(seed, vector);
         Ok(())
     }
