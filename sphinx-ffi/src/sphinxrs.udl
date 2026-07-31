@@ -23,6 +23,7 @@ interface SphinxError {
   SetBlockheightFailed(string r);
   ParseStateFailed(string r);
   BadState(string r);
+  ContentBudgetExceeded(string r);
 };
 
 dictionary Keys {
