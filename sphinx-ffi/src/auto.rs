@@ -208,11 +208,11 @@ pub fn fetch_msgs(
     last_msg_idx: u64,
     limit: Option<u32>,
 ) -> Result<RunReturn> {
-    Ok(
+    let rr: RunReturn =
         bindings::fetch_msgs(&seed, &unique_time, &full_state, last_msg_idx, limit)
             .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
-            .into(),
-    )
+            .into();
+    chunk::handle_chunks(rr, &full_state)
 }
 
 pub fn ping_done(
@@ -724,7 +724,7 @@ pub fn fetch_msgs_batch(
     limit: Option<u32>,
     reverse: Option<bool>,
 ) -> Result<RunReturn> {
-    Ok(bindings::fetch_msgs_batch(
+    let rr: RunReturn = bindings::fetch_msgs_batch(
         &seed,
         &unique_time,
         &full_state,
@@ -733,7 +733,8 @@ pub fn fetch_msgs_batch(
         reverse,
     )
     .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
-    .into())
+    .into();
+    chunk::handle_chunks(rr, &full_state)
 }
 
 pub fn fetch_msgs_batch_per_contact(
@@ -745,7 +746,7 @@ pub fn fetch_msgs_batch_per_contact(
     reverse: Option<bool>,
     contact: String,
 ) -> Result<RunReturn> {
-    Ok(bindings::fetch_msgs_batch_per_contact(
+    let rr: RunReturn = bindings::fetch_msgs_batch_per_contact(
         &seed,
         &unique_time,
         &full_state,
@@ -755,7 +756,8 @@ pub fn fetch_msgs_batch_per_contact(
         &contact,
     )
     .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
-    .into())
+    .into();
+    chunk::handle_chunks(rr, &full_state)
 }
 
 pub fn fetch_msgs_batch_okkey(
@@ -766,7 +768,7 @@ pub fn fetch_msgs_batch_okkey(
     limit: Option<u32>,
     reverse: Option<bool>,
 ) -> Result<RunReturn> {
-    Ok(bindings::fetch_msgs_batch_okkey(
+    let rr: RunReturn = bindings::fetch_msgs_batch_okkey(
         &seed,
         &unique_time,
         &full_state,
@@ -775,7 +777,8 @@ pub fn fetch_msgs_batch_okkey(
         reverse,
     )
     .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
-    .into())
+    .into();
+    chunk::handle_chunks(rr, &full_state)
 }
 
 pub fn fetch_first_msgs_per_key(
