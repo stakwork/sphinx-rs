@@ -101,7 +101,16 @@ pub fn compute_available_content_bytes(my_alias: &str, my_img: &str) -> Option<u
 }
 
 const CHUNK_TYPE: u8 = 34;
-const CHUNK_TIMEOUT_SECS: u64 = 30;
+/// 5-minute buffer window for in-progress chunk reassembly.
+///
+/// NOTE: widening this timeout does NOT add a proactive garbage-collection sweep.
+/// Cleanup is reactive only — it fires when a new fragment for the *same* `chunk_id`
+/// arrives and `process_chunk_msg` detects the elapsed time exceeds this constant.
+/// A `chunk_id` that is never revisited (e.g., an abandoned mid-transfer) will
+/// persist in state up to 5× longer than before before any chance of cleanup.
+/// A proactive sweep is out of scope for this fix; flag as a fast-follow if
+/// `chunkbuf_*` bloat is observed in persisted state during account-restore workloads.
+const CHUNK_TIMEOUT_SECS: u64 = 300;
 const CHUNK_STATE_PREFIX: &str = "chunkbuf_";
 
 /// Metadata-only struct carrying chunk coordinates on the wire.
@@ -147,6 +156,17 @@ fn make_chunk_id(unique_time: &str) -> String {
 
 /// Merge a state_mp delta (returned by bindings::send) into the running full_state map.
 /// Returns the new serialized full_state.
+///
+/// # Known limitation — concurrent-overwrite risk (do not fix here)
+/// `merge_state` performs a flat per-key overwrite: for each key in `delta`, the value
+/// in `base` is unconditionally replaced. There is no locking, versioning, or
+/// compare-and-swap. Two concurrent callers (e.g. a live `handle()` push racing a
+/// background batch-restore fetch) that each load `full_state` before either's
+/// `state_mp` delta is persisted could clobber each other's in-progress chunk buffer
+/// for the same `chunk_id` key. This is a pre-existing property of the persistence
+/// contract — routing more callers through the existing reassembly path does not change
+/// the blast radius. A versioned/CAS merge is a larger cross-cutting change recorded
+/// here as a known limitation and candidate follow-up, not folded into this fix.
 fn merge_state(
     full_state: &[u8],
     delta_mp: &[u8],
@@ -362,23 +382,55 @@ fn slice_utf8_safe(s: &str, start: usize, end: usize) -> String {
     s[start..end].to_string()
 }
 
-/// Called from `auto::handle()` after bindings::handle().
+/// Called from `auto::handle()` and all four fetch-path functions after the bindings call.
 /// Intercepts any Msgs with type == CHUNK_TYPE and either buffers or reassembles them.
+///
+/// # Multi-fragment-per-call correctness
+/// `handle()` delivers at most one message per call, so there is at most one chunk
+/// fragment per `RunReturn` on that path. However, the four batch/paginated fetch
+/// functions (`fetch_msgs`, `fetch_msgs_batch`, `fetch_msgs_batch_per_contact`,
+/// `fetch_msgs_batch_okkey`) can return many messages — including multiple fragments
+/// of the **same** `chunk_id` — in a single `RunReturn`. To handle this correctly,
+/// we thread an accumulating in-memory state map (`local_state`) through the loop.
+/// Each iteration reads chunk buffers from `local_state` first (falling back to
+/// `full_state` only for keys not yet touched this call), and writes updates back
+/// into `local_state` immediately so the next iteration in the same loop sees them.
+/// The final `local_state` is what gets serialised into `rr.state_mp`.
 pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8]) -> Result<RunReturn> {
     let now = now_secs();
     let mut i = 0;
 
-    // We process chunk msgs one at a time (there should be at most one per handle call).
+    // Seed the accumulating state map from the caller-supplied full_state.
+    // We keep it as a deserialized BTreeMap so per-iteration updates are visible
+    // to subsequent iterations in the same call without a round-trip through msgpack.
+    let mut local_state: BTreeMap<String, (u64, Vec<u8>)> = if full_state.is_empty() {
+        BTreeMap::new()
+    } else {
+        rmp_utils::deserialize_state_map(full_state).map_err(|e| SphinxError::BadState {
+            r: format!("handle_chunks deserialize full_state: {}", e),
+        })?
+    };
+
     while i < rr.msgs.len() {
         if rr.msgs[i].r#type == Some(CHUNK_TYPE) {
             let chunk_msg = rr.msgs.remove(i);
-            let result = process_chunk_msg(chunk_msg, full_state, now)?;
+
+            // Serialize the current local_state snapshot so process_chunk_msg can read it.
+            let local_state_bytes = rmp_utils::serialize_state_map(&local_state)
+                .map_err(|e| SphinxError::BadState {
+                    r: format!("handle_chunks serialize local_state: {}", e),
+                })?;
+
+            let result = process_chunk_msg(chunk_msg, &local_state_bytes, now)?;
 
             match result {
                 ChunkResult::Complete {
                     reassembled_msg,
                     state_key,
                 } => {
+                    // Remove the completed buffer from the accumulator so subsequent
+                    // iterations (and the caller's persisted state) don't retain it.
+                    local_state.remove(&state_key);
                     rr.msgs.insert(i, reassembled_msg);
                     rr.state_to_delete.push(state_key);
                     i += 1;
@@ -387,24 +439,13 @@ pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8]) -> Result<RunReturn> 
                     state_key,
                     buffer_bytes,
                 } => {
-                    // Store updated buffer in state_mp delta.
-                    let mut delta: BTreeMap<String, (u64, Vec<u8>)> = BTreeMap::new();
-                    delta.insert(state_key, (now, buffer_bytes));
-                    let delta_bytes =
-                        rmp_utils::serialize_state_map(&delta).map_err(|e| {
-                            SphinxError::BadState {
-                                r: format!("chunk buffer serialize: {}", e),
-                            }
-                        })?;
-                    // Merge with any existing state_mp in rr.
-                    rr.state_mp = Some(if let Some(ref existing) = rr.state_mp {
-                        merge_state(existing, &delta_bytes)?
-                    } else {
-                        delta_bytes
-                    });
+                    // Write the updated buffer back into local_state immediately so
+                    // a subsequent iteration for the same chunk_id sees this update.
+                    local_state.insert(state_key, (now, buffer_bytes));
                     // Chunk msg removed; don't advance i.
                 }
                 ChunkResult::TimedOut { state_key } => {
+                    local_state.remove(&state_key);
                     rr.error =
                         Some(format!("chunk_timeout:{}", &state_key[CHUNK_STATE_PREFIX.len()..]));
                     rr.state_to_delete.push(state_key);
@@ -414,6 +455,27 @@ pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8]) -> Result<RunReturn> 
         } else {
             i += 1;
         }
+    }
+
+    // Serialise the final accumulated state into rr.state_mp, merging with any
+    // existing state_mp already present in the RunReturn (e.g., from bindings).
+    let final_state_bytes = rmp_utils::serialize_state_map(&local_state).map_err(|e| {
+        SphinxError::BadState {
+            r: format!("handle_chunks serialize final local_state: {}", e),
+        }
+    })?;
+
+    // Only set state_mp if local_state differs from full_state (i.e., we touched
+    // at least one chunk buffer this call), or if rr already carried a state_mp.
+    // We detect "touched" by comparing the serialized form to the original bytes.
+    // If nothing changed and rr had no prior state_mp, leave state_mp as None.
+    let state_changed = final_state_bytes != full_state;
+    if state_changed || rr.state_mp.is_some() {
+        rr.state_mp = Some(if let Some(ref existing) = rr.state_mp {
+            merge_state(existing, &final_state_bytes)?
+        } else {
+            final_state_bytes
+        });
     }
 
     Ok(rr)
@@ -1040,6 +1102,154 @@ mod tests {
             reassembled, original,
             "dynamic slice size must produce byte-exact roundtrip"
         );
+    }
+
+    // Test NEW-A: two different concurrent chunk_ids in a single RunReturn → both buffers
+    // tracked independently, both appear in state_mp, neither is reassembled yet.
+    #[test]
+    fn test_handle_chunks_two_concurrent_chunk_ids() {
+        let chunk_id_a = "concurrent_a".to_string();
+        let chunk_id_b = "concurrent_b".to_string();
+
+        let cp_a = ChunkPayload {
+            chunk_id: chunk_id_a.clone(),
+            chunk_index: 0,
+            total_chunks: 2,
+            original_msg_type: 1,
+            content: "hello from A".to_string(),
+        };
+        let cp_b = ChunkPayload {
+            chunk_id: chunk_id_b.clone(),
+            chunk_index: 0,
+            total_chunks: 2,
+            original_msg_type: 2,
+            content: "hello from B".to_string(),
+        };
+
+        let mut rr = empty_run_return();
+        rr.msgs.push(make_chunk_msg(&cp_a));
+        rr.msgs.push(make_chunk_msg(&cp_b));
+
+        let result = handle_chunks(rr, &[]).unwrap();
+
+        // Both fragments are incomplete (each needs 2 total) — no reassembled msgs.
+        assert!(result.msgs.is_empty(), "no complete messages expected");
+        assert!(result.state_mp.is_some(), "state_mp must carry both chunk buffers");
+        assert!(result.state_to_delete.is_empty());
+
+        // Verify both state keys are present in the returned state_mp.
+        let state_mp = result.state_mp.unwrap();
+        let state_map: BTreeMap<String, (u64, Vec<u8>)> =
+            rmp_utils::deserialize_state_map(&state_mp).unwrap();
+        let key_a = format!("{}{}", CHUNK_STATE_PREFIX, chunk_id_a);
+        let key_b = format!("{}{}", CHUNK_STATE_PREFIX, chunk_id_b);
+        assert!(state_map.contains_key(&key_a), "state_mp must contain key for chunk_id_a");
+        assert!(state_map.contains_key(&key_b), "state_mp must contain key for chunk_id_b");
+
+        // Verify the stored buffers have the correct content.
+        let (_, buf_bytes_a) = state_map.get(&key_a).unwrap();
+        let buf_a: ChunkBuffer = serde_json::from_slice(buf_bytes_a).unwrap();
+        assert_eq!(buf_a.received.len(), 1);
+        assert_eq!(buf_a.received[0].content, "hello from A");
+
+        let (_, buf_bytes_b) = state_map.get(&key_b).unwrap();
+        let buf_b: ChunkBuffer = serde_json::from_slice(buf_bytes_b).unwrap();
+        assert_eq!(buf_b.received.len(), 1);
+        assert_eq!(buf_b.received[0].content, "hello from B");
+    }
+
+    // Test NEW-B: two fragments of the *same* chunk_id in a single RunReturn.
+    // Confirms the accumulation fix: the second fragment sees the first fragment's
+    // in-call buffer update and the message reassembles correctly within one call.
+    #[test]
+    fn test_handle_chunks_same_chunk_id_two_fragments_one_call() {
+        let chunk_id = "same_id_two_frags".to_string();
+
+        let cp0 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 0,
+            total_chunks: 2,
+            original_msg_type: 3,
+            content: "first_half_".to_string(),
+        };
+        let cp1 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 1,
+            total_chunks: 2,
+            original_msg_type: 3,
+            content: "second_half".to_string(),
+        };
+
+        let mut rr = empty_run_return();
+        rr.msgs.push(make_chunk_msg(&cp0));
+        rr.msgs.push(make_chunk_msg(&cp1));
+
+        // Pass empty state — both fragments arrive in the same call.
+        let result = handle_chunks(rr, &[]).unwrap();
+
+        // Both fragments together complete the message → exactly one reassembled msg.
+        assert_eq!(result.msgs.len(), 1, "both fragments in one call must reassemble");
+        let m = &result.msgs[0];
+        assert_eq!(m.r#type, Some(3u8));
+        assert_eq!(m.message.as_deref().unwrap(), "first_half_second_half");
+        assert_eq!(m.uuid.as_deref().unwrap(), chunk_id.as_str());
+
+        // The completed buffer key must be scheduled for deletion.
+        let key = format!("{}{}", CHUNK_STATE_PREFIX, chunk_id);
+        assert!(result.state_to_delete.contains(&key));
+    }
+
+    // Test NEW-C: sequential handle_chunks calls simulating two separate fetch_msgs
+    // invocations. The second call must use the state_mp from the first call so that
+    // fragment buffering persists across calls and the message reassembles correctly.
+    #[test]
+    fn test_handle_chunks_sequential_calls_cross_call_reassembly() {
+        let chunk_id = "cross_call_id".to_string();
+        let orig_type: u8 = 5;
+
+        let cp0 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 0,
+            total_chunks: 2,
+            original_msg_type: orig_type,
+            content: "part_one_".to_string(),
+        };
+        let cp1 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 1,
+            total_chunks: 2,
+            original_msg_type: orig_type,
+            content: "part_two".to_string(),
+        };
+
+        // --- First "fetch" call: only fragment 0 arrives ---
+        let mut rr1 = empty_run_return();
+        rr1.msgs.push(make_chunk_msg(&cp0));
+
+        let result1 = handle_chunks(rr1, &[]).unwrap();
+
+        assert!(result1.msgs.is_empty(), "first call must not reassemble (incomplete)");
+        assert!(result1.state_mp.is_some(), "first call must return state_mp with buffer");
+
+        // Persist state_mp from call 1 (simulating what the client stores).
+        let persisted_state = result1.state_mp.unwrap();
+
+        // --- Second "fetch" call: fragment 1 arrives, state from call 1 passed in ---
+        let mut rr2 = empty_run_return();
+        rr2.msgs.push(make_chunk_msg(&cp1));
+
+        let result2 = handle_chunks(rr2, &persisted_state).unwrap();
+
+        // Second call has both fragments → complete message.
+        assert_eq!(result2.msgs.len(), 1, "second call must complete reassembly");
+        let m = &result2.msgs[0];
+        assert_eq!(m.r#type, Some(orig_type));
+        assert_eq!(m.message.as_deref().unwrap(), "part_one_part_two");
+        assert_eq!(m.uuid.as_deref().unwrap(), chunk_id.as_str());
+
+        // Completed buffer must be scheduled for deletion.
+        let key = format!("{}{}", CHUNK_STATE_PREFIX, chunk_id);
+        assert!(result2.state_to_delete.contains(&key));
     }
 
     // Test 9: legacy-format ChunkPayload JSON (pre-upgrade wire format) is handled by the
