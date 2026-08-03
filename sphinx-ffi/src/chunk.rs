@@ -171,23 +171,23 @@ fn merge_state(
     full_state: &[u8],
     delta_mp: &[u8],
 ) -> Result<Vec<u8>> {
-    let mut base: BTreeMap<String, (u64, Vec<u8>)> = if full_state.is_empty() {
+    let mut base: BTreeMap<String, Vec<u8>> = if full_state.is_empty() {
         BTreeMap::new()
     } else {
-        rmp_utils::deserialize_state_map(full_state).map_err(|e| SphinxError::BadState {
+        rmp_utils::deserialize_simple_state_map(full_state).map_err(|e| SphinxError::BadState {
             r: format!("merge_state deserialize base: {}", e),
         })?
     };
     if !delta_mp.is_empty() {
-        let delta: BTreeMap<String, (u64, Vec<u8>)> =
-            rmp_utils::deserialize_state_map(delta_mp).map_err(|e| SphinxError::BadState {
+        let delta: BTreeMap<String, Vec<u8>> =
+            rmp_utils::deserialize_simple_state_map(delta_mp).map_err(|e| SphinxError::BadState {
                 r: format!("merge_state deserialize delta: {}", e),
             })?;
         for (k, v) in delta {
             base.insert(k, v);
         }
     }
-    rmp_utils::serialize_state_map(&base).map_err(|e| SphinxError::BadState {
+    rmp_utils::serialize_simple_state_map(&base).map_err(|e| SphinxError::BadState {
         r: format!("merge_state serialize: {}", e),
     })
 }
@@ -403,10 +403,10 @@ pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8]) -> Result<RunReturn> 
     // Seed the accumulating state map from the caller-supplied full_state.
     // We keep it as a deserialized BTreeMap so per-iteration updates are visible
     // to subsequent iterations in the same call without a round-trip through msgpack.
-    let mut local_state: BTreeMap<String, (u64, Vec<u8>)> = if full_state.is_empty() {
+    let mut local_state: BTreeMap<String, Vec<u8>> = if full_state.is_empty() {
         BTreeMap::new()
     } else {
-        rmp_utils::deserialize_state_map(full_state).map_err(|e| SphinxError::BadState {
+        rmp_utils::deserialize_simple_state_map(full_state).map_err(|e| SphinxError::BadState {
             r: format!("handle_chunks deserialize full_state: {}", e),
         })?
     };
@@ -416,7 +416,7 @@ pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8]) -> Result<RunReturn> 
             let chunk_msg = rr.msgs.remove(i);
 
             // Serialize the current local_state snapshot so process_chunk_msg can read it.
-            let local_state_bytes = rmp_utils::serialize_state_map(&local_state)
+            let local_state_bytes = rmp_utils::serialize_simple_state_map(&local_state)
                 .map_err(|e| SphinxError::BadState {
                     r: format!("handle_chunks serialize local_state: {}", e),
                 })?;
@@ -441,7 +441,7 @@ pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8]) -> Result<RunReturn> 
                 } => {
                     // Write the updated buffer back into local_state immediately so
                     // a subsequent iteration for the same chunk_id sees this update.
-                    local_state.insert(state_key, (now, buffer_bytes));
+                    local_state.insert(state_key, buffer_bytes);
                     // Chunk msg removed; don't advance i.
                 }
                 ChunkResult::TimedOut { state_key } => {
@@ -459,7 +459,7 @@ pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8]) -> Result<RunReturn> 
 
     // Serialise the final accumulated state into rr.state_mp, merging with any
     // existing state_mp already present in the RunReturn (e.g., from bindings).
-    let final_state_bytes = rmp_utils::serialize_state_map(&local_state).map_err(|e| {
+    let final_state_bytes = rmp_utils::serialize_simple_state_map(&local_state).map_err(|e| {
         SphinxError::BadState {
             r: format!("handle_chunks serialize final local_state: {}", e),
         }
@@ -621,12 +621,12 @@ fn load_chunk_buffer(full_state: &[u8], key: &str) -> Result<Option<ChunkBuffer>
     if full_state.is_empty() {
         return Ok(None);
     }
-    let state_map: BTreeMap<String, (u64, Vec<u8>)> =
-        rmp_utils::deserialize_state_map(full_state).map_err(|e| SphinxError::BadState {
+    let state_map: BTreeMap<String, Vec<u8>> =
+        rmp_utils::deserialize_simple_state_map(full_state).map_err(|e| SphinxError::BadState {
             r: format!("load_chunk_buffer deserialize: {}", e),
         })?;
 
-    if let Some((_version, bytes)) = state_map.get(key) {
+    if let Some(bytes) = state_map.get(key) {
         let buf: ChunkBuffer =
             serde_json::from_slice(bytes).map_err(|e| SphinxError::BadState {
                 r: format!("chunk buffer deserialize: {}", e),
@@ -715,12 +715,12 @@ mod tests {
         }
     }
 
-    /// Build a full_state containing a ChunkBuffer at the given key.
+    /// Build a full_state containing a ChunkBuffer at the given key (simple format).
     fn state_with_buffer(key: &str, buf: &ChunkBuffer) -> Vec<u8> {
         let buf_bytes = serde_json::to_vec(buf).unwrap();
-        let mut map: BTreeMap<String, (u64, Vec<u8>)> = BTreeMap::new();
-        map.insert(key.to_string(), (0, buf_bytes));
-        rmp_utils::serialize_state_map(&map).unwrap()
+        let mut map: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+        map.insert(key.to_string(), buf_bytes);
+        rmp_utils::serialize_simple_state_map(&map).unwrap()
     }
 
     // Test 1: msg_json under threshold → split_and_send not triggered (threshold check in auto.rs).
@@ -1139,20 +1139,20 @@ mod tests {
 
         // Verify both state keys are present in the returned state_mp.
         let state_mp = result.state_mp.unwrap();
-        let state_map: BTreeMap<String, (u64, Vec<u8>)> =
-            rmp_utils::deserialize_state_map(&state_mp).unwrap();
+        let state_map: BTreeMap<String, Vec<u8>> =
+            rmp_utils::deserialize_simple_state_map(&state_mp).unwrap();
         let key_a = format!("{}{}", CHUNK_STATE_PREFIX, chunk_id_a);
         let key_b = format!("{}{}", CHUNK_STATE_PREFIX, chunk_id_b);
         assert!(state_map.contains_key(&key_a), "state_mp must contain key for chunk_id_a");
         assert!(state_map.contains_key(&key_b), "state_mp must contain key for chunk_id_b");
 
         // Verify the stored buffers have the correct content.
-        let (_, buf_bytes_a) = state_map.get(&key_a).unwrap();
+        let buf_bytes_a = state_map.get(&key_a).unwrap();
         let buf_a: ChunkBuffer = serde_json::from_slice(buf_bytes_a).unwrap();
         assert_eq!(buf_a.received.len(), 1);
         assert_eq!(buf_a.received[0].content, "hello from A");
 
-        let (_, buf_bytes_b) = state_map.get(&key_b).unwrap();
+        let buf_bytes_b = state_map.get(&key_b).unwrap();
         let buf_b: ChunkBuffer = serde_json::from_slice(buf_bytes_b).unwrap();
         assert_eq!(buf_b.received.len(), 1);
         assert_eq!(buf_b.received[0].content, "hello from B");
@@ -1250,6 +1250,163 @@ mod tests {
         // Completed buffer must be scheduled for deletion.
         let key = format!("{}{}", CHUNK_STATE_PREFIX, chunk_id);
         assert!(result2.state_to_delete.contains(&key));
+    }
+
+    // Test 10: ChunkBuffer round-trips through a simple-format full_state (regression guard).
+    // Also validates decode of an externally-sourced real-world simple-format byte fixture
+    // (from https://github.com/stakwork/sphinx-ios/issues/256) so the test is not purely
+    // self-validating against its own encoder.
+    #[test]
+    fn test_chunkbuffer_roundtrip_simple_format() {
+        // --- Part A: self-encoded round-trip ---
+        let chunk_id = "roundtrip_id";
+        let key = format!("{}{}", CHUNK_STATE_PREFIX, chunk_id);
+
+        // Build a ChunkBuffer with one fragment already in it.
+        // Use a current timestamp so the buffer doesn't trip the CHUNK_TIMEOUT_SECS check.
+        let existing_buf = ChunkBuffer {
+            total_chunks: 2,
+            original_msg_type: 3,
+            received: vec![ChunkPayload {
+                chunk_id: chunk_id.to_string(),
+                chunk_index: 0,
+                total_chunks: 2,
+                original_msg_type: 3,
+                content: "first_part_".to_string(),
+            }],
+            first_received_ts: now_secs(),
+        };
+
+        // Serialize the buffer into a simple-format full_state.
+        let buf_bytes = serde_json::to_vec(&existing_buf).unwrap();
+        let mut map: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+        map.insert(key.clone(), buf_bytes);
+        let full_state = rmp_utils::serialize_simple_state_map(&map).unwrap();
+
+        // Feed the second fragment through handle_chunks against that state.
+        let cp1 = ChunkPayload {
+            chunk_id: chunk_id.to_string(),
+            chunk_index: 1,
+            total_chunks: 2,
+            original_msg_type: 3,
+            content: "second_part".to_string(),
+        };
+        let mut rr = empty_run_return();
+        rr.msgs.push(make_chunk_msg(&cp1));
+
+        let result = handle_chunks(rr, &full_state).unwrap();
+
+        // Both fragments now present → reassembled message.
+        assert_eq!(result.msgs.len(), 1, "should have exactly one reassembled message");
+        let m = &result.msgs[0];
+        assert_eq!(m.r#type, Some(3u8));
+        assert_eq!(
+            m.message.as_deref().unwrap(),
+            "first_part_second_part",
+            "reassembled content must equal original fragments concatenated"
+        );
+        assert_eq!(m.uuid.as_deref().unwrap(), chunk_id);
+
+        // The completed key must be scheduled for deletion (not left in state).
+        assert!(result.state_to_delete.contains(&key));
+
+        // --- Part B: real-world externally-sourced bytes (from iOS bug report) ---
+        // These bytes were captured from a live iOS client and used to validate
+        // deserialize_simple_state_map in rmp-utils/src/playground.rs.
+        // They represent a simple-format map with key "MSG_1" → binary value.
+        let x: &[u8] = &[
+            129, 165, 77, 83, 71, 95, 49, 196, 56, 129, 164, 73, 110, 105, 116, 129,
+            173, 115, 101, 114, 118, 101, 114, 95, 112, 117, 98, 107, 101, 121, 196,
+            33, 2, 116, 210, 87, 213, 129, 0, 4, 177, 77, 39, 94, 32, 210, 198, 74,
+            84, 30, 183, 174, 1, 133, 51, 137, 69, 135, 160, 29, 77, 74, 218, 206, 233,
+        ];
+        let decoded = rmp_utils::deserialize_simple_state_map(x);
+        assert!(
+            decoded.is_ok(),
+            "deserialize_simple_state_map must decode real-world iOS bytes: {:?}",
+            decoded.err()
+        );
+        let decoded_map = decoded.unwrap();
+        assert_eq!(decoded_map.len(), 1, "real-world fixture must decode to a 1-entry map");
+        assert!(
+            decoded_map.contains_key("MSG_1"),
+            "real-world fixture must have key 'MSG_1'"
+        );
+    }
+
+    // Test 11: send-path merge_state test — drives merge_state() the way split_and_send
+    // does (merging a base and delta state, both in simple format) and asserts the merged
+    // result deserializes correctly with the expected combined key set.
+    #[test]
+    fn test_merge_state_simple_format_send_path() {
+        // Build a base state with one key (simulating the full_state passed into split_and_send).
+        let mut base_map: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+        base_map.insert("base_key".to_string(), b"base_value".to_vec());
+        let base_bytes = rmp_utils::serialize_simple_state_map(&base_map).unwrap();
+
+        // Build a delta state with a different key (simulating a state_mp delta returned
+        // by bindings::send for one chunk).
+        let mut delta_map: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+        delta_map.insert("delta_key".to_string(), b"delta_value".to_vec());
+        let delta_bytes = rmp_utils::serialize_simple_state_map(&delta_map).unwrap();
+
+        // Merge them as split_and_send does.
+        let merged_bytes = merge_state(&base_bytes, &delta_bytes).unwrap();
+
+        // The merged result must deserialize via the simple format and contain both keys.
+        let merged_map = rmp_utils::deserialize_simple_state_map(&merged_bytes).unwrap();
+        assert_eq!(merged_map.len(), 2, "merged state must contain both base and delta keys");
+        assert_eq!(
+            merged_map.get("base_key").map(|v| v.as_slice()),
+            Some(b"base_value" as &[u8]),
+            "base_key must be preserved in merged state"
+        );
+        assert_eq!(
+            merged_map.get("delta_key").map(|v| v.as_slice()),
+            Some(b"delta_value" as &[u8]),
+            "delta_key must be present in merged state"
+        );
+
+        // Also confirm: delta key overwrites base key when they collide (flat overwrite semantics).
+        let mut delta_collision: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+        delta_collision.insert("base_key".to_string(), b"overwritten".to_vec());
+        let delta_collision_bytes =
+            rmp_utils::serialize_simple_state_map(&delta_collision).unwrap();
+        let merged2 = merge_state(&base_bytes, &delta_collision_bytes).unwrap();
+        let merged2_map = rmp_utils::deserialize_simple_state_map(&merged2).unwrap();
+        assert_eq!(
+            merged2_map.get("base_key").map(|v| v.as_slice()),
+            Some(b"overwritten" as &[u8]),
+            "delta must overwrite base for colliding keys"
+        );
+    }
+
+    // Test 12: corrupt-buffer characterization — load_chunk_buffer returns BadState
+    // when the stored bytes are not valid JSON (documents the hard-fail-on-corrupt behavior).
+    #[test]
+    fn test_load_chunk_buffer_corrupt_returns_bad_state() {
+        let chunk_id = "corrupt_test_id";
+        let key = format!("{}{}", CHUNK_STATE_PREFIX, chunk_id);
+
+        // Store non-JSON garbage bytes under the chunkbuf_ key.
+        let corrupt_bytes: Vec<u8> = vec![0xFF, 0xFE, 0x00, 0x01, 0x42];
+        let mut map: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+        map.insert(key.clone(), corrupt_bytes);
+        let full_state = rmp_utils::serialize_simple_state_map(&map).unwrap();
+
+        let result = load_chunk_buffer(&full_state, &key);
+
+        match result {
+            Err(SphinxError::BadState { r }) => {
+                assert!(
+                    r.contains("chunk buffer deserialize"),
+                    "BadState reason must mention 'chunk buffer deserialize', got: {}",
+                    r
+                );
+            }
+            Err(other) => panic!("expected BadState, got a different error: {}", other),
+            Ok(_) => panic!("expected Err(BadState) for corrupt buffer bytes, got Ok"),
+        }
     }
 
     // Test 9: legacy-format ChunkPayload JSON (pre-upgrade wire format) is handled by the
