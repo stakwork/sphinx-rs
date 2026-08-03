@@ -472,7 +472,7 @@ pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8]) -> Result<RunReturn> 
     let state_changed = final_state_bytes != full_state;
     if state_changed || rr.state_mp.is_some() {
         rr.state_mp = Some(if let Some(ref existing) = rr.state_mp {
-            merge_state(existing, &final_state_bytes)?
+            merge_state(&final_state_bytes, existing)?
         } else {
             final_state_bytes
         });
