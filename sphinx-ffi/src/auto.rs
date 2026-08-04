@@ -212,7 +212,7 @@ pub fn fetch_msgs(
         bindings::fetch_msgs(&seed, &unique_time, &full_state, last_msg_idx, limit)
             .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
             .into();
-    chunk::handle_chunks(rr, &full_state)
+    chunk::handle_chunks(rr, &full_state, &seed)
 }
 
 pub fn ping_done(
@@ -254,7 +254,7 @@ pub fn handle(
     )
     .map_err(|e| SphinxError::HandleFailed { r: e.to_string() })?
     .into();
-    chunk::handle_chunks(rr, &full_state)
+    chunk::handle_chunks(rr, &full_state, &seed)
 }
 
 pub fn send(
@@ -734,7 +734,7 @@ pub fn fetch_msgs_batch(
     )
     .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
     .into();
-    chunk::handle_chunks(rr, &full_state)
+    chunk::handle_chunks(rr, &full_state, &seed)
 }
 
 pub fn fetch_msgs_batch_per_contact(
@@ -757,7 +757,7 @@ pub fn fetch_msgs_batch_per_contact(
     )
     .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
     .into();
-    chunk::handle_chunks(rr, &full_state)
+    chunk::handle_chunks(rr, &full_state, &seed)
 }
 
 pub fn fetch_msgs_batch_okkey(
@@ -778,7 +778,7 @@ pub fn fetch_msgs_batch_okkey(
     )
     .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
     .into();
-    chunk::handle_chunks(rr, &full_state)
+    chunk::handle_chunks(rr, &full_state, &seed)
 }
 
 pub fn fetch_first_msgs_per_key(
