@@ -197,6 +197,66 @@ fn merge_state(
     })
 }
 
+/// Post-loop fixups applied to the merged `RunReturn` after all chunk sends complete.
+///
+/// - If `merged.msgs` is empty, inserts a minimal placeholder `Msg` with `uuid = chunk_id`
+///   and `tag = None`. There is no real relay-tracked transport tag available when the last
+///   chunk's `RunReturn` returned no msgs, so `tag` is left `None`; callers must check
+///   `merged.error` rather than relying on `tag` presence to detect a failed final chunk.
+/// - Otherwise, truncates `merged.msgs` to 1 entry (NOTE: this assumes `msgs[0]` is the
+///   last chunk's own send-confirmation entry — a pre-existing assumption, now load-bearing
+///   for confirmation tracking, not being changed here) and sets `msgs[0].uuid = chunk_id`.
+///   Does NOT override `tag` — it is intentionally left as the last chunk's real
+///   relay-tracked transport tag from `last_rr`, so `get_tags(tag)` on the relay can match
+///   it and `handleMessageStatusByTag()` on iOS/macOS/Android can mark the message received.
+/// - Clears `sent_status` and `settled_status` (per-fragment values are meaningless
+///   as a whole-send status and must not cause the app to key off the wrong tag).
+/// - Aggregates `chunk_errors` into `merged.error` if any chunk sends failed.
+fn apply_chunk_merge_fixups(merged: &mut RunReturn, chunk_id: &str, chunk_errors: &[String]) {
+    if merged.msgs.is_empty() {
+        merged.msgs.push(Msg {
+            r#type: None,
+            message: None,
+            sender: None,
+            uuid: Some(chunk_id.to_string()),
+            // tag is None: no real relay-tracked transport tag is available when
+            // the last chunk's RunReturn produced no msgs. Callers must check
+            // merged.error rather than tag presence to detect a failed final chunk.
+            tag: None,
+            index: None,
+            msat: None,
+            timestamp: None,
+            sent_to: None,
+            from_me: None,
+            payment_hash: None,
+            error: None,
+        });
+    } else {
+        // NOTE: This truncate assumes msgs[0] is the last chunk's own
+        // send-confirmation entry — a pre-existing assumption, now load-bearing
+        // for confirmation tracking since tag is the real relay-tracked transport
+        // tag from this entry. Not being changed here.
+        merged.msgs.truncate(1);
+        // Set uuid to chunk_id for self-echo dedup. Do NOT override tag — leave it
+        // as the last chunk's real relay-tracked transport tag from last_rr.
+        merged.msgs[0].uuid = Some(chunk_id.to_string());
+    }
+
+    // `sent_status` is an opaque JSON string from the sphinx crate that may embed
+    // the last chunk's transport tag. For a multi-chunk send the per-fragment
+    // sent_status is not meaningful as a whole-send status, so clear it.
+    merged.sent_status = None;
+
+    // `settled_status` is per-payment and has no meaningful aggregate for a
+    // multi-chunk send. Clear it rather than silently carrying last-chunk-only state.
+    merged.settled_status = None;
+
+    // Aggregate transport errors from all chunk sends so callers detect partial failure.
+    if !chunk_errors.is_empty() {
+        merged.error = Some(format!("chunk_send_errors: {}", chunk_errors.join("; ")));
+    }
+}
+
 /// Called from `auto::send()` when msg_json.len() > CHUNK_CONTENT_THRESHOLD.
 /// Splits msg_json into N ChunkPayloads and calls bindings::send() for each,
 /// threading state forward. Returns a merged RunReturn with all topics/payloads.
@@ -377,56 +437,7 @@ pub fn split_and_send(
     merged.topics = all_topics;
     merged.payloads = all_payloads;
 
-    // Surface chunk_id as the stable pending-send tag.
-    //
-    // Both sphinx-ios-v2 and sphinx-mac-v2 track pending sends by reading
-    // `rr.msgs[0].tag` immediately after `split_and_send` returns, and match
-    // incoming confirmations (keyed by chunk_id on the receiver side) against
-    // that tag.  Without this override the tag would be the last chunk's
-    // per-fragment transport tag, which never appears in any confirmation.
-    //
-    // We ensure exactly one Msg entry is present so the app's `msgs[0]` access
-    // is safe: if `last_rr` produced multiple msgs (unusual but possible for
-    // certain bindings paths) we truncate to one; if it produced none we insert
-    // a minimal placeholder.
-    if merged.msgs.is_empty() {
-        merged.msgs.push(Msg {
-            r#type: None,
-            message: None,
-            sender: None,
-            uuid: Some(chunk_id.clone()),
-            tag: Some(chunk_id.clone()),
-            index: None,
-            msat: None,
-            timestamp: None,
-            sent_to: None,
-            from_me: None,
-            payment_hash: None,
-            error: None,
-        });
-    } else {
-        merged.msgs.truncate(1);
-        merged.msgs[0].tag = Some(chunk_id.clone());
-        merged.msgs[0].uuid = Some(chunk_id.clone());
-    }
-
-    // `sent_status` is an opaque JSON string from the sphinx crate that may embed
-    // the last chunk's transport tag.  For a multi-chunk send the per-fragment
-    // sent_status is not meaningful as a whole-send status, so clear it to prevent
-    // the app's tag-matching path from keying off the wrong (fragment) tag.
-    merged.sent_status = None;
-
-    // `settled_status` is per-payment and has no meaningful aggregate for a
-    // multi-chunk send (chunks share the same msat but are separate transport
-    // messages). Clear it rather than silently carrying last-chunk-only state.
-    merged.settled_status = None;
-
-    // Aggregate transport errors from all chunk sends.  An error on any single
-    // chunk is surfaced here so callers can detect partial failure rather than
-    // only seeing the final chunk's (possibly-clean) error field.
-    if !chunk_errors.is_empty() {
-        merged.error = Some(format!("chunk_send_errors: {}", chunk_errors.join("; ")));
-    }
+    apply_chunk_merge_fixups(&mut merged, &chunk_id, &chunk_errors);
 
     Ok(merged)
 }
@@ -689,13 +700,14 @@ pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8], seed: &str) -> Result
                     // iterations (and the caller's persisted state) don't retain it.
                     local_state.remove(&state_key);
 
-                    // Override the tag with chunk_id so the sender's pending-delivery
-                    // tracker (keyed on chunk_id by split_and_send) can match it.
-                    // The uuid is already set to chunk_id by process_chunk_msg; mirroring
-                    // it into tag ensures consistency with the uuid assignment in
-                    // split_and_send (added in this same change).
+                    // Leave reassembled_msg.tag as whatever real tag arrived on the
+                    // underlying last received chunk message — do NOT force it to
+                    // chunk_id. The split_and_send sender-side fix already ensures
+                    // msgs[0].tag is the last chunk's real relay-tracked transport tag;
+                    // overriding tag here would clobber that correct tag during
+                    // self-echo reassembly, reintroducing the confirmation-stuck bug.
+                    // chunk_id is available via uuid for any dedup/matching purposes.
                     let chunk_id = reassembled_msg.uuid.clone().unwrap_or_default();
-                    reassembled_msg.tag = Some(chunk_id.clone());
 
                     // Serialize local_state for the confirmation send (it must see the
                     // same state that handle_chunks has accumulated so far, without the
@@ -1819,8 +1831,9 @@ mod tests {
     /// Simulate the post-loop merge that split_and_send performs, given a list of
     /// per-chunk RunReturns and a chunk_id.  Returns the merged RunReturn.
     ///
-    /// This mirrors the actual split_and_send merge code so we can unit-test the
-    /// invariants without needing a live network.
+    /// Calls the shared `apply_chunk_merge_fixups` function (not a hand-copied
+    /// duplicate) so tests exercise production logic rather than a parallel copy
+    /// that could silently diverge.
     fn simulate_split_and_send_merge(
         chunk_rrs: Vec<RunReturn>,
         chunk_id: &str,
@@ -1843,40 +1856,17 @@ mod tests {
         merged.topics = all_topics;
         merged.payloads = all_payloads;
 
-        // Apply the same post-loop fixups as split_and_send:
-        if merged.msgs.is_empty() {
-            merged.msgs.push(Msg {
-                r#type: None,
-                message: None,
-                sender: None,
-                uuid: Some(chunk_id.to_string()),
-                tag: Some(chunk_id.to_string()),
-                index: None,
-                msat: None,
-                timestamp: None,
-                sent_to: None,
-                from_me: None,
-                payment_hash: None,
-                error: None,
-            });
-        } else {
-            merged.msgs.truncate(1);
-            merged.msgs[0].tag = Some(chunk_id.to_string());
-            merged.msgs[0].uuid = Some(chunk_id.to_string());
-        }
-        merged.sent_status = None;
-        merged.settled_status = None;
-        if !chunk_errors.is_empty() {
-            merged.error = Some(format!("chunk_send_errors: {}", chunk_errors.join("; ")));
-        }
+        // Delegate to the same shared function used by split_and_send so tests
+        // exercise production logic, not a hand-duplicated block.
+        apply_chunk_merge_fixups(&mut merged, chunk_id, &chunk_errors);
 
         merged
     }
 
-    // Test SAM-1: after a multi-chunk send, merged.msgs[0].tag must equal chunk_id,
-    // not the last chunk's per-fragment transport tag.
+    // Test SAM-1: after a multi-chunk send, merged.msgs[0].tag must be the last
+    // chunk's real relay-tracked transport tag, NOT chunk_id.
     #[test]
-    fn test_split_and_send_merge_tag_is_chunk_id() {
+    fn test_split_and_send_merge_tag_is_real_transport_tag() {
         let chunk_id = "1785847310885";
         let rrs = vec![
             chunk_send_rr(Some("transport_tag_chunk_0"), None, "topic/0"),
@@ -1886,16 +1876,21 @@ mod tests {
 
         let merged = simulate_split_and_send_merge(rrs, chunk_id);
 
-        // Tag must be chunk_id, not the last chunk's "transport_tag_chunk_2".
         assert_eq!(
             merged.msgs.len(),
             1,
             "merged RunReturn must carry exactly one Msg entry"
         );
+        // Tag must be the last chunk's real transport tag, not chunk_id.
         assert_eq!(
             merged.msgs[0].tag.as_deref(),
+            Some("transport_tag_chunk_2"),
+            "merged tag must be the last chunk's real relay-tracked transport tag"
+        );
+        assert_ne!(
+            merged.msgs[0].tag.as_deref(),
             Some(chunk_id),
-            "merged tag must equal chunk_id, not the last chunk's transport tag"
+            "merged tag must NOT equal chunk_id (that is untracked by the relay)"
         );
     }
 
@@ -1985,7 +1980,7 @@ mod tests {
     }
 
     // Test SAM-6: when bindings::send returns a RunReturn with no msgs (possible
-    // on some paths), split_and_send must still produce a Msg with chunk_id as tag.
+    // on some paths), split_and_send must produce a Msg with uuid=chunk_id and tag=None.
     #[test]
     fn test_split_and_send_merge_inserts_placeholder_msg_when_last_rr_has_no_msgs() {
         let chunk_id = "1706300001111";
@@ -1998,19 +1993,23 @@ mod tests {
         let merged = simulate_split_and_send_merge(rrs, chunk_id);
 
         assert_eq!(merged.msgs.len(), 1, "must produce exactly one Msg even when last_rr had none");
-        assert_eq!(
-            merged.msgs[0].tag.as_deref(),
-            Some(chunk_id),
-            "placeholder Msg tag must equal chunk_id"
-        );
+        // uuid must be chunk_id for self-echo dedup.
         assert_eq!(
             merged.msgs[0].uuid.as_deref(),
             Some(chunk_id),
             "placeholder Msg uuid must equal chunk_id"
         );
+        // tag must be None — no real relay-tracked transport tag is available
+        // when last_rr produced no msgs. Callers must check merged.error.
+        assert_eq!(
+            merged.msgs[0].tag,
+            None,
+            "placeholder Msg tag must be None (no real transport tag available)"
+        );
     }
 
-    // Test: non-empty last_rr.msgs branch — uuid and tag must both be set to chunk_id.
+    // Test: non-empty last_rr.msgs branch — uuid must be overridden to chunk_id,
+    // but tag must be left as the last chunk's real relay-tracked transport tag.
     #[test]
     fn test_split_and_send_merge_sets_uuid_and_tag_when_last_rr_has_msgs() {
         let chunk_id = "1706300002222";
@@ -2038,12 +2037,91 @@ mod tests {
         assert_eq!(
             rr.msgs[0].uuid,
             Some(chunk_id.to_string()),
-            "uuid must be overridden to chunk_id, not the fragment's transport uuid"
+            "uuid must be overridden to chunk_id for self-echo dedup"
         );
+        // tag must NOT be overridden — it stays as the last chunk's real
+        // relay-tracked transport tag so get_tags() can resolve delivery status.
         assert_eq!(
             rr.msgs[0].tag,
-            Some(chunk_id.to_string()),
-            "tag must equal chunk_id"
+            Some("fragment-transport-tag".to_string()),
+            "tag must be the last chunk's real relay-tracked transport tag, unchanged from last_rr"
+        );
+        assert_ne!(
+            rr.msgs[0].tag.as_deref(),
+            Some(chunk_id),
+            "tag must NOT equal chunk_id"
+        );
+    }
+
+    // Test SAM-NEW-1: after split_and_send merge, uuid == chunk_id (dedup preserved),
+    // tag != chunk_id (real transport tag), and tag is Some(...) and non-empty.
+    #[test]
+    fn test_split_and_send_merge_uuid_is_chunk_id_and_tag_is_real_non_empty() {
+        let chunk_id = "1706300009999";
+        let rrs = vec![
+            chunk_send_rr(Some("transport_tag_chunk_0"), None, "topic/0"),
+            chunk_send_rr(Some("transport_tag_chunk_1"), None, "topic/1"),
+        ];
+
+        let merged = simulate_split_and_send_merge(rrs, chunk_id);
+
+        assert_eq!(merged.msgs.len(), 1);
+        // uuid must equal chunk_id for self-echo dedup.
+        assert_eq!(
+            merged.msgs[0].uuid.as_deref(),
+            Some(chunk_id),
+            "uuid must equal chunk_id for self-echo dedup"
+        );
+        // tag must NOT equal chunk_id — it must be the real relay-tracked transport tag.
+        assert_ne!(
+            merged.msgs[0].tag.as_deref(),
+            Some(chunk_id),
+            "tag must NOT equal chunk_id"
+        );
+        // tag must be Some(...) and non-empty (a real transport tag was returned).
+        let tag = merged.msgs[0].tag.as_deref().expect("tag must be Some");
+        assert!(!tag.is_empty(), "tag must be non-empty (a real relay transport tag)");
+        assert_eq!(tag, "transport_tag_chunk_1", "tag must be the last chunk's transport tag");
+    }
+
+    // Test SAM-NEW-2: last chunk's own send fails — merged.error is set, tag reflects
+    // whatever the failed RunReturn naturally produced (no fabricated value).
+    // Callers must check merged.error, not tag presence, to detect a failed final chunk.
+    #[test]
+    fn test_split_and_send_merge_last_chunk_failure_sets_error_and_tag_is_natural() {
+        let chunk_id = "1706300008888";
+        // Last chunk fails — its RunReturn has an error and no msgs (simulate no tag returned).
+        let mut failed_rr = empty_run_return();
+        failed_rr.error = Some("transport failure on last chunk".to_string());
+        failed_rr.topics.push("topic/last".to_string());
+        // No msgs in the failed RunReturn → placeholder path.
+
+        let rrs = vec![
+            chunk_send_rr(Some("transport_tag_chunk_0"), None, "topic/0"),
+            failed_rr,
+        ];
+
+        let merged = simulate_split_and_send_merge(rrs, chunk_id);
+
+        // merged.error must reflect the failure.
+        let err = merged.error.as_deref().expect("merged.error must be set when last chunk fails");
+        assert!(
+            err.contains("transport failure on last chunk"),
+            "error must contain the original failure text, got: {}",
+            err
+        );
+        // uuid must still be chunk_id for dedup.
+        assert_eq!(
+            merged.msgs[0].uuid.as_deref(),
+            Some(chunk_id),
+            "uuid must still be chunk_id even on failure"
+        );
+        // tag is whatever the failed RunReturn naturally produced (None here since no msgs).
+        // Do NOT assert a non-None tag — callers must check error, not tag presence.
+        assert_eq!(
+            merged.msgs[0].tag,
+            None,
+            "tag must be None when the failed last_rr produced no msgs (no fabricated value)"
         );
     }
 
@@ -2263,15 +2341,16 @@ mod tests {
         });
     }
 
-    // Test CONF-5: the reassembled message's tag equals chunk_id (not the last-chunk
-    // transport tag), consistent with the split_and_send companion fix.
+    // Test CONF-5: the reassembled message's tag preserves the real underlying
+    // transport tag from the last received chunk — it must NOT be overridden to chunk_id.
+    // This is the receiver-side companion to the split_and_send fix.
     #[test]
-    fn test_reassembled_msg_tag_equals_chunk_id() {
+    fn test_reassembled_msg_tag_preserves_transport_tag() {
         CONFIRMATION_CALLS.with(|calls| calls.borrow_mut().clear());
 
         let chunk_id = "1706399005005";
         let sender_pubkey = "03aabbccdd1234567890aabbccdd1234567890aabbccdd1234567890aabbccdd";
-        let transport_tag = "old_transport_tag_from_last_chunk";
+        let transport_tag = "real_transport_tag_from_last_chunk";
 
         let cp0 = ChunkPayload {
             chunk_id: chunk_id.to_string(),
@@ -2288,7 +2367,8 @@ mod tests {
             content: "part2".to_string(),
         };
 
-        // Give the second (last) chunk a transport-level tag to confirm we override it.
+        // Give the second (last) chunk a transport-level tag — this must be
+        // preserved on the reassembled msg, not overridden to chunk_id.
         let meta1 = ChunkMeta {
             chunk_id: cp1.chunk_id.clone(),
             chunk_index: cp1.chunk_index,
@@ -2310,7 +2390,7 @@ mod tests {
             message: Some(msg1_json),
             sender: Some(sender_json),
             uuid: None,
-            tag: Some(transport_tag.to_string()), // <-- transport tag that must be overridden
+            tag: Some(transport_tag.to_string()), // <-- real transport tag; must be preserved
             index: None,
             msat: None,
             timestamp: None,
@@ -2328,15 +2408,21 @@ mod tests {
 
         assert_eq!(result.msgs.len(), 1);
         let m = &result.msgs[0];
+        // tag must be the real underlying transport tag, not chunk_id.
         assert_eq!(
             m.tag.as_deref(),
+            Some(transport_tag),
+            "reassembled msg tag must preserve the real underlying transport tag, not chunk_id"
+        );
+        assert_ne!(
+            m.tag.as_deref(),
             Some(chunk_id),
-            "reassembled msg tag must be chunk_id, not the last chunk's transport tag"
+            "reassembled msg tag must NOT be chunk_id"
         );
         assert_eq!(
             m.uuid.as_deref(),
             Some(chunk_id),
-            "reassembled msg uuid must be chunk_id"
+            "reassembled msg uuid must still be chunk_id"
         );
     }
 
