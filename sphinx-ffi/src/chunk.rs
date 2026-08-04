@@ -394,7 +394,7 @@ pub fn split_and_send(
             r#type: None,
             message: None,
             sender: None,
-            uuid: None,
+            uuid: Some(chunk_id.clone()),
             tag: Some(chunk_id.clone()),
             index: None,
             msat: None,
@@ -407,6 +407,7 @@ pub fn split_and_send(
     } else {
         merged.msgs.truncate(1);
         merged.msgs[0].tag = Some(chunk_id.clone());
+        merged.msgs[0].uuid = Some(chunk_id.clone());
     }
 
     // `sent_status` is an opaque JSON string from the sphinx crate that may embed
@@ -689,9 +690,10 @@ pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8], seed: &str) -> Result
                     local_state.remove(&state_key);
 
                     // Override the tag with chunk_id so the sender's pending-delivery
-                    // tracker (keyed on chunk_id by the split_and_send fix) can match it.
+                    // tracker (keyed on chunk_id by split_and_send) can match it.
                     // The uuid is already set to chunk_id by process_chunk_msg; mirroring
-                    // it into tag ensures consistency with the split_and_send companion fix.
+                    // it into tag ensures consistency with the uuid assignment in
+                    // split_and_send (added in this same change).
                     let chunk_id = reassembled_msg.uuid.clone().unwrap_or_default();
                     reassembled_msg.tag = Some(chunk_id.clone());
 
@@ -1847,7 +1849,7 @@ mod tests {
                 r#type: None,
                 message: None,
                 sender: None,
-                uuid: None,
+                uuid: Some(chunk_id.to_string()),
                 tag: Some(chunk_id.to_string()),
                 index: None,
                 msat: None,
@@ -1860,6 +1862,7 @@ mod tests {
         } else {
             merged.msgs.truncate(1);
             merged.msgs[0].tag = Some(chunk_id.to_string());
+            merged.msgs[0].uuid = Some(chunk_id.to_string());
         }
         merged.sent_status = None;
         merged.settled_status = None;
@@ -1999,6 +2002,48 @@ mod tests {
             merged.msgs[0].tag.as_deref(),
             Some(chunk_id),
             "placeholder Msg tag must equal chunk_id"
+        );
+        assert_eq!(
+            merged.msgs[0].uuid.as_deref(),
+            Some(chunk_id),
+            "placeholder Msg uuid must equal chunk_id"
+        );
+    }
+
+    // Test: non-empty last_rr.msgs branch — uuid and tag must both be set to chunk_id.
+    #[test]
+    fn test_split_and_send_merge_sets_uuid_and_tag_when_last_rr_has_msgs() {
+        let chunk_id = "1706300002222";
+        // Simulate last_rr having an existing Msg (non-empty branch).
+        let mut last_rr = empty_run_return();
+        last_rr.msgs.push(Msg {
+            r#type: None,
+            message: Some("fragment content".to_string()),
+            sender: None,
+            uuid: Some("fragment-transport-uuid".to_string()),
+            tag: Some("fragment-transport-tag".to_string()),
+            index: None,
+            msat: None,
+            timestamp: None,
+            sent_to: None,
+            from_me: None,
+            payment_hash: None,
+            error: None,
+        });
+        let rrs = vec![last_rr];
+
+        let rr = simulate_split_and_send_merge(rrs, chunk_id);
+
+        assert_eq!(rr.msgs.len(), 1, "must keep exactly one Msg");
+        assert_eq!(
+            rr.msgs[0].uuid,
+            Some(chunk_id.to_string()),
+            "uuid must be overridden to chunk_id, not the fragment's transport uuid"
+        );
+        assert_eq!(
+            rr.msgs[0].tag,
+            Some(chunk_id.to_string()),
+            "tag must equal chunk_id"
         );
     }
 
