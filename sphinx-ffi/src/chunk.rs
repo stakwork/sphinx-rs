@@ -148,10 +148,15 @@ fn now_secs() -> u64 {
 }
 
 /// Generate a stable chunk_id from unique_time (same for all chunks in a send call).
+///
+/// Using the full `unique_time` string (a compact ≤16-char numeric timestamp) directly
+/// as the `chunk_id` avoids the 8-byte-prefix collision that occurred when two sends
+/// shared the same leading characters (e.g. `1785847310885` vs `1785847372513`).
+/// Returning the string as-is is equal-or-smaller in wire size compared to the old
+/// `hex::encode(&bytes[..8])` approach (~16 hex chars), so no budget constant changes
+/// are needed.
 fn make_chunk_id(unique_time: &str) -> String {
-    let ut_bytes = unique_time.as_bytes();
-    let len = 8.min(ut_bytes.len());
-    hex::encode(&ut_bytes[..len])
+    unique_time.to_string()
 }
 
 /// Merge a state_mp delta (returned by bindings::send) into the running full_state map.
@@ -260,6 +265,9 @@ pub fn split_and_send(
     let mut current_state = full_state;
     let mut all_topics: Vec<String> = Vec::new();
     let mut all_payloads: Vec<Vec<u8>> = Vec::new();
+    // Collect errors from individual chunk sends so we can report aggregated failure
+    // rather than only the final chunk's error (which would silently hide earlier failures).
+    let mut chunk_errors: Vec<String> = Vec::new();
     let mut last_rr: Option<RunReturn> = None;
 
     for i in 0..n {
@@ -305,6 +313,13 @@ pub fn split_and_send(
         })?;
 
         let rr: RunReturn = raw_rr.into();
+
+        // Collect per-chunk transport errors (non-fatal — we continue sending remaining
+        // chunks and surface an aggregated error on the merged RunReturn rather than
+        // aborting mid-send).
+        if let Some(ref e) = rr.error {
+            chunk_errors.push(format!("chunk[{}]: {}", i, e));
+        }
 
         // Merge state delta into running full_state for the next call.
         if let Some(ref delta) = rr.state_mp {
@@ -361,6 +376,56 @@ pub fn split_and_send(
     // Replace topics/payloads with all collected across all chunk sends.
     merged.topics = all_topics;
     merged.payloads = all_payloads;
+
+    // Surface chunk_id as the stable pending-send tag.
+    //
+    // Both sphinx-ios-v2 and sphinx-mac-v2 track pending sends by reading
+    // `rr.msgs[0].tag` immediately after `split_and_send` returns, and match
+    // incoming confirmations (keyed by chunk_id on the receiver side) against
+    // that tag.  Without this override the tag would be the last chunk's
+    // per-fragment transport tag, which never appears in any confirmation.
+    //
+    // We ensure exactly one Msg entry is present so the app's `msgs[0]` access
+    // is safe: if `last_rr` produced multiple msgs (unusual but possible for
+    // certain bindings paths) we truncate to one; if it produced none we insert
+    // a minimal placeholder.
+    if merged.msgs.is_empty() {
+        merged.msgs.push(Msg {
+            r#type: None,
+            message: None,
+            sender: None,
+            uuid: None,
+            tag: Some(chunk_id.clone()),
+            index: None,
+            msat: None,
+            timestamp: None,
+            sent_to: None,
+            from_me: None,
+            payment_hash: None,
+            error: None,
+        });
+    } else {
+        merged.msgs.truncate(1);
+        merged.msgs[0].tag = Some(chunk_id.clone());
+    }
+
+    // `sent_status` is an opaque JSON string from the sphinx crate that may embed
+    // the last chunk's transport tag.  For a multi-chunk send the per-fragment
+    // sent_status is not meaningful as a whole-send status, so clear it to prevent
+    // the app's tag-matching path from keying off the wrong (fragment) tag.
+    merged.sent_status = None;
+
+    // `settled_status` is per-payment and has no meaningful aggregate for a
+    // multi-chunk send (chunks share the same msat but are separate transport
+    // messages). Clear it rather than silently carrying last-chunk-only state.
+    merged.settled_status = None;
+
+    // Aggregate transport errors from all chunk sends.  An error on any single
+    // chunk is surfaced here so callers can detect partial failure rather than
+    // only seeing the final chunk's (possibly-clean) error field.
+    if !chunk_errors.is_empty() {
+        merged.error = Some(format!("chunk_send_errors: {}", chunk_errors.join("; ")));
+    }
 
     Ok(merged)
 }
@@ -1456,5 +1521,255 @@ mod tests {
             }
             _ => panic!("expected Incomplete result for legacy format chunk"),
         }
+    }
+
+    // ---- make_chunk_id tests ----
+
+    // Test MCI-1: two unique_time values that share the same first 8 bytes must
+    // produce different chunk_ids (regression against the old 8-byte-prefix bug).
+    #[test]
+    fn test_make_chunk_id_unique_for_same_8_byte_prefix() {
+        let a = make_chunk_id("1785847310885");
+        let b = make_chunk_id("1785847372513");
+        assert_ne!(a, b, "chunk_id must differ even when the first 8 bytes match");
+    }
+
+    // Test MCI-2: the chunk_id produced from the longest legal unique_time
+    // (≤16 chars per the existing debug_assert) must not exceed 16 characters,
+    // confirming the fix does not inflate per-chunk wire overhead beyond what
+    // APP_OVERHEAD_BYTES / MAX_OVERHEAD_BYTES budget constants assume.
+    #[test]
+    fn test_make_chunk_id_does_not_exceed_wire_budget() {
+        // Longest legal unique_time per the existing debug_assert (<=16 chars).
+        let worst_case = make_chunk_id("9999999999999999");
+        assert!(
+            worst_case.len() <= 16,
+            "chunk_id must not exceed the length the current APP_OVERHEAD_BYTES/MAX_OVERHEAD_BYTES \
+             budget assumes, got len={}",
+            worst_case.len()
+        );
+    }
+
+    // ---- split_and_send merge-field tests ----
+    //
+    // split_and_send calls bindings::send which requires a live network — we
+    // cannot call it end-to-end in unit tests.  Instead we exercise the
+    // post-loop merge logic directly by constructing mock RunReturns that mimic
+    // what the loop accumulates, then asserting the invariants the apps depend on.
+
+    /// Build a minimal RunReturn that represents a single chunk send result,
+    /// optionally carrying a transport tag and/or error.
+    fn chunk_send_rr(tag: Option<&str>, error: Option<&str>, topic: &str) -> RunReturn {
+        let mut rr = empty_run_return();
+        if let Some(t) = tag {
+            rr.msgs.push(Msg {
+                r#type: None,
+                message: None,
+                sender: None,
+                uuid: None,
+                tag: Some(t.to_string()),
+                index: None,
+                msat: None,
+                timestamp: None,
+                sent_to: None,
+                from_me: None,
+                payment_hash: None,
+                error: None,
+            });
+        }
+        rr.error = error.map(|e| e.to_string());
+        rr.sent_status = Some(format!(r#"{{"tag":"{}","status":"pending"}}"#, tag.unwrap_or("")));
+        rr.settled_status = Some(r#"{"settled":true}"#.to_string());
+        rr.topics.push(topic.to_string());
+        rr.payloads.push(vec![0xAB, 0xCD]);
+        rr
+    }
+
+    /// Simulate the post-loop merge that split_and_send performs, given a list of
+    /// per-chunk RunReturns and a chunk_id.  Returns the merged RunReturn.
+    ///
+    /// This mirrors the actual split_and_send merge code so we can unit-test the
+    /// invariants without needing a live network.
+    fn simulate_split_and_send_merge(
+        chunk_rrs: Vec<RunReturn>,
+        chunk_id: &str,
+    ) -> RunReturn {
+        let mut all_topics: Vec<String> = Vec::new();
+        let mut all_payloads: Vec<Vec<u8>> = Vec::new();
+        let mut chunk_errors: Vec<String> = Vec::new();
+        let mut last_rr: Option<RunReturn> = None;
+
+        for (i, rr) in chunk_rrs.into_iter().enumerate() {
+            if let Some(ref e) = rr.error {
+                chunk_errors.push(format!("chunk[{}]: {}", i, e));
+            }
+            all_topics.extend(rr.topics.iter().cloned());
+            all_payloads.extend(rr.payloads.iter().cloned());
+            last_rr = Some(rr);
+        }
+
+        let mut merged = last_rr.unwrap_or_else(empty_run_return);
+        merged.topics = all_topics;
+        merged.payloads = all_payloads;
+
+        // Apply the same post-loop fixups as split_and_send:
+        if merged.msgs.is_empty() {
+            merged.msgs.push(Msg {
+                r#type: None,
+                message: None,
+                sender: None,
+                uuid: None,
+                tag: Some(chunk_id.to_string()),
+                index: None,
+                msat: None,
+                timestamp: None,
+                sent_to: None,
+                from_me: None,
+                payment_hash: None,
+                error: None,
+            });
+        } else {
+            merged.msgs.truncate(1);
+            merged.msgs[0].tag = Some(chunk_id.to_string());
+        }
+        merged.sent_status = None;
+        merged.settled_status = None;
+        if !chunk_errors.is_empty() {
+            merged.error = Some(format!("chunk_send_errors: {}", chunk_errors.join("; ")));
+        }
+
+        merged
+    }
+
+    // Test SAM-1: after a multi-chunk send, merged.msgs[0].tag must equal chunk_id,
+    // not the last chunk's per-fragment transport tag.
+    #[test]
+    fn test_split_and_send_merge_tag_is_chunk_id() {
+        let chunk_id = "1785847310885";
+        let rrs = vec![
+            chunk_send_rr(Some("transport_tag_chunk_0"), None, "topic/0"),
+            chunk_send_rr(Some("transport_tag_chunk_1"), None, "topic/1"),
+            chunk_send_rr(Some("transport_tag_chunk_2"), None, "topic/2"),
+        ];
+
+        let merged = simulate_split_and_send_merge(rrs, chunk_id);
+
+        // Tag must be chunk_id, not the last chunk's "transport_tag_chunk_2".
+        assert_eq!(
+            merged.msgs.len(),
+            1,
+            "merged RunReturn must carry exactly one Msg entry"
+        );
+        assert_eq!(
+            merged.msgs[0].tag.as_deref(),
+            Some(chunk_id),
+            "merged tag must equal chunk_id, not the last chunk's transport tag"
+        );
+    }
+
+    // Test SAM-2: sent_status and settled_status must be cleared on the merged
+    // RunReturn (per-fragment values are not meaningful for the whole send).
+    #[test]
+    fn test_split_and_send_merge_clears_per_fragment_status_fields() {
+        let chunk_id = "1706300000123";
+        let rrs = vec![
+            chunk_send_rr(Some("t0"), None, "topic/0"),
+            chunk_send_rr(Some("t1"), None, "topic/1"),
+        ];
+
+        let merged = simulate_split_and_send_merge(rrs, chunk_id);
+
+        assert!(
+            merged.sent_status.is_none(),
+            "sent_status must be cleared on merged RunReturn (was last-chunk-only)"
+        );
+        assert!(
+            merged.settled_status.is_none(),
+            "settled_status must be cleared on merged RunReturn (was last-chunk-only)"
+        );
+    }
+
+    // Test SAM-3: errors from earlier (non-final) chunk sends must appear in the
+    // merged error field, not be silently dropped.
+    #[test]
+    fn test_split_and_send_merge_aggregates_chunk_errors() {
+        let chunk_id = "1706300000456";
+        // Chunk 1 (middle) fails; chunk 0 and chunk 2 succeed.
+        let rrs = vec![
+            chunk_send_rr(Some("t0"), None, "topic/0"),
+            chunk_send_rr(Some("t1"), Some("transport error on chunk 1"), "topic/1"),
+            chunk_send_rr(Some("t2"), None, "topic/2"),
+        ];
+
+        let merged = simulate_split_and_send_merge(rrs, chunk_id);
+
+        let err = merged.error.expect("merged RunReturn must carry aggregated error");
+        assert!(
+            err.contains("chunk[1]"),
+            "error must identify which chunk failed, got: {}",
+            err
+        );
+        assert!(
+            err.contains("transport error on chunk 1"),
+            "error must include the original error text, got: {}",
+            err
+        );
+    }
+
+    // Test SAM-4: when no chunk sends fail, the merged error field must be None.
+    #[test]
+    fn test_split_and_send_merge_no_error_when_all_chunks_succeed() {
+        let chunk_id = "1706300000789";
+        let rrs = vec![
+            chunk_send_rr(Some("t0"), None, "topic/0"),
+            chunk_send_rr(Some("t1"), None, "topic/1"),
+        ];
+
+        let merged = simulate_split_and_send_merge(rrs, chunk_id);
+
+        assert!(
+            merged.error.is_none(),
+            "merged error must be None when all chunks succeed"
+        );
+    }
+
+    // Test SAM-5: topics and payloads are aggregated from all chunks.
+    #[test]
+    fn test_split_and_send_merge_aggregates_topics_and_payloads() {
+        let chunk_id = "1706300000999";
+        let rrs = vec![
+            chunk_send_rr(Some("t0"), None, "topic/0"),
+            chunk_send_rr(Some("t1"), None, "topic/1"),
+            chunk_send_rr(Some("t2"), None, "topic/2"),
+        ];
+
+        let merged = simulate_split_and_send_merge(rrs, chunk_id);
+
+        assert_eq!(merged.topics.len(), 3, "all chunk topics must be aggregated");
+        assert_eq!(merged.payloads.len(), 3, "all chunk payloads must be aggregated");
+        assert!(merged.topics.contains(&"topic/0".to_string()));
+        assert!(merged.topics.contains(&"topic/1".to_string()));
+        assert!(merged.topics.contains(&"topic/2".to_string()));
+    }
+
+    // Test SAM-6: when bindings::send returns a RunReturn with no msgs (possible
+    // on some paths), split_and_send must still produce a Msg with chunk_id as tag.
+    #[test]
+    fn test_split_and_send_merge_inserts_placeholder_msg_when_last_rr_has_no_msgs() {
+        let chunk_id = "1706300001111";
+        // Simulate last_rr having no msgs at all.
+        let mut rr = empty_run_return();
+        rr.topics.push("topic/0".to_string());
+        rr.payloads.push(vec![0x01]);
+        let rrs = vec![rr];
+
+        let merged = simulate_split_and_send_merge(rrs, chunk_id);
+
+        assert_eq!(merged.msgs.len(), 1, "must produce exactly one Msg even when last_rr had none");
+        assert_eq!(
+            merged.msgs[0].tag.as_deref(),
+            Some(chunk_id),
+            "placeholder Msg tag must equal chunk_id"
+        );
     }
 }
