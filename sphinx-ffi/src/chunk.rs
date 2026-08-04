@@ -148,10 +148,10 @@ fn now_secs() -> u64 {
 }
 
 /// Generate a stable chunk_id from unique_time (same for all chunks in a send call).
+/// Uses the full unique_time string directly to avoid collisions between sends whose
+/// unique_time values share the same leading bytes (e.g. "1785847310885" vs "1785847372513").
 fn make_chunk_id(unique_time: &str) -> String {
-    let ut_bytes = unique_time.as_bytes();
-    let len = 8.min(ut_bytes.len());
-    hex::encode(&ut_bytes[..len])
+    unique_time.to_string()
 }
 
 /// Merge a state_mp delta (returned by bindings::send) into the running full_state map.
@@ -1456,5 +1456,22 @@ mod tests {
             }
             _ => panic!("expected Incomplete result for legacy format chunk"),
         }
+    }
+
+    #[test]
+    fn test_make_chunk_id_unique_for_same_8_byte_prefix() {
+        let a = make_chunk_id("1785847310885");
+        let b = make_chunk_id("1785847372513");
+        assert_ne!(a, b, "chunk_id must differ even when the first 8 bytes match");
+    }
+
+    #[test]
+    fn test_make_chunk_id_does_not_exceed_wire_budget() {
+        // Longest legal unique_time per the existing debug_assert (<=16 chars).
+        let worst_case = make_chunk_id("9999999999999999");
+        assert!(
+            worst_case.len() <= 16,
+            "chunk_id must not exceed the length the current APP_OVERHEAD_BYTES/MAX_OVERHEAD_BYTES budget assumes"
+        );
     }
 }
