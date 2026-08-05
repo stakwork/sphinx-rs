@@ -243,6 +243,8 @@ pub fn handle(
     my_alias: String,
     my_img: String,
 ) -> Result<RunReturn> {
+    eprintln!("[handle] topic={} payload_len={}", topic, payload.len());
+
     let rr: RunReturn = bindings::handle(
         &topic,
         &payload,
