@@ -679,8 +679,14 @@ pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8], seed: &str) -> Result
         })?
     };
 
+    let chunk_count = rr.msgs.iter().filter(|m| m.r#type == Some(CHUNK_TYPE)).count();
+    if chunk_count > 0 {
+        eprintln!("[chunk] handle_chunks: {} total msgs, {} are type-34", rr.msgs.len(), chunk_count);
+    }
+
     while i < rr.msgs.len() {
         if rr.msgs[i].r#type == Some(CHUNK_TYPE) {
+            eprintln!("[chunk] incoming fragment type=34 msg index={:?}", rr.msgs[i].index);
             let chunk_msg = rr.msgs.remove(i);
 
             // Serialize the current local_state snapshot so process_chunk_msg can read it.
@@ -689,7 +695,15 @@ pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8], seed: &str) -> Result
                     r: format!("handle_chunks serialize local_state: {}", e),
                 })?;
 
-            let result = process_chunk_msg(chunk_msg, &local_state_bytes, now)?;
+            let msg_index = chunk_msg.index.clone();
+            let result = match process_chunk_msg(chunk_msg, &local_state_bytes, now) {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("[chunk] ERROR processing fragment: {}", e);
+                    eprintln!("[chunk] PARSE FAIL msg index={:?} err={}", msg_index, e);
+                    return Err(e);
+                }
+            };
 
             match result {
                 ChunkResult::Complete {
@@ -841,6 +855,8 @@ fn process_chunk_msg(
     };
 
     // Reconstruct a ChunkPayload for the existing ChunkBuffer logic below (unchanged).
+    eprintln!("[chunk] parsed fragment chunk_id={} index={}/{} from_me={:?}",
+        meta.chunk_id, meta.chunk_index, meta.total_chunks, msg.from_me);
     let chunk = ChunkPayload {
         chunk_id: meta.chunk_id,
         chunk_index: meta.chunk_index,
@@ -872,6 +888,9 @@ fn process_chunk_msg(
 
     // Check timeout.
     if now.saturating_sub(first_ts) > CHUNK_TIMEOUT_SECS {
+        let chunk_id = chunk.chunk_id.clone();
+        let age_secs = now.saturating_sub(first_ts);
+        eprintln!("[chunk] TIMEOUT chunk_id={} age={}s", chunk_id, age_secs);
         return Ok(ChunkResult::TimedOut { state_key });
     }
 
@@ -890,6 +909,7 @@ fn process_chunk_msg(
         let reassembled: String = buffer.received.iter().map(|c| c.content.as_str()).collect();
         let original_msg_type = buffer.original_msg_type;
         let chunk_id = chunk.chunk_id.clone();
+        eprintln!("[chunk] REASSEMBLED chunk_id={} total_chunks={}", chunk_id, buffer.total_chunks);
 
         let reassembled_msg = Msg {
             r#type: Some(original_msg_type),
@@ -913,6 +933,9 @@ fn process_chunk_msg(
     }
 
     // Incomplete: serialize updated buffer.
+    let chunk_id = chunk.chunk_id.clone();
+    eprintln!("[chunk] buffered fragment chunk_id={} have={}/{}",
+        chunk_id, buffer.received.len(), buffer.total_chunks);
     let buffer_bytes =
         serde_json::to_vec(&buffer).map_err(|e| SphinxError::BadState {
             r: format!("chunk buffer serialize: {}", e),
