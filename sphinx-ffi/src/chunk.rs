@@ -8,11 +8,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub(crate) const MAX_MSG_LEN: usize = 869;
 
-/// Application-layer overhead in msg_json: outer `{"content":...,"metadata":...}`
+/// Application-layer overhead in msg_json: outer `{"content":...,"metadata":...,"date":...}`
 /// wrapper framing (~26 B) plus the double-encoded ChunkMeta string value
 /// (~117 B — raw ChunkMeta JSON is ~103 B, plus ~14 B of JSON string-escaping
-/// when embedded as a string value inside the outer object).
-const APP_OVERHEAD_BYTES: usize = 143;
+/// when embedded as a string value inside the outer object), plus the worst-case
+/// `,"date":` field (8 B key + comma + colon + up to 20 digits for u64::MAX = 28 B).
+const APP_OVERHEAD_BYTES: usize = 171;
 
 /// Fixed non-identity protocol overhead added by the sphinx crate on every send:
 /// sender + recipient compressed pubkeys (2 × 33 B = 66 B), encrypted tag (~48 B),
@@ -131,6 +132,15 @@ pub struct ChunkPayload {
     pub total_chunks: u16,
     pub original_msg_type: u8,
     pub content: String,
+    /// Original send timestamp embedded in the chunk wrapper on the sender side.
+    /// `#[serde(default)]` is required for two compatibility surfaces:
+    /// (a) the legacy wire-format fallback path in `process_chunk_msg` deserializes
+    ///     old-format JSON with no `"date"` key directly into `ChunkPayload`;
+    /// (b) a `ChunkBuffer` (holding `Vec<ChunkPayload>`) persisted by a pre-fix
+    ///     binary mid-reassembly must still deserialize via `load_chunk_buffer`
+    ///     after upgrade without throwing `SphinxError::BadState`.
+    #[serde(default)]
+    pub date: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -139,6 +149,14 @@ pub struct ChunkBuffer {
     pub original_msg_type: u8,
     pub received: Vec<ChunkPayload>,
     pub first_received_ts: u64,
+    /// Original send timestamp hoisted from the first fragment's `ChunkPayload.date`.
+    /// Stored once on the buffer (not per-fragment) for the same reason as
+    /// `total_chunks`/`original_msg_type`: the value is constant across every fragment
+    /// of one message. Reassembly reads from here, removing "which chunk's date wins"
+    /// ambiguity. `#[serde(default)]` allows existing persisted buffers (written by
+    /// pre-fix binaries) to deserialize without error.
+    #[serde(default)]
+    pub date: Option<u64>,
 }
 
 fn now_secs() -> u64 {
@@ -349,9 +367,14 @@ pub fn split_and_send(
         // with one serde_json::Value parse of msg.message.
         let meta_json = serde_json::to_string(&meta)
             .map_err(|e| SphinxError::SendFailed { r: format!("chunk meta serialize: {}", e) })?;
+        // Parse unique_time as u64 for the date field. Using .ok() means a malformed
+        // unique_time yields None (field absent), falling back to transport-timestamp
+        // behavior on the receiver — never injecting a wrong epoch-0 timestamp.
+        let date_val: Option<u64> = unique_time.parse::<u64>().ok();
         let chunk_msg_json = serde_json::to_string(&serde_json::json!({
             "content": content,
             "metadata": meta_json,
+            "date": date_val,
         }))
         .map_err(|e| SphinxError::SendFailed { r: format!("chunk msg serialize: {}", e) })?;
 
@@ -825,29 +848,38 @@ fn process_chunk_msg(
 ) -> Result<ChunkResult> {
     let msg_text = msg.message.as_deref().unwrap_or("");
 
-    let (content, meta) = if let Ok(v) = serde_json::from_str::<serde_json::Value>(msg_text) {
+    // `parsed_date` carries the `"date"` value extracted from the new-format wrapper JSON.
+    // It stays `None` on the legacy path (no `"date"` key) — `#[serde(default)]` on
+    // `ChunkPayload.date` covers that case automatically.
+    let (content, meta, parsed_date) = if let Ok(v) =
+        serde_json::from_str::<serde_json::Value>(msg_text)
+    {
         if let (Some(content_str), Some(meta_str)) =
             (v["content"].as_str(), v["metadata"].as_str())
         {
-            // New wire format: metadata is a JSON-encoded string (double-serialized by the sender).
+            // New wire format: metadata is a JSON-encoded string (double-serialized by the
+            // sender). Extract the optional `"date"` field from the wrapper object.
             let meta: ChunkMeta = serde_json::from_str(meta_str).map_err(|e| {
                 SphinxError::HandleFailed { r: format!("chunk meta parse: {}", e) }
             })?;
-            (content_str.to_string(), meta)
+            let date: Option<u64> = v["date"].as_u64();
+            (content_str.to_string(), meta, date)
         } else {
             // Backward-compat: old format serialized the full ChunkPayload at the top level.
+            // `#[serde(default)]` on `ChunkPayload.date` yields `None` for absent field.
             let p: ChunkPayload = serde_json::from_str(msg_text).map_err(|e| {
                 SphinxError::HandleFailed {
                     r: format!("chunk payload parse (legacy): {}", e),
                 }
             })?;
+            let date = p.date; // None via #[serde(default)] for old-format messages
             let meta = ChunkMeta {
                 chunk_id: p.chunk_id.clone(),
                 chunk_index: p.chunk_index,
                 total_chunks: p.total_chunks,
                 original_msg_type: p.original_msg_type,
             };
-            (p.content, meta)
+            (p.content, meta, date)
         }
     } else {
         return Err(SphinxError::HandleFailed {
@@ -855,15 +887,18 @@ fn process_chunk_msg(
         });
     };
 
-    // Reconstruct a ChunkPayload for the existing ChunkBuffer logic below (unchanged).
-    eprintln!("[chunk] parsed fragment chunk_id={} index={}/{} from_me={:?}",
-        meta.chunk_id, meta.chunk_index, meta.total_chunks, msg.from_me);
+    // Reconstruct a ChunkPayload for the existing ChunkBuffer logic below.
+    eprintln!(
+        "[chunk] parsed fragment chunk_id={} index={}/{} from_me={:?} date={:?}",
+        meta.chunk_id, meta.chunk_index, meta.total_chunks, msg.from_me, parsed_date
+    );
     let chunk = ChunkPayload {
         chunk_id: meta.chunk_id,
         chunk_index: meta.chunk_index,
         total_chunks: meta.total_chunks,
         original_msg_type: meta.original_msg_type,
         content,
+        date: parsed_date,
     };
 
     let state_key = format!("{}{}", CHUNK_STATE_PREFIX, chunk.chunk_id);
@@ -873,15 +908,33 @@ fn process_chunk_msg(
 
     let (mut buffer, first_ts) = match existing_buffer {
         Some(buf) => {
+            // Fragment-consistency guard: if this fragment carries a date and it disagrees
+            // with the already-stored buffer date, keep the first-stored value and warn.
+            // This protects against a resent/retried fragment (e.g. after a sender restart)
+            // carrying a different unique_time from corrupting the final timestamp.
+            if let Some(frag_date) = chunk.date {
+                match buf.date {
+                    Some(stored_date) if stored_date != frag_date => {
+                        eprintln!(
+                            "[chunk] WARN fragment date mismatch chunk_id={} \
+                             stored_date={} frag_date={} — keeping first-stored value",
+                            chunk.chunk_id, stored_date, frag_date
+                        );
+                    }
+                    _ => {}
+                }
+            }
             let ts = buf.first_received_ts;
             (buf, ts)
         }
         None => {
+            // First fragment for this chunk_id: hoist date onto the buffer.
             let buf = ChunkBuffer {
                 total_chunks: chunk.total_chunks,
                 original_msg_type: chunk.original_msg_type,
                 received: Vec::new(),
                 first_received_ts: now,
+                date: chunk.date,
             };
             (buf, now)
         }
@@ -910,11 +963,64 @@ fn process_chunk_msg(
         let reassembled: String = buffer.received.iter().map(|c| c.content.as_str()).collect();
         let original_msg_type = buffer.original_msg_type;
         let chunk_id = chunk.chunk_id.clone();
-        eprintln!("[chunk] REASSEMBLED chunk_id={} total_chunks={}", chunk_id, buffer.total_chunks);
+
+        // Attempt to inject the original send timestamp into the reassembled message JSON.
+        // Only inject when the root value is a JSON object — bare strings/arrays are left
+        // unchanged.  This must never panic or error; any failure falls back to `reassembled`
+        // as-is, preserving today's existing behaviour for those edge-case payloads.
+        let final_message = if let Some(date_ts) = buffer.date {
+            match serde_json::from_str::<serde_json::Value>(&reassembled) {
+                Ok(mut val) if val.is_object() => {
+                    val["date"] = serde_json::json!(date_ts);
+                    match serde_json::to_string(&val) {
+                        Ok(s) => {
+                            eprintln!(
+                                "[chunk] REASSEMBLED chunk_id={} total_chunks={} \
+                                 date=injected({})",
+                                chunk_id, buffer.total_chunks, date_ts
+                            );
+                            s
+                        }
+                        Err(_) => {
+                            eprintln!(
+                                "[chunk] REASSEMBLED chunk_id={} total_chunks={} \
+                                 date=skipped(serialize-error)",
+                                chunk_id, buffer.total_chunks
+                            );
+                            reassembled
+                        }
+                    }
+                }
+                Ok(_) => {
+                    // Root is not an object (bare string, array, number, etc.).
+                    eprintln!(
+                        "[chunk] REASSEMBLED chunk_id={} total_chunks={} \
+                         date=skipped(non-object-root)",
+                        chunk_id, buffer.total_chunks
+                    );
+                    reassembled
+                }
+                Err(_) => {
+                    // Reassembled payload is not valid JSON at all.
+                    eprintln!(
+                        "[chunk] REASSEMBLED chunk_id={} total_chunks={} \
+                         date=skipped(parse-error)",
+                        chunk_id, buffer.total_chunks
+                    );
+                    reassembled
+                }
+            }
+        } else {
+            eprintln!(
+                "[chunk] REASSEMBLED chunk_id={} total_chunks={} date=skipped(legacy-no-date)",
+                chunk_id, buffer.total_chunks
+            );
+            reassembled
+        };
 
         let reassembled_msg = Msg {
             r#type: Some(original_msg_type),
-            message: Some(reassembled),
+            message: Some(final_message),
             uuid: Some(chunk_id),
             sender: msg.sender,
             tag: msg.tag,
@@ -935,12 +1041,15 @@ fn process_chunk_msg(
 
     // Incomplete: serialize updated buffer.
     let chunk_id = chunk.chunk_id.clone();
-    eprintln!("[chunk] buffered fragment chunk_id={} have={}/{}",
-        chunk_id, buffer.received.len(), buffer.total_chunks);
-    let buffer_bytes =
-        serde_json::to_vec(&buffer).map_err(|e| SphinxError::BadState {
-            r: format!("chunk buffer serialize: {}", e),
-        })?;
+    eprintln!(
+        "[chunk] buffered fragment chunk_id={} have={}/{}",
+        chunk_id,
+        buffer.received.len(),
+        buffer.total_chunks
+    );
+    let buffer_bytes = serde_json::to_vec(&buffer).map_err(|e| SphinxError::BadState {
+        r: format!("chunk buffer serialize: {}", e),
+    })?;
 
     Ok(ChunkResult::Incomplete {
         state_key,
@@ -1029,6 +1138,7 @@ mod tests {
         let msg_json = serde_json::json!({
             "content": chunk.content.clone(),
             "metadata": meta_json,
+            "date": chunk.date,
         })
         .to_string();
         Msg {
@@ -1086,6 +1196,7 @@ mod tests {
                 total_chunks: total,
                 original_msg_type: 1,
                 content,
+                date: None,
             });
         }
         assert_eq!(chunks.len(), 4);
@@ -1115,6 +1226,7 @@ mod tests {
                 total_chunks: total,
                 original_msg_type: orig_type,
                 content,
+                date: None,
             };
             rr.msgs.push(make_chunk_msg(&cp));
         }
@@ -1151,6 +1263,7 @@ mod tests {
             total_chunks: 3, // 3 expected, only sending 1
             original_msg_type: 2,
             content: "part one ".to_string(),
+                date: None,
         };
 
         let mut rr = empty_run_return();
@@ -1180,8 +1293,10 @@ mod tests {
                 total_chunks: 3,
                 original_msg_type: 2,
                 content: "part".to_string(),
+                date: None,
             }],
             first_received_ts: old_ts,
+            date: None,
         };
 
         let state = state_with_buffer(&key, &old_buf);
@@ -1193,6 +1308,7 @@ mod tests {
             total_chunks: 3,
             original_msg_type: 2,
             content: "more".to_string(),
+                date: None,
         };
         let mut rr = empty_run_return();
         rr.msgs.push(make_chunk_msg(&cp));
@@ -1248,6 +1364,7 @@ mod tests {
             total_chunks: 5,
             original_msg_type: 7,
             content: "some content slice".to_string(),
+                date: None,
         };
 
         let msg = make_chunk_msg(&cp);
@@ -1486,6 +1603,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 1,
             content: "hello from A".to_string(),
+                date: None,
         };
         let cp_b = ChunkPayload {
             chunk_id: chunk_id_b.clone(),
@@ -1493,6 +1611,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 2,
             content: "hello from B".to_string(),
+                date: None,
         };
 
         let mut rr = empty_run_return();
@@ -1540,6 +1659,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 3,
             content: "first_half_".to_string(),
+                date: None,
         };
         let cp1 = ChunkPayload {
             chunk_id: chunk_id.clone(),
@@ -1547,6 +1667,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 3,
             content: "second_half".to_string(),
+                date: None,
         };
 
         let mut rr = empty_run_return();
@@ -1582,6 +1703,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: orig_type,
             content: "part_one_".to_string(),
+                date: None,
         };
         let cp1 = ChunkPayload {
             chunk_id: chunk_id.clone(),
@@ -1589,6 +1711,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: orig_type,
             content: "part_two".to_string(),
+                date: None,
         };
 
         // --- First "fetch" call: only fragment 0 arrives ---
@@ -1642,8 +1765,10 @@ mod tests {
                 total_chunks: 2,
                 original_msg_type: 3,
                 content: "first_part_".to_string(),
+                date: None,
             }],
             first_received_ts: now_secs(),
+            date: None,
         };
 
         // Serialize the buffer into a simple-format full_state.
@@ -1659,6 +1784,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 3,
             content: "second_part".to_string(),
+                date: None,
         };
         let mut rr = empty_run_return();
         rr.msgs.push(make_chunk_msg(&cp1));
@@ -1788,6 +1914,7 @@ mod tests {
             total_chunks: 3,
             original_msg_type: 4,
             content: "legacy content".to_string(),
+                date: None,
         };
 
         // Build a Msg using the OLD wire format: ChunkPayload fields at the top level.
@@ -2241,6 +2368,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 0,
             content: "hello ".to_string(),
+                date: None,
         };
         let cp1 = ChunkPayload {
             chunk_id: chunk_id.to_string(),
@@ -2248,6 +2376,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 0,
             content: "world".to_string(),
+                date: None,
         };
 
         let mut rr = empty_run_return();
@@ -2284,6 +2413,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 0,
             content: "only half".to_string(),
+                date: None,
         };
 
         let mut rr = empty_run_return();
@@ -2320,8 +2450,10 @@ mod tests {
                 total_chunks: 2,
                 original_msg_type: 0,
                 content: "partial".to_string(),
+                date: None,
             }],
             first_received_ts: old_ts,
+            date: None,
         };
         let state = state_with_buffer(&key, &old_buf);
 
@@ -2332,6 +2464,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 0,
             content: "more".to_string(),
+                date: None,
         };
         let mut rr = empty_run_return();
         rr.msgs.push(make_chunk_msg_with_sender(&cp1, sender_pubkey));
@@ -2364,6 +2497,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 0,
             content: "first_".to_string(),
+                date: None,
         };
         let cp1 = ChunkPayload {
             chunk_id: chunk_id.to_string(),
@@ -2371,6 +2505,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 0,
             content: "second".to_string(),
+                date: None,
         };
 
         // --- First "fetch" call: only fragment 0 arrives ---
@@ -2419,6 +2554,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 0,
             content: "part1_".to_string(),
+                date: None,
         };
         let cp1 = ChunkPayload {
             chunk_id: chunk_id.to_string(),
@@ -2426,6 +2562,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 0,
             content: "part2".to_string(),
+                date: None,
         };
 
         // Give the second (last) chunk a transport-level tag — this must be
@@ -2501,6 +2638,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 0,
             content: "a".to_string(),
+                date: None,
         };
         let cp1 = ChunkPayload {
             chunk_id: chunk_id.to_string(),
@@ -2508,6 +2646,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 0,
             content: "b".to_string(),
+                date: None,
         };
 
         let mut rr = empty_run_return();
@@ -2548,5 +2687,387 @@ mod tests {
         // Empty pubkey string → Some("") (field present but empty).
         // send_chunk_confirmation guards against this at call time (the `!pk.is_empty()` check).
         assert_eq!(extract_sender_pubkey(r#"{"pubkey":""}"#), Some("".to_string()));
+    }
+
+    // ---- Date field tests (new) ----
+
+    // Test DATE-1: Extended test_chunk_metadata_roundtrip — `date` round-trips through
+    // `ChunkPayload.date` into `ChunkBuffer.date` correctly.
+    #[test]
+    fn test_chunk_metadata_roundtrip_date_preserved_in_buffer() {
+        let test_date: u64 = 1706300000123;
+        let cp = ChunkPayload {
+            chunk_id: "date_roundtrip_id".to_string(),
+            chunk_index: 0,
+            total_chunks: 3,
+            original_msg_type: 5,
+            content: "first slice".to_string(),
+            date: Some(test_date),
+        };
+
+        let msg = make_chunk_msg(&cp);
+        let now = now_secs();
+        let result = process_chunk_msg(msg, &[], now).unwrap();
+
+        match result {
+            ChunkResult::Incomplete { state_key: _, buffer_bytes } => {
+                let buf: ChunkBuffer = serde_json::from_slice(&buffer_bytes).unwrap();
+                // The date must be hoisted onto ChunkBuffer.date from the first fragment.
+                assert_eq!(
+                    buf.date,
+                    Some(test_date),
+                    "ChunkBuffer.date must equal the first fragment's date"
+                );
+                // The stored fragment also carries the date field.
+                assert_eq!(buf.received[0].date, Some(test_date));
+            }
+            _ => panic!("expected Incomplete result"),
+        }
+    }
+
+    // Test DATE-2: Full reassembly produces a final message JSON containing the correct
+    // `"date"` field equal to the original `unique_time`.
+    #[test]
+    fn test_reassembly_injects_date_into_message_json() {
+        let test_date: u64 = 1706300000456;
+        let chunk_id = "date_inject_id".to_string();
+
+        // Inner message is a JSON object (the typical case for tribe messages).
+        let inner_msg = r#"{"text":"hello tribe","type":49}"#;
+
+        // Split into two chunks manually.
+        let mid = inner_msg.len() / 2;
+        let cp0 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 0,
+            total_chunks: 2,
+            original_msg_type: 49,
+            content: inner_msg[..mid].to_string(),
+            date: Some(test_date),
+        };
+        let cp1 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 1,
+            total_chunks: 2,
+            original_msg_type: 49,
+            content: inner_msg[mid..].to_string(),
+            date: Some(test_date),
+        };
+
+        // Process first fragment — incomplete.
+        let mut rr1 = empty_run_return();
+        rr1.msgs.push(make_chunk_msg(&cp0));
+        let result1 = handle_chunks(rr1, &[], "").unwrap();
+        assert!(result1.msgs.is_empty());
+        let state = result1.state_mp.expect("must return state_mp after first fragment");
+
+        // Process second fragment — complete, date should be injected.
+        let mut rr2 = empty_run_return();
+        rr2.msgs.push(make_chunk_msg(&cp1));
+        let result2 = handle_chunks(rr2, &state, "").unwrap();
+
+        assert_eq!(result2.msgs.len(), 1, "must have exactly one reassembled message");
+        let message_str = result2.msgs[0].message.as_deref().expect("message must be Some");
+
+        // The reassembled message must be valid JSON containing the correct "date" field.
+        let parsed: serde_json::Value =
+            serde_json::from_str(message_str).expect("reassembled message must be valid JSON");
+        assert_eq!(
+            parsed["date"].as_u64(),
+            Some(test_date),
+            "reassembled message JSON must contain the original date, got: {}",
+            message_str
+        );
+    }
+
+    // Test DATE-3: Extended test_legacy_chunk_compat — legacy (no-date) payloads still
+    // reassemble without a `date` key and without errors, exercising `#[serde(default)]`.
+    #[test]
+    fn test_legacy_chunk_compat_no_date_field() {
+        // Build a legacy ChunkPayload (no date field) and serialize it as the old wire format.
+        let cp = ChunkPayload {
+            chunk_id: "legacy_no_date".to_string(),
+            chunk_index: 0,
+            total_chunks: 1,
+            original_msg_type: 2,
+            content: r#"{"text":"old message"}"#.to_string(),
+            date: None,
+        };
+        // Serialize as old format (flat ChunkPayload, no "date" key — simulate pre-fix wire).
+        // We manually build the JSON to exclude the "date" field.
+        let legacy_json = format!(
+            r#"{{"chunk_id":"{}","chunk_index":{},"total_chunks":{},"original_msg_type":{},"content":"{}"}}"#,
+            cp.chunk_id, cp.chunk_index, cp.total_chunks, cp.original_msg_type,
+            cp.content.replace('"', r#"\""#)
+        );
+        let legacy_msg = Msg {
+            r#type: Some(CHUNK_TYPE),
+            message: Some(legacy_json),
+            sender: None,
+            uuid: None,
+            tag: None,
+            index: None,
+            msat: None,
+            timestamp: None,
+            sent_to: None,
+            from_me: None,
+            payment_hash: None,
+            error: None,
+        };
+
+        let mut rr = empty_run_return();
+        rr.msgs.push(legacy_msg);
+        let result = handle_chunks(rr, &[], "").unwrap();
+
+        // Single-chunk message should reassemble successfully.
+        assert_eq!(result.msgs.len(), 1, "legacy single-chunk must reassemble");
+        let message = result.msgs[0].message.as_deref().expect("message must be Some");
+        // No date injection for legacy messages (buffer.date is None).
+        // The message content should be the inner text as-is.
+        assert!(
+            message.contains("old message"),
+            "reassembled content must contain original text, got: {}",
+            message
+        );
+        // No "date" key should have been injected for legacy (None date).
+        // We verify by parsing and checking date is absent or null.
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(message) {
+            assert!(
+                v.get("date").is_none() || v["date"].is_null(),
+                "legacy reassembly must not inject a date, got: {}",
+                message
+            );
+        }
+    }
+
+    // Test DATE-4: Pre-fix ChunkBuffer/ChunkPayload JSON (no "date" key at all) deserializes
+    // correctly via #[serde(default)] — simulates a mid-reassembly buffer written by a
+    // pre-fix binary that arrives post-upgrade.
+    #[test]
+    fn test_prefix_chunk_buffer_deserializes_without_date() {
+        // Manually construct old-format ChunkBuffer JSON (no "date" field at buffer or payload level).
+        let old_buffer_json = r#"{
+            "total_chunks": 2,
+            "original_msg_type": 3,
+            "received": [
+                {
+                    "chunk_id": "prefix_id",
+                    "chunk_index": 0,
+                    "total_chunks": 2,
+                    "original_msg_type": 3,
+                    "content": "hello "
+                }
+            ],
+            "first_received_ts": 1706300000
+        }"#;
+
+        // Must deserialize without error (no SphinxError::BadState).
+        let buf: ChunkBuffer =
+            serde_json::from_str(old_buffer_json).expect("pre-fix buffer must deserialize");
+        assert_eq!(buf.total_chunks, 2);
+        assert_eq!(buf.received.len(), 1);
+        // date fields must default to None via #[serde(default)].
+        assert_eq!(buf.date, None, "buffer.date must default to None for pre-fix JSON");
+        assert_eq!(
+            buf.received[0].date, None,
+            "received[0].date must default to None for pre-fix JSON"
+        );
+    }
+
+    // Test DATE-5: Reassembly of a non-object JSON payload (bare string/array) leaves the
+    // reassembled message unmodified rather than erroring or panicking.
+    #[test]
+    fn test_reassembly_non_object_payload_unchanged() {
+        let chunk_id = "non_object_id".to_string();
+
+        // Bare string payload (not a JSON object).
+        let bare_string = "\"just a bare string payload\"";
+
+        let cp0 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 0,
+            total_chunks: 1,
+            original_msg_type: 7,
+            content: bare_string.to_string(),
+            date: Some(1706300000789),
+        };
+
+        let mut rr = empty_run_return();
+        rr.msgs.push(make_chunk_msg(&cp0));
+        // Single-chunk complete reassembly.
+        let result = handle_chunks(rr, &[], "").unwrap();
+
+        assert_eq!(result.msgs.len(), 1, "must reassemble");
+        let msg = result.msgs[0].message.as_deref().expect("message must be Some");
+        // The bare string root is not an object — date injection must be skipped.
+        // Message must equal the original bare-string content, unchanged.
+        assert_eq!(msg, bare_string, "non-object payload must be left unchanged, got: {}", msg);
+
+        // Also test with a JSON array root.
+        let chunk_id2 = "non_object_array_id".to_string();
+        let array_payload = r#"["item1","item2"]"#;
+        let cp_array = ChunkPayload {
+            chunk_id: chunk_id2.clone(),
+            chunk_index: 0,
+            total_chunks: 1,
+            original_msg_type: 7,
+            content: array_payload.to_string(),
+            date: Some(1706300000789),
+        };
+        let mut rr2 = empty_run_return();
+        rr2.msgs.push(make_chunk_msg(&cp_array));
+        let result2 = handle_chunks(rr2, &[], "").unwrap();
+        assert_eq!(result2.msgs.len(), 1);
+        let msg2 = result2.msgs[0].message.as_deref().expect("message must be Some");
+        assert_eq!(msg2, array_payload, "array payload must be left unchanged, got: {}", msg2);
+    }
+
+    // Test DATE-6: Mismatched `date` values across fragments of the same `chunk_id` keep
+    // the first-seen value rather than being overwritten.
+    #[test]
+    fn test_mismatched_date_keeps_first_seen_value() {
+        let chunk_id = "mismatch_date_id".to_string();
+        let first_date: u64 = 1706300000111;
+        let second_date: u64 = 9999999999999; // different — simulates a resent fragment
+
+        let cp0 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 0,
+            total_chunks: 2,
+            original_msg_type: 1,
+            content: r#"{"text":"firs"#.to_string(),
+            date: Some(first_date),
+        };
+        let cp1 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 1,
+            total_chunks: 2,
+            original_msg_type: 1,
+            content: r#"t part"}"#.to_string(),
+            date: Some(second_date), // different date — should be ignored
+        };
+
+        // First fragment: buffer created, date = first_date.
+        let mut rr1 = empty_run_return();
+        rr1.msgs.push(make_chunk_msg(&cp0));
+        let result1 = handle_chunks(rr1, &[], "").unwrap();
+        assert!(result1.msgs.is_empty());
+        let state = result1.state_mp.expect("must have state after first fragment");
+
+        // Second fragment: arrives with a different date — first_date must be kept.
+        let mut rr2 = empty_run_return();
+        rr2.msgs.push(make_chunk_msg(&cp1));
+        let result2 = handle_chunks(rr2, &state, "").unwrap();
+
+        assert_eq!(result2.msgs.len(), 1, "must reassemble");
+        let message = result2.msgs[0].message.as_deref().expect("message must be Some");
+        let parsed: serde_json::Value =
+            serde_json::from_str(message).expect("reassembled message must be valid JSON");
+        // The date in the final message must equal first_date, not second_date.
+        assert_eq!(
+            parsed["date"].as_u64(),
+            Some(first_date),
+            "reassembled date must equal first-seen value ({}) not second fragment value ({})",
+            first_date,
+            second_date
+        );
+    }
+
+    // Test DATE-7: Byte-budget invariant still holds after the 28-byte overhead bump.
+    // Confirms CHUNK_CONTENT_THRESHOLD + MAX_OVERHEAD_BYTES <= MAX_MSG_LEN + 500
+    // and that max-length alias/photo combos still produce a non-None budget.
+    #[test]
+    fn test_byte_budget_invariant_holds_after_overhead_bump() {
+        // The compile-time assert already checks the invariant, but we verify it at
+        // runtime too with explicit values so test output is clear if something regresses.
+        assert!(
+            CHUNK_CONTENT_THRESHOLD + MAX_OVERHEAD_BYTES <= MAX_MSG_LEN + 500,
+            "CHUNK_CONTENT_THRESHOLD ({}) + MAX_OVERHEAD_BYTES ({}) must be <= MAX_MSG_LEN ({}) + 500",
+            CHUNK_CONTENT_THRESHOLD, MAX_OVERHEAD_BYTES, MAX_MSG_LEN
+        );
+
+        // A typical max-length alias (64 chars) + long photo URL still has a budget.
+        let long_alias = "A".repeat(64);
+        let long_img = "https://cdn.example.com/very/long/profile/photo/url/that/takes/space.png";
+        let budget = compute_available_content_bytes(&long_alias, long_img);
+        assert!(
+            budget.is_some(),
+            "max-length alias + long photo URL must still have a content budget after 28-byte overhead bump, got None"
+        );
+        let budget_val = budget.unwrap();
+        assert!(
+            budget_val > 0,
+            "content budget must be > 0 for typical max alias/photo combo, got {}",
+            budget_val
+        );
+
+        // APP_OVERHEAD_BYTES must equal 171 (143 base + 28 for date field).
+        assert_eq!(
+            APP_OVERHEAD_BYTES,
+            171,
+            "APP_OVERHEAD_BYTES must equal 171 after the 28-byte date-field bump"
+        );
+    }
+
+    // Test DATE-8: send/receive round-trip — a message split by `split_and_send` logic
+    // (simulated) and reassembled via `handle_chunks` produces a final message JSON whose
+    // `"date"` equals the original `unique_time` passed into the chunks.
+    // NOTE: This test simulates `split_and_send` behavior by constructing chunks with
+    // the same `date` field that `split_and_send` embeds, without calling the real
+    // bindings::send (which requires live crypto state).
+    #[test]
+    fn test_date_roundtrip_split_and_reassemble() {
+        let unique_time = "1706300000999";
+        let expected_date: u64 = unique_time.parse().unwrap();
+        let chunk_id = make_chunk_id(unique_time);
+
+        // Simulate split_and_send chunking: inner JSON object split across 2 chunks,
+        // each carrying `date: Some(expected_date)` just like split_and_send does.
+        let inner_json = r#"{"message":"tribe history message","type":49,"uuid":"test-uuid"}"#;
+        let mid = inner_json.len() / 2;
+
+        let cp0 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 0,
+            total_chunks: 2,
+            original_msg_type: 49,
+            content: inner_json[..mid].to_string(),
+            date: Some(expected_date), // what split_and_send embeds
+        };
+        let cp1 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 1,
+            total_chunks: 2,
+            original_msg_type: 49,
+            content: inner_json[mid..].to_string(),
+            date: Some(expected_date), // same on every chunk
+        };
+
+        // First chunk arrives.
+        let mut rr1 = empty_run_return();
+        rr1.msgs.push(make_chunk_msg(&cp0));
+        let r1 = handle_chunks(rr1, &[], "").unwrap();
+        assert!(r1.msgs.is_empty());
+        let state = r1.state_mp.expect("state after first chunk");
+
+        // Second chunk arrives → reassembly completes.
+        let mut rr2 = empty_run_return();
+        rr2.msgs.push(make_chunk_msg(&cp1));
+        let r2 = handle_chunks(rr2, &state, "").unwrap();
+        assert_eq!(r2.msgs.len(), 1);
+
+        let final_msg = r2.msgs[0].message.as_deref().expect("message must be Some");
+        let parsed: serde_json::Value =
+            serde_json::from_str(final_msg).expect("final message must be valid JSON");
+
+        // The "date" in the final message must equal the original unique_time — not
+        // the transport replay timestamp.
+        assert_eq!(
+            parsed["date"].as_u64(),
+            Some(expected_date),
+            "final message 'date' must equal original unique_time={}, got: {}",
+            expected_date,
+            final_msg
+        );
     }
 }
