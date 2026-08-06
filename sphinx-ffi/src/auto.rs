@@ -269,7 +269,11 @@ pub fn send(
     amt_msat: u64,
     is_tribe: bool,
 ) -> Result<RunReturn> {
-    if msg_json.len() > chunk::CHUNK_CONTENT_THRESHOLD {
+    // Whole-message wire-limit check: if the full msg_json exceeds the single-send
+    // wire limit (MAX_MSG_LEN = 869 bytes), split it into chunks. This is a distinct
+    // concern from the per-chunk content budget computed by compute_available_content_bytes()
+    // inside split_and_send() — do not conflate the two.
+    if msg_json.len() > chunk::MAX_MSG_LEN {
         return chunk::split_and_send(
             &seed,
             &unique_time,
