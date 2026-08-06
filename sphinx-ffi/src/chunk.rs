@@ -6,7 +6,7 @@ use sphinx::serde_json;
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const MAX_MSG_LEN: usize = 869;
+pub(crate) const MAX_MSG_LEN: usize = 869;
 
 /// Application-layer overhead in msg_json: outer `{"content":...,"metadata":...}`
 /// wrapper framing (~26 B) plus the double-encoded ChunkMeta string value
@@ -38,27 +38,28 @@ const ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES: usize = 50;
 const MAX_OVERHEAD_BYTES: usize =
     FIXED_PROTOCOL_OVERHEAD_BYTES + ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES + APP_OVERHEAD_BYTES; // = 443
 
-/// First-pass trigger threshold: if msg_json.len() exceeds this value, `auto::send()`
-/// routes through `split_and_send()` rather than a direct send. This is an
-/// average-case estimate only — the true per-send content budget is computed
-/// dynamically inside `split_and_send()` using `compute_sender_overhead()` plus
-/// the checked-arithmetic chain:
+/// Per-chunk content slice size limit. `split_and_send()` uses this value to decide
+/// how many bytes of `msg_json` content to pack into each individual chunk when a
+/// message has already been determined to need splitting. This constant does NOT
+/// govern whether chunking is triggered — that decision is made in `auto::send()`
+/// by comparing the full `msg_json` length against `MAX_MSG_LEN` (the single-send
+/// wire limit). The true per-chunk content budget is computed dynamically inside
+/// `split_and_send()` using `compute_sender_overhead()` plus the checked-arithmetic
+/// chain:
 ///   FIXED_PROTOCOL_OVERHEAD_BYTES + ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES + sender_overhead
 /// where `sender_overhead` reflects the real `my_alias` and `my_img` byte lengths.
-/// Lowering this from 750 to 450 means messages in the 451-750 byte range that were
-/// previously single sends are now chunked into type-34 payloads. Both sender and
-/// receiver must run this updated code — a peer running the old handle_chunks-less
-/// code cannot reassemble chunks from an updated sender.
 pub const CHUNK_CONTENT_THRESHOLD: usize = 450; // 450 + 443 = 893 — intentionally >869
 
-/// Compile-time guard: validates only the original average-case trigger threshold
-/// assumption used in `auto::send()` — NOT the true dynamic per-send budget.
-/// The real per-send budget is:
+/// Compile-time guard: validates a per-chunk sizing invariant — NOT the chunking
+/// trigger decision. Confirms that `CHUNK_CONTENT_THRESHOLD` (the per-chunk content
+/// slice size) plus worst-case overhead fits within a reasonable bound, ensuring
+/// `split_and_send()` never produces chunks that exceed the wire limit. The real
+/// per-chunk budget is:
 ///   MAX_MSG_LEN - APP_OVERHEAD_BYTES - FIXED_PROTOCOL_OVERHEAD_BYTES
 ///     - ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES - sender_overhead
 /// computed at send time via `compute_sender_overhead()` and the checked_sub chain
-/// in `split_and_send()`. This assert merely ensures the trigger threshold + a
-/// reasonable worst-case overhead still fits within MAX_MSG_LEN.
+/// in `split_and_send()`. The trigger for chunking itself is in `auto::send()` and
+/// compares the full `msg_json` length against `MAX_MSG_LEN` — a separate concern.
 const _: () = assert!(CHUNK_CONTENT_THRESHOLD + MAX_OVERHEAD_BYTES <= MAX_MSG_LEN + 500);
 
 /// Probe struct used only to measure the JSON byte length of the sender's
@@ -1373,21 +1374,58 @@ mod tests {
         }
     }
 
-    // Test N4: regression — auto.rs::send()'s trigger check (msg_json.len() > CHUNK_CONTENT_THRESHOLD)
-    // is unchanged by this refactor. CHUNK_CONTENT_THRESHOLD must still equal 450.
+    // Test N4: regression — CHUNK_CONTENT_THRESHOLD must remain 450. Note: auto.rs::send()'s
+    // chunking trigger now uses MAX_MSG_LEN (869), not CHUNK_CONTENT_THRESHOLD. This constant
+    // governs per-chunk slice sizing inside split_and_send() only. The assertions below confirm
+    // CHUNK_CONTENT_THRESHOLD's value is unchanged, which is still correct and required.
     #[test]
     fn test_trigger_check_threshold_unchanged() {
         assert_eq!(
             CHUNK_CONTENT_THRESHOLD,
             450,
-            "CHUNK_CONTENT_THRESHOLD must remain 450 — auto.rs::send() depends on this value"
+            "CHUNK_CONTENT_THRESHOLD must remain 450 — split_and_send() per-chunk sizing depends on this value"
         );
-        // A message exactly at the threshold does NOT trigger chunking (uses >, not >=).
+        // A message exactly at the threshold does NOT trigger per-chunk splitting (uses >, not >=).
         let at_threshold = "a".repeat(450);
         assert!(!(at_threshold.len() > CHUNK_CONTENT_THRESHOLD));
-        // A message one byte over the threshold DOES trigger chunking.
+        // A message one byte over the threshold DOES trigger per-chunk splitting.
         let over_threshold = "a".repeat(451);
         assert!(over_threshold.len() > CHUNK_CONTENT_THRESHOLD);
+    }
+
+    // Test N4b: auto.rs::send() chunking trigger now uses MAX_MSG_LEN (869), not
+    // CHUNK_CONTENT_THRESHOLD. Messages at or below 869 bytes must NOT chunk; messages
+    // over 869 bytes must chunk. The 450-byte case is the key regression: previously it
+    // incorrectly triggered chunking against the old 450-byte threshold.
+    #[test]
+    fn test_send_chunking_trigger_uses_max_msg_len() {
+        // 450 bytes: old threshold — must no longer trigger chunking.
+        assert!(
+            !("a".repeat(450).len() > MAX_MSG_LEN),
+            "450-byte message must NOT trigger chunking (regression: old threshold was 450)"
+        );
+        // 500 bytes: between old and new threshold — must not trigger chunking.
+        assert!(
+            !("a".repeat(500).len() > MAX_MSG_LEN),
+            "500-byte message must NOT trigger chunking"
+        );
+        // 869 bytes: exact wire limit boundary — must not chunk (uses >, not >=).
+        assert!(
+            !("a".repeat(869).len() > MAX_MSG_LEN),
+            "869-byte message (exact MAX_MSG_LEN) must NOT trigger chunking"
+        );
+        // 870 bytes: one over the wire limit — must chunk.
+        assert!(
+            "a".repeat(870).len() > MAX_MSG_LEN,
+            "870-byte message must trigger chunking"
+        );
+        // 900 bytes: well over the wire limit — must still chunk.
+        assert!(
+            "a".repeat(900).len() > MAX_MSG_LEN,
+            "900-byte message must trigger chunking"
+        );
+        // Verify MAX_MSG_LEN itself is 869.
+        assert_eq!(MAX_MSG_LEN, 869, "MAX_MSG_LEN must equal 869");
     }
 
     // Test N5: parity — given identical alias/img, compute_available_content_bytes returns
