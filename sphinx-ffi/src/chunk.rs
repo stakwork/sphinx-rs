@@ -496,199 +496,13 @@ fn slice_utf8_safe(s: &str, start: usize, end: usize) -> String {
     s[start..end].to_string()
 }
 
-/// MsgType::Confirmation numeric value from the upstream sphinx crate.
-/// Duplicated here to avoid a public dependency on sphinx::msg::MsgType.
-const CONFIRMATION_MSG_TYPE: u8 = 1;
-
-/// Parse the sender's pubkey out of the JSON-encoded SenderInfo string stored in
-/// `Msg::sender`.  Returns `None` if the field is absent or the JSON is malformed.
-///
-/// The `sender` field is set by `sphinx::bindings::handle_msg` and
-/// `handle_batch` as `serde_json::to_string(&sender_info)` where `SenderInfo`
-/// has the shape `{ "pubkey": "...", "alias": "...", ... }`.
-fn extract_sender_pubkey(sender_json: &str) -> Option<String> {
-    let v: serde_json::Value = serde_json::from_str(sender_json).ok()?;
-    v.get("pubkey")?.as_str().map(|s| s.to_string())
-}
-
-/// Issue a `MsgType::Confirmation` (type 1) back to the original sender of a
-/// fully reassembled chunked message.  The `{"replyUuid": "<chunk_id>"}` payload
-/// lets the sender's tag-based pending-delivery tracker match the confirmation
-/// against the `chunk_id` it stored when it called `split_and_send`.
-///
-/// Returns the `RunReturn` from `bindings::send` (which carries the MQTT topics
-/// and payloads the caller must publish) on success, or `None` if the send could
-/// not be attempted (missing sender info, contact not found, network error, etc.).
-/// In all failure cases a `[sphinx-ffi/chunk] WARN` line is printed to stderr.
-///
-/// `alias` and `img` are always left empty for this internal send; `is_tribe` is
-/// `false`.  `unique_time` is derived from `now_secs()` to ensure a valid u64.
-///
-/// # Test hook
-/// Under `#[cfg(test)]` the function short-circuits: instead of calling
-/// `bindings::send` (which requires real crypto state) it appends the
-/// `(to_pubkey, chunk_id)` pair to the `CONFIRMATION_CALLS` thread-local so
-/// tests can assert whether a confirmation was (or was not) attempted.
-fn send_chunk_confirmation(
-    seed: &str,
-    reassembled_msg: &Msg,
-    chunk_id: &str,
-    full_state: &[u8],
-) -> Option<RunReturn> {
-    let sender_json = reassembled_msg.sender.as_deref()?;
-    let to_pubkey = match extract_sender_pubkey(sender_json) {
-        Some(pk) if !pk.is_empty() => pk,
-        _ => {
-            eprintln!(
-                "[sphinx-ffi/chunk] WARN send_chunk_confirmation: \
-                 chunk_id={} — could not extract sender pubkey from sender JSON; \
-                 no confirmation sent",
-                chunk_id
-            );
-            return None;
-        }
-    };
-
-    // Build the confirmation msg_json.  The Message struct in the sphinx crate uses
-    // serde rename_all = "camelCase", so the wire field name is "replyUuid".
-    let msg_json = format!(r#"{{"replyUuid":"{}"}}"#, chunk_id);
-    // Derive a unique_time from wall-clock seconds.  It is always a valid u64 string.
-    let unique_time = now_secs().to_string();
-
-    #[cfg(test)]
-    {
-        // In unit tests, record the call instead of hitting the real network.
-        CONFIRMATION_CALLS.with(|calls| {
-            calls
-                .borrow_mut()
-                .push((to_pubkey.clone(), chunk_id.to_string()));
-        });
-        eprintln!(
-            "[sphinx-ffi/chunk] DEBUG send_chunk_confirmation (test): \
-             chunk_id={} → to={}",
-            chunk_id, to_pubkey
-        );
-        return Some(crate::auto::RunReturn {
-            msgs: Vec::new(),
-            msgs_total: None,
-            msgs_counts: None,
-            subscription_topics: Vec::new(),
-            settle_topic: None,
-            settle_payload: None,
-            asyncpay_topic: None,
-            asyncpay_payload: None,
-            register_topic: None,
-            register_payload: None,
-            topics: vec![format!("conf_topic/{}", chunk_id)],
-            payloads: vec![b"conf".to_vec()],
-            state_mp: None,
-            state_to_delete: Vec::new(),
-            new_balance: None,
-            my_contact_info: None,
-            sent_status: None,
-            settled_status: None,
-            asyncpay_tag: None,
-            register_response: None,
-            error: None,
-            new_tribe: None,
-            tribe_members: None,
-            new_invite: None,
-            inviter_contact_info: None,
-            inviter_alias: None,
-            initial_tribe: None,
-            lsp_host: None,
-            invoice: None,
-            route: None,
-            node: None,
-            last_read: None,
-            mute_levels: None,
-            payments: None,
-            payments_total: None,
-            tags: None,
-            deleted_msgs: None,
-            new_child_idx: None,
-            ping: None,
-        });
-    }
-
-    #[cfg(not(test))]
-    {
-        eprintln!(
-            "[sphinx-ffi/chunk] DEBUG send_chunk_confirmation: \
-             chunk_id={} → to={}",
-            chunk_id, to_pubkey
-        );
-
-        match bindings::send(
-            seed,
-            &unique_time,
-            &to_pubkey,
-            CONFIRMATION_MSG_TYPE,
-            &msg_json,
-            full_state,
-            "",        // alias: empty is valid; becomes Some("") on wire
-            &None,     // img: None
-            0,         // amt_msat: free confirmation
-            false,     // is_tribe: always direct
-        ) {
-            Ok(rr) => Some(rr.into()),
-            Err(e) => {
-                eprintln!(
-                    "[sphinx-ffi/chunk] WARN send_chunk_confirmation: \
-                     chunk_id={} to={} — bindings::send failed: {}; \
-                     reassembly still succeeds",
-                    chunk_id, to_pubkey, e
-                );
-                None
-            }
-        }
-    }
-}
-
-/// Thread-local used by unit tests to capture `send_chunk_confirmation` calls
-/// without hitting the real network.  Each entry is `(to_pubkey, chunk_id)`.
-#[cfg(test)]
-thread_local! {
-    static CONFIRMATION_CALLS: std::cell::RefCell<Vec<(String, String)>> =
-        std::cell::RefCell::new(Vec::new());
-}
-
 /// Called from `auto::handle()` and all four fetch-path functions after the bindings call.
 /// Intercepts any Msgs with type == CHUNK_TYPE and either buffers or reassembles them.
 ///
-/// # Receiver-side confirmation
-/// On `ChunkResult::Complete`, a single `MsgType::Confirmation` (type 1) is sent back
-/// to the original sender via `bindings::send`, carrying `{"replyUuid": "<chunk_id>"}`.
-/// This allows the sender's tag-based pending-delivery tracking (keyed on `chunk_id` by
-/// the companion `split_and_send` fix) to mark the message as delivered. The confirmation
-/// is issued exactly once per fully reassembled message (never on `Incomplete`/`TimedOut`).
-///
-/// Alias and photo-URL are left as empty strings for this internal-only confirmation send;
-/// `bindings::send` accepts empty alias fine (it becomes `alias: Some("")` on the wire)
-/// and empty img resolves to `photo_url: None`. `is_tribe` is `false` — the confirmation
-/// is always a direct peer send regardless of the original message's tribe context. These
-/// defaults avoid adding new parameters to the public FFI API (which would require app-side
-/// changes in sphinx-ios-v2/sphinx-mac-v2/sphinx-android-v2, contradicting the requirement
-/// that no app changes are needed).
-///
-/// If the confirmation send fails (e.g. the sender is not in the receiver's contact list
-/// yet, or the network is temporarily unavailable), the failure is logged at WARN level and
-/// silently swallowed — reassembly of the message still succeeds and the reassembled `Msg`
-/// is still returned. The sender may time out its pending-delivery indicator, but the
-/// received message content is not affected.
-///
-/// # Concurrency risk (documented, not fixed in this ticket)
-/// `local_state` is deserialized fresh from `full_state` at the start of each call and
-/// reserialized at the end. This ticket adds a network send (`bindings::send`) inside the
-/// same code path. Two concurrent invocations of `handle_chunks` (e.g. a live `handle()`
-/// push racing a background batch-restore fetch on mobile) could each load `full_state`
-/// before either's state delta is persisted, causing a last-writer-wins clobber of the
-/// in-progress chunk buffer for the same `chunk_id`. Adding the confirmation send does not
-/// worsen this race — it is a pre-existing property of the stateless persistence contract —
-/// but it does mean the confirmation could be issued redundantly if both concurrent callers
-/// independently complete the same reassembly before either's state_to_delete is applied.
-/// A full concurrency fix (versioned/CAS merge) is recorded here as a known limitation and
-/// candidate follow-up; it is explicitly out of scope for this ticket.
+/// On `ChunkResult::Complete`, the fully reassembled `Msg` is inserted into `rr.msgs`.
+/// The reassembled message's `tag` field is left as whatever real tag arrived on the last
+/// received chunk — this is the relay-tracked transport tag that the relay-based
+/// `sentStatus.tag` delivery confirmation path depends on exclusively.  Do NOT override it.
 ///
 /// # Multi-fragment-per-call correctness
 /// `handle()` delivers at most one message per call, so there is at most one chunk
@@ -701,7 +515,7 @@ thread_local! {
 /// `full_state` only for keys not yet touched this call), and writes updates back
 /// into `local_state` immediately so the next iteration in the same loop sees them.
 /// The final `local_state` is what gets serialised into `rr.state_mp`.
-pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8], seed: &str) -> Result<RunReturn> {
+pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8], _seed: &str) -> Result<RunReturn> {
     let now = now_secs();
     let mut i = 0;
 
@@ -744,7 +558,7 @@ pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8], seed: &str) -> Result
 
             match result {
                 ChunkResult::Complete {
-                    mut reassembled_msg,
+                    reassembled_msg,
                     state_key,
                 } => {
                     // Remove the completed buffer from the accumulator so subsequent
@@ -752,43 +566,11 @@ pub fn handle_chunks(mut rr: RunReturn, full_state: &[u8], seed: &str) -> Result
                     local_state.remove(&state_key);
 
                     // Leave reassembled_msg.tag as whatever real tag arrived on the
-                    // underlying last received chunk message — do NOT force it to
-                    // chunk_id. The split_and_send sender-side fix already ensures
-                    // msgs[0].tag is the last chunk's real relay-tracked transport tag;
-                    // overriding tag here would clobber that correct tag during
-                    // self-echo reassembly, reintroducing the confirmation-stuck bug.
-                    // chunk_id is available via uuid for any dedup/matching purposes.
-                    let chunk_id = reassembled_msg.uuid.clone().unwrap_or_default();
-
-                    // Serialize local_state for the confirmation send (it must see the
-                    // same state that handle_chunks has accumulated so far, without the
-                    // now-deleted chunk buffer key).
-                    let state_for_conf = rmp_utils::serialize_simple_state_map(&local_state)
-                        .unwrap_or_default();
-
-                    // Send a single application-level confirmation back to the original
-                    // sender so their pending-delivery indicator can resolve.  Merge
-                    // the resulting MQTT topics/payloads into rr so the caller publishes
-                    // them; also fold any state delta from the confirmation send back
-                    // into local_state so it is included in the final state_mp.
-                    if let Some(conf_rr) = send_chunk_confirmation(
-                        seed,
-                        &reassembled_msg,
-                        &chunk_id,
-                        &state_for_conf,
-                    ) {
-                        rr.topics.extend(conf_rr.topics);
-                        rr.payloads.extend(conf_rr.payloads);
-                        if let Some(delta_mp) = conf_rr.state_mp {
-                            if let Ok(merged_bytes) = merge_state(&state_for_conf, &delta_mp) {
-                                if let Ok(new_map) =
-                                    rmp_utils::deserialize_simple_state_map(&merged_bytes)
-                                {
-                                    local_state = new_map;
-                                }
-                            }
-                        }
-                    }
+                    // last received chunk message — do NOT override it.  The
+                    // split_and_send sender-side fix ensures msgs[0].tag is the last
+                    // chunk's real relay-tracked transport tag; the relay-based
+                    // sentStatus.tag delivery confirmation path depends on this
+                    // invariant exclusively.  uuid carries the chunk_id for dedup.
 
                     rr.msgs.insert(i, reassembled_msg);
                     rr.state_to_delete.push(state_key);
@@ -2047,25 +1829,23 @@ mod tests {
         }
     }
 
-    // Test MCI-5: send_chunk_confirmation uses the same chunk_id as Msg.uuid for
-    // the replyUuid wire field.  Assert that the chunk_id captured in CONFIRMATION_CALLS
-    // always decodes to exactly 32 bytes, confirming this shared-value path also
-    // satisfies the sphinx crate's 32-byte reply_uuid requirement.
+    // Test MCI-5: make_chunk_id always produces a 64-char hex string (32 bytes).
+    // This is the value surfaced as Msg.uuid on the reassembled message; the sphinx
+    // crate requires uuid/reply_uuid fields to decode to exactly 32 bytes, so any
+    // regression in make_chunk_id output length would silently break reply/boost
+    // operations that reference a reassembled chunked message by uuid.
     #[test]
     fn test_send_chunk_confirmation_reply_uuid_is_32_bytes() {
-        // make_chunk_id is the sole source of chunk_id values passed to
-        // send_chunk_confirmation.  Verify its output for the three canonical
-        // input classes so the replyUuid wire field always decodes to 32 bytes.
+        // make_chunk_id is the sole source of chunk_id values used as Msg.uuid.
+        // Verify its output for the three canonical input classes.
         for input in ["1785940616069", "", "9999999999999999"] {
             let chunk_id = make_chunk_id(input);
-            // The wire field is: {"replyUuid":"<chunk_id>"}
-            // Assert the chunk_id embedded in that JSON decodes to 32 bytes.
             let decoded = hex::decode(&chunk_id)
-                .unwrap_or_else(|_| panic!("replyUuid chunk_id must be valid hex for input={:?}", input));
+                .unwrap_or_else(|_| panic!("chunk_id must be valid hex for input={:?}", input));
             assert_eq!(
                 decoded.len(),
                 32,
-                "replyUuid chunk_id must decode to exactly 32 bytes for input={:?}, got {} bytes",
+                "chunk_id must decode to exactly 32 bytes for input={:?}, got {} bytes",
                 input,
                 decoded.len()
             );
@@ -2404,240 +2184,18 @@ mod tests {
         );
     }
 
-    // ---- Receiver-side confirmation tests ----
-    //
-    // These tests use the #[cfg(test)] CONFIRMATION_CALLS thread-local to capture
-    // confirmation sends without hitting the real network.  Each test clears the
-    // thread-local before running to avoid cross-test pollution.
+    // ---- Relay-tag invariant regression test ----
 
-    /// Build a make_chunk_msg variant that includes a sender field so the
-    /// confirmation code can extract a pubkey.
-    fn make_chunk_msg_with_sender(chunk: &ChunkPayload, sender_pubkey: &str) -> Msg {
-        let meta = ChunkMeta {
-            chunk_id: chunk.chunk_id.clone(),
-            chunk_index: chunk.chunk_index,
-            total_chunks: chunk.total_chunks,
-            original_msg_type: chunk.original_msg_type,
-        };
-        let meta_json = serde_json::to_string(&meta).unwrap();
-        let msg_json = serde_json::json!({
-            "content": chunk.content.clone(),
-            "metadata": meta_json,
-        })
-        .to_string();
-        // Produce a minimal SenderInfo JSON that has the `pubkey` field.
-        let sender_json = format!(r#"{{"pubkey":"{}","alias":"","photo_url":"","person":"","confirmed":false}}"#, sender_pubkey);
-        Msg {
-            r#type: Some(CHUNK_TYPE),
-            message: Some(msg_json),
-            sender: Some(sender_json),
-            uuid: None,
-            tag: None,
-            index: None,
-            msat: None,
-            timestamp: None,
-            sent_to: None,
-            from_me: None,
-            payment_hash: None,
-            error: None,
-        }
-    }
-
-    // Test CONF-1: a confirmation is issued exactly once when all chunks arrive
-    // and the message is fully reassembled (ChunkResult::Complete).
+    // Test RELAY-TAG-1: the reassembled message's tag must equal the relay-tracked
+    // transport tag from the last received chunk.  This is the invariant the
+    // relay-based sentStatus.tag delivery-confirmation path depends on exclusively
+    // now that the app-level send_chunk_confirmation() call has been removed.
+    // Any regression here would silently reintroduce stuck "pending" messages with
+    // no recovery path.
     #[test]
-    fn test_confirmation_sent_on_complete() {
-        CONFIRMATION_CALLS.with(|calls| calls.borrow_mut().clear());
-
-        let chunk_id = "1706399001001";
-        let sender_pubkey = "03abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678";
-
-        // Two-chunk message: deliver both in one call so Complete fires.
-        let cp0 = ChunkPayload {
-            chunk_id: chunk_id.to_string(),
-            chunk_index: 0,
-            total_chunks: 2,
-            original_msg_type: 0,
-            content: "hello ".to_string(),
-                date: None,
-        };
-        let cp1 = ChunkPayload {
-            chunk_id: chunk_id.to_string(),
-            chunk_index: 1,
-            total_chunks: 2,
-            original_msg_type: 0,
-            content: "world".to_string(),
-                date: None,
-        };
-
-        let mut rr = empty_run_return();
-        rr.msgs.push(make_chunk_msg_with_sender(&cp0, sender_pubkey));
-        rr.msgs.push(make_chunk_msg_with_sender(&cp1, sender_pubkey));
-
-        let result = handle_chunks(rr, &[], "").unwrap();
-
-        // Message should be reassembled.
-        assert_eq!(result.msgs.len(), 1, "reassembled message must be present");
-        assert_eq!(result.msgs[0].message.as_deref(), Some("hello world"));
-
-        // Exactly one confirmation must have been issued.
-        CONFIRMATION_CALLS.with(|calls| {
-            let calls = calls.borrow();
-            assert_eq!(calls.len(), 1, "exactly one confirmation must be sent on Complete");
-            assert_eq!(calls[0].0, sender_pubkey, "confirmation must target the sender pubkey");
-            assert_eq!(calls[0].1, chunk_id, "confirmation chunk_id must match the reassembled chunk_id");
-        });
-    }
-
-    // Test CONF-2: no confirmation is issued when chunks are still incomplete.
-    #[test]
-    fn test_no_confirmation_on_incomplete() {
-        CONFIRMATION_CALLS.with(|calls| calls.borrow_mut().clear());
-
-        let chunk_id = "1706399002002";
-        let sender_pubkey = "03abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678";
-
-        // Only deliver one of two expected chunks.
-        let cp0 = ChunkPayload {
-            chunk_id: chunk_id.to_string(),
-            chunk_index: 0,
-            total_chunks: 2,
-            original_msg_type: 0,
-            content: "only half".to_string(),
-                date: None,
-        };
-
-        let mut rr = empty_run_return();
-        rr.msgs.push(make_chunk_msg_with_sender(&cp0, sender_pubkey));
-
-        let result = handle_chunks(rr, &[], "").unwrap();
-
-        // No message should be reassembled yet.
-        assert!(result.msgs.is_empty(), "no reassembled message on incomplete");
-
-        // No confirmation must be sent.
-        CONFIRMATION_CALLS.with(|calls| {
-            assert!(calls.borrow().is_empty(), "no confirmation must be sent on Incomplete");
-        });
-    }
-
-    // Test CONF-3: no confirmation is issued on timeout.
-    #[test]
-    fn test_no_confirmation_on_timeout() {
-        CONFIRMATION_CALLS.with(|calls| calls.borrow_mut().clear());
-
-        let chunk_id = "1706399003003";
-        let sender_pubkey = "03abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678";
-        let key = format!("{}{}", CHUNK_STATE_PREFIX, chunk_id);
-
-        // Plant a stale buffer whose first_received_ts is older than CHUNK_TIMEOUT_SECS.
-        let old_ts = now_secs().saturating_sub(CHUNK_TIMEOUT_SECS + 1);
-        let old_buf = ChunkBuffer {
-            total_chunks: 2,
-            original_msg_type: 0,
-            received: vec![ChunkPayload {
-                chunk_id: chunk_id.to_string(),
-                chunk_index: 0,
-                total_chunks: 2,
-                original_msg_type: 0,
-                content: "partial".to_string(),
-                date: None,
-            }],
-            first_received_ts: old_ts,
-            date: None,
-        };
-        let state = state_with_buffer(&key, &old_buf);
-
-        // Deliver a second chunk that would otherwise complete the message.
-        let cp1 = ChunkPayload {
-            chunk_id: chunk_id.to_string(),
-            chunk_index: 1,
-            total_chunks: 2,
-            original_msg_type: 0,
-            content: "more".to_string(),
-                date: None,
-        };
-        let mut rr = empty_run_return();
-        rr.msgs.push(make_chunk_msg_with_sender(&cp1, sender_pubkey));
-
-        let result = handle_chunks(rr, &state, "").unwrap();
-
-        // TimedOut: no message, error set.
-        assert!(result.msgs.is_empty(), "timed-out buffer must not produce a message");
-        assert!(result.error.is_some(), "timed-out buffer must set an error");
-
-        // No confirmation on timeout.
-        CONFIRMATION_CALLS.with(|calls| {
-            assert!(calls.borrow().is_empty(), "no confirmation must be sent on TimedOut");
-        });
-    }
-
-    // Test CONF-4: confirmation is sent on the restore/batch-fetch path.
-    // Simulates a two-call sequence (first call: fragment 0, second call: fragment 1
-    // plus persisted state from first call).  Confirmation must fire on the second call.
-    #[test]
-    fn test_confirmation_sent_on_restore_batch_fetch_path() {
-        CONFIRMATION_CALLS.with(|calls| calls.borrow_mut().clear());
-
-        let chunk_id = "1706399004004";
-        let sender_pubkey = "03abcdef1234567890abcdef1234567890abcdef1234567890abcdef99887766";
-
-        let cp0 = ChunkPayload {
-            chunk_id: chunk_id.to_string(),
-            chunk_index: 0,
-            total_chunks: 2,
-            original_msg_type: 0,
-            content: "first_".to_string(),
-                date: None,
-        };
-        let cp1 = ChunkPayload {
-            chunk_id: chunk_id.to_string(),
-            chunk_index: 1,
-            total_chunks: 2,
-            original_msg_type: 0,
-            content: "second".to_string(),
-                date: None,
-        };
-
-        // --- First "fetch" call: only fragment 0 arrives ---
-        let mut rr1 = empty_run_return();
-        rr1.msgs.push(make_chunk_msg_with_sender(&cp0, sender_pubkey));
-        let result1 = handle_chunks(rr1, &[], "").unwrap();
-        assert!(result1.msgs.is_empty(), "first call: not complete yet");
-        let persisted = result1.state_mp.expect("first call must return state_mp");
-
-        // No confirmation yet.
-        CONFIRMATION_CALLS.with(|calls| {
-            assert!(calls.borrow().is_empty(), "no confirmation on incomplete first call");
-        });
-
-        // --- Second "fetch" call (simulating restore/batch-fetch): fragment 1 arrives ---
-        let mut rr2 = empty_run_return();
-        rr2.msgs.push(make_chunk_msg_with_sender(&cp1, sender_pubkey));
-        let result2 = handle_chunks(rr2, &persisted, "").unwrap();
-
-        assert_eq!(result2.msgs.len(), 1, "second call: message must be reassembled");
-        assert_eq!(result2.msgs[0].message.as_deref(), Some("first_second"));
-
-        // Exactly one confirmation on the second (completing) call.
-        CONFIRMATION_CALLS.with(|calls| {
-            let calls = calls.borrow();
-            assert_eq!(calls.len(), 1, "exactly one confirmation on the completing call");
-            assert_eq!(calls[0].0, sender_pubkey);
-            assert_eq!(calls[0].1, chunk_id);
-        });
-    }
-
-    // Test CONF-5: the reassembled message's tag preserves the real underlying
-    // transport tag from the last received chunk — it must NOT be overridden to chunk_id.
-    // This is the receiver-side companion to the split_and_send fix.
-    #[test]
-    fn test_reassembled_msg_tag_preserves_transport_tag() {
-        CONFIRMATION_CALLS.with(|calls| calls.borrow_mut().clear());
-
+    fn test_reassembled_msg_tag_is_relay_tracked_transport_tag() {
         let chunk_id = "1706399005005";
-        let sender_pubkey = "03aabbccdd1234567890aabbccdd1234567890aabbccdd1234567890aabbccdd";
-        let transport_tag = "real_transport_tag_from_last_chunk";
+        let transport_tag = "relay_transport_tag_abc123";
 
         let cp0 = ChunkPayload {
             chunk_id: chunk_id.to_string(),
@@ -2645,7 +2203,7 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 0,
             content: "part1_".to_string(),
-                date: None,
+            date: None,
         };
         let cp1 = ChunkPayload {
             chunk_id: chunk_id.to_string(),
@@ -2653,11 +2211,10 @@ mod tests {
             total_chunks: 2,
             original_msg_type: 0,
             content: "part2".to_string(),
-                date: None,
+            date: None,
         };
 
-        // Give the second (last) chunk a transport-level tag — this must be
-        // preserved on the reassembled msg, not overridden to chunk_id.
+        // Build the last chunk msg with a real relay transport tag.
         let meta1 = ChunkMeta {
             chunk_id: cp1.chunk_id.clone(),
             chunk_index: cp1.chunk_index,
@@ -2670,16 +2227,12 @@ mod tests {
             "metadata": meta1_json,
         })
         .to_string();
-        let sender_json = format!(
-            r#"{{"pubkey":"{}","alias":"","photo_url":"","person":"","confirmed":false}}"#,
-            sender_pubkey
-        );
         let last_chunk_msg = Msg {
             r#type: Some(CHUNK_TYPE),
             message: Some(msg1_json),
-            sender: Some(sender_json),
+            sender: None,
             uuid: None,
-            tag: Some(transport_tag.to_string()), // <-- real transport tag; must be preserved
+            tag: Some(transport_tag.to_string()),
             index: None,
             msat: None,
             timestamp: None,
@@ -2690,94 +2243,31 @@ mod tests {
         };
 
         let mut rr = empty_run_return();
-        rr.msgs.push(make_chunk_msg_with_sender(&cp0, sender_pubkey));
+        rr.msgs.push(make_chunk_msg(&cp0));
         rr.msgs.push(last_chunk_msg);
 
         let result = handle_chunks(rr, &[], "").unwrap();
 
-        assert_eq!(result.msgs.len(), 1);
+        assert_eq!(result.msgs.len(), 1, "message must be reassembled");
         let m = &result.msgs[0];
-        // tag must be the real underlying transport tag, not chunk_id.
+        // The relay-tag confirmation path depends on this being the real transport tag.
         assert_eq!(
             m.tag.as_deref(),
             Some(transport_tag),
-            "reassembled msg tag must preserve the real underlying transport tag, not chunk_id"
+            "reassembled msg tag must be the relay-tracked transport tag from the last chunk"
         );
-        assert_ne!(
-            m.tag.as_deref(),
-            Some(chunk_id),
-            "reassembled msg tag must NOT be chunk_id"
-        );
+        // uuid carries the raw chunk_id string (from ChunkPayload.chunk_id) for dedup/reply.
         assert_eq!(
             m.uuid.as_deref(),
             Some(chunk_id),
-            "reassembled msg uuid must still be chunk_id"
+            "reassembled msg uuid must be the chunk_id"
         );
-    }
-
-    // Test CONF-6: no confirmation when sender JSON is missing or has no pubkey.
-    #[test]
-    fn test_no_confirmation_when_sender_missing() {
-        CONFIRMATION_CALLS.with(|calls| calls.borrow_mut().clear());
-
-        let chunk_id = "1706399006006";
-
-        // Two chunks with no sender field set (simulates a path where sender is absent).
-        let cp0 = ChunkPayload {
-            chunk_id: chunk_id.to_string(),
-            chunk_index: 0,
-            total_chunks: 2,
-            original_msg_type: 0,
-            content: "a".to_string(),
-                date: None,
-        };
-        let cp1 = ChunkPayload {
-            chunk_id: chunk_id.to_string(),
-            chunk_index: 1,
-            total_chunks: 2,
-            original_msg_type: 0,
-            content: "b".to_string(),
-                date: None,
-        };
-
-        let mut rr = empty_run_return();
-        // Use plain make_chunk_msg (no sender) for both.
-        rr.msgs.push(make_chunk_msg(&cp0));
-        rr.msgs.push(make_chunk_msg(&cp1));
-
-        let result = handle_chunks(rr, &[], "").unwrap();
-
-        // Message still reassembles correctly despite missing sender.
-        assert_eq!(result.msgs.len(), 1, "message must still reassemble even without sender");
-
-        // No confirmation must be attempted when sender pubkey is unavailable.
-        CONFIRMATION_CALLS.with(|calls| {
-            assert!(
-                calls.borrow().is_empty(),
-                "no confirmation must be sent when sender pubkey is absent"
-            );
-        });
-    }
-
-    // Test CONF-7: extract_sender_pubkey correctly parses SenderInfo JSON.
-    #[test]
-    fn test_extract_sender_pubkey_parses_correctly() {
-        let pubkey = "03abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678";
-        let json = format!(
-            r#"{{"pubkey":"{}","alias":"Alice","photo_url":"","person":"","confirmed":true}}"#,
-            pubkey
+        // tag must never be overridden to chunk_id — it must stay as the relay transport tag.
+        assert_ne!(
+            m.tag.as_deref(),
+            m.uuid.as_deref(),
+            "reassembled msg tag must NOT equal uuid (chunk_id)"
         );
-        assert_eq!(extract_sender_pubkey(&json), Some(pubkey.to_string()));
-
-        // Missing pubkey field → None.
-        assert_eq!(extract_sender_pubkey(r#"{"alias":"Bob"}"#), None);
-
-        // Malformed JSON → None.
-        assert_eq!(extract_sender_pubkey("not json"), None);
-
-        // Empty pubkey string → Some("") (field present but empty).
-        // send_chunk_confirmation guards against this at call time (the `!pk.is_empty()` check).
-        assert_eq!(extract_sender_pubkey(r#"{"pubkey":""}"#), Some("".to_string()));
     }
 
     // ---- Date field tests (new) ----
