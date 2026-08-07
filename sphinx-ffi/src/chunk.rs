@@ -12,8 +12,11 @@ pub(crate) const MAX_MSG_LEN: usize = 869;
 /// wrapper framing (~26 B) plus the double-encoded ChunkMeta string value
 /// (~117 B — raw ChunkMeta JSON is ~103 B, plus ~14 B of JSON string-escaping
 /// when embedded as a string value inside the outer object), plus the worst-case
-/// `,"date":` field (8 B key + comma + colon + up to 20 digits for u64::MAX = 28 B).
-const APP_OVERHEAD_BYTES: usize = 171;
+/// `,"date":` field (8 B key + comma + colon + up to 20 digits for u64::MAX = 28 B),
+/// plus the worst-case `chunk_id` length: `make_chunk_id` hex-encodes `unique_time`
+/// (max 16 chars per `split_and_send`'s debug_assert) → 32 hex chars (+16 B over
+/// the previous 16-char decimal representation).
+const APP_OVERHEAD_BYTES: usize = 187;
 
 /// Fixed non-identity protocol overhead added by the sphinx crate on every send:
 /// sender + recipient compressed pubkeys (2 × 33 B = 66 B), encrypted tag (~48 B),
@@ -37,7 +40,7 @@ const ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES: usize = 50;
 /// Total reserved overhead per chunk used for the static trigger-check invariant.
 /// = FIXED_PROTOCOL_OVERHEAD_BYTES + ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES + APP_OVERHEAD_BYTES
 const MAX_OVERHEAD_BYTES: usize =
-    FIXED_PROTOCOL_OVERHEAD_BYTES + ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES + APP_OVERHEAD_BYTES; // = 443
+    FIXED_PROTOCOL_OVERHEAD_BYTES + ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES + APP_OVERHEAD_BYTES; // = 487
 
 /// Per-chunk content slice size limit. `split_and_send()` uses this value to decide
 /// how many bytes of `msg_json` content to pack into each individual chunk when a
@@ -168,14 +171,19 @@ fn now_secs() -> u64 {
 
 /// Generate a stable chunk_id from unique_time (same for all chunks in a send call).
 ///
-/// Using the full `unique_time` string (a compact ≤16-char numeric timestamp) directly
-/// as the `chunk_id` avoids the 8-byte-prefix collision that occurred when two sends
-/// shared the same leading characters (e.g. `1785847310885` vs `1785847372513`).
-/// Returning the string as-is is equal-or-smaller in wire size compared to the old
-/// `hex::encode(&bytes[..8])` approach (~16 hex chars), so no budget constant changes
-/// are needed.
+/// `hex::encode(unique_time.as_bytes())` guarantees an even-length, valid hex string
+/// for any input, which is required because the external `sphinx` crate calls
+/// `hex::decode(replyUUID)` when a user replies to a chunked message — odd-length
+/// decimal timestamp strings (e.g. 13-digit timestamps) are invalid hex and would
+/// cause "Odd number of digits" errors.
+///
+/// Using the full `unique_time` string (not a truncated prefix) avoids the 8-byte-prefix
+/// collision that occurred when two sends shared the same leading characters
+/// (e.g. `1785847310885` vs `1785847372513`). `hex::encode` doubles the length
+/// (2 hex chars per input byte), so a worst-case 16-char `unique_time` produces a
+/// 32-char `chunk_id` — accounted for in `APP_OVERHEAD_BYTES`.
 fn make_chunk_id(unique_time: &str) -> String {
-    unique_time.to_string()
+    hex::encode(unique_time.as_bytes())
 }
 
 /// Merge a state_mp delta (returned by bindings::send) into the running full_state map.
@@ -1966,19 +1974,40 @@ mod tests {
     }
 
     // Test MCI-2: the chunk_id produced from the longest legal unique_time
-    // (≤16 chars per the existing debug_assert) must not exceed 16 characters,
-    // confirming the fix does not inflate per-chunk wire overhead beyond what
-    // APP_OVERHEAD_BYTES / MAX_OVERHEAD_BYTES budget constants assume.
+    // (≤16 chars per the existing debug_assert) must be exactly 32 characters
+    // (hex::encode doubles length: 16 chars × 2 = 32 hex chars), confirming
+    // APP_OVERHEAD_BYTES accounts for the correct worst-case chunk_id length.
     #[test]
     fn test_make_chunk_id_does_not_exceed_wire_budget() {
         // Longest legal unique_time per the existing debug_assert (<=16 chars).
         let worst_case = make_chunk_id("9999999999999999");
-        assert!(
-            worst_case.len() <= 16,
-            "chunk_id must not exceed the length the current APP_OVERHEAD_BYTES/MAX_OVERHEAD_BYTES \
-             budget assumes, got len={}",
+        assert_eq!(
+            worst_case.len(),
+            "9999999999999999".len() * 2,
+            "chunk_id must be exactly 32 hex chars for a 16-char unique_time (hex::encode doubles length), \
+             got len={}",
             worst_case.len()
         );
+    }
+
+    // Test MCI-3: chunk_id must always be valid even-length hex for any input,
+    // satisfying the external sphinx crate's hex::decode(replyUUID) requirement.
+    #[test]
+    fn test_make_chunk_id_is_valid_even_length_hex() {
+        for input in ["1785940616069", "", "9999999999999999"] {
+            let id = make_chunk_id(input);
+            assert_eq!(
+                id.len() % 2,
+                0,
+                "chunk_id must have even length for hex::decode, input={}",
+                input
+            );
+            assert!(
+                hex::decode(&id).is_ok(),
+                "chunk_id must be valid hex, input={}",
+                input
+            );
+        }
     }
 
     // ---- split_and_send merge-field tests ----
@@ -3001,11 +3030,12 @@ mod tests {
             budget_val
         );
 
-        // APP_OVERHEAD_BYTES must equal 171 (143 base + 28 for date field).
+        // APP_OVERHEAD_BYTES must equal 187 (171 prior value + 16 for chunk_id
+        // hex-encoding: worst-case 16-char decimal unique_time → 32-char hex = +16 B).
         assert_eq!(
             APP_OVERHEAD_BYTES,
-            171,
-            "APP_OVERHEAD_BYTES must equal 171 after the 28-byte date-field bump"
+            187,
+            "APP_OVERHEAD_BYTES must equal 187 after the chunk_id hex-encoding bump (+16 B: 16-char decimal → 32-char hex)"
         );
     }
 
