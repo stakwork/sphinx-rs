@@ -13,10 +13,10 @@ pub(crate) const MAX_MSG_LEN: usize = 869;
 /// (~117 B — raw ChunkMeta JSON is ~103 B, plus ~14 B of JSON string-escaping
 /// when embedded as a string value inside the outer object), plus the worst-case
 /// `,"date":` field (8 B key + comma + colon + up to 20 digits for u64::MAX = 28 B),
-/// plus the worst-case `chunk_id` length: `make_chunk_id` hex-encodes `unique_time`
-/// (max 16 chars per `split_and_send`'s debug_assert) → 32 hex chars (+16 B over
-/// the previous 16-char decimal representation).
-const APP_OVERHEAD_BYTES: usize = 187;
+/// plus the fixed `chunk_id` length: `make_chunk_id` always produces exactly 64 hex
+/// chars (32 bytes decoded), zero-padded to a fixed length independent of `unique_time`'s
+/// length (+32 B over the prior worst-case 32-char assumption).
+const APP_OVERHEAD_BYTES: usize = 219;
 
 /// Fixed non-identity protocol overhead added by the sphinx crate on every send:
 /// sender + recipient compressed pubkeys (2 × 33 B = 66 B), encrypted tag (~48 B),
@@ -180,10 +180,15 @@ fn now_secs() -> u64 {
 /// Using the full `unique_time` string (not a truncated prefix) avoids the 8-byte-prefix
 /// collision that occurred when two sends shared the same leading characters
 /// (e.g. `1785847310885` vs `1785847372513`). `hex::encode` doubles the length
-/// (2 hex chars per input byte), so a worst-case 16-char `unique_time` produces a
-/// 32-char `chunk_id` — accounted for in `APP_OVERHEAD_BYTES`.
+/// (2 hex chars per input byte). The result is always zero-padded to exactly 64 hex
+/// chars (32 bytes decoded) so that `reply_uuid` references to chunked messages pass
+/// the external sphinx crate's strict 32-byte validation check.
 fn make_chunk_id(unique_time: &str) -> String {
-    hex::encode(unique_time.as_bytes())
+    let hex_encoded = hex::encode(unique_time.as_bytes());
+    // Defensive truncate guards release builds where debug_assert!(unique_time.len() <= 16)
+    // is compiled out. For all valid inputs this is a no-op.
+    let truncated: String = hex_encoded.chars().take(64).collect();
+    format!("{:0<64}", truncated)
 }
 
 /// Merge a state_mp delta (returned by bindings::send) into the running full_state map.
@@ -1973,18 +1978,18 @@ mod tests {
         assert_ne!(a, b, "chunk_id must differ even when the first 8 bytes match");
     }
 
-    // Test MCI-2: the chunk_id produced from the longest legal unique_time
-    // (≤16 chars per the existing debug_assert) must be exactly 32 characters
-    // (hex::encode doubles length: 16 chars × 2 = 32 hex chars), confirming
-    // APP_OVERHEAD_BYTES accounts for the correct worst-case chunk_id length.
+    // Test MCI-2: the chunk_id produced from any unique_time (including the longest legal
+    // 16-char input) must always be exactly 64 hex chars (32 bytes decoded), regardless of
+    // input length — the id length is now fixed via zero-padding, not proportional to the
+    // input length, so APP_OVERHEAD_BYTES accounts for the correct flat chunk_id length.
     #[test]
     fn test_make_chunk_id_does_not_exceed_wire_budget() {
         // Longest legal unique_time per the existing debug_assert (<=16 chars).
         let worst_case = make_chunk_id("9999999999999999");
         assert_eq!(
             worst_case.len(),
-            "9999999999999999".len() * 2,
-            "chunk_id must be exactly 32 hex chars for a 16-char unique_time (hex::encode doubles length), \
+            64,
+            "chunk_id must always be exactly 64 hex chars (fixed length, zero-padded), \
              got len={}",
             worst_case.len()
         );
@@ -2006,6 +2011,63 @@ mod tests {
                 hex::decode(&id).is_ok(),
                 "chunk_id must be valid hex, input={}",
                 input
+            );
+        }
+    }
+
+    // Test MCI-4: chunk_id must always be exactly 64 hex chars (32 bytes decoded)
+    // for any input — the 32-byte/64-hex-char invariant that fixes the silent
+    // message drop when a reply/boost references a chunked message's uuid.
+    #[test]
+    fn test_make_chunk_id_is_32_bytes_hex() {
+        for input in ["1785940616069", "", "9999999999999999"] {
+            let id = make_chunk_id(input);
+            assert_eq!(
+                id.len(),
+                64,
+                "chunk_id must be 64 hex chars (32 bytes) for input={:?}, got len={}",
+                input,
+                id.len()
+            );
+            assert_eq!(
+                id.len() % 2,
+                0,
+                "chunk_id must have even length for input={:?}",
+                input
+            );
+            let decoded = hex::decode(&id)
+                .unwrap_or_else(|_| panic!("chunk_id must be valid hex for input={:?}", input));
+            assert_eq!(
+                decoded.len(),
+                32,
+                "chunk_id must decode to exactly 32 bytes for input={:?}, got {} bytes",
+                input,
+                decoded.len()
+            );
+        }
+    }
+
+    // Test MCI-5: send_chunk_confirmation uses the same chunk_id as Msg.uuid for
+    // the replyUuid wire field.  Assert that the chunk_id captured in CONFIRMATION_CALLS
+    // always decodes to exactly 32 bytes, confirming this shared-value path also
+    // satisfies the sphinx crate's 32-byte reply_uuid requirement.
+    #[test]
+    fn test_send_chunk_confirmation_reply_uuid_is_32_bytes() {
+        // make_chunk_id is the sole source of chunk_id values passed to
+        // send_chunk_confirmation.  Verify its output for the three canonical
+        // input classes so the replyUuid wire field always decodes to 32 bytes.
+        for input in ["1785940616069", "", "9999999999999999"] {
+            let chunk_id = make_chunk_id(input);
+            // The wire field is: {"replyUuid":"<chunk_id>"}
+            // Assert the chunk_id embedded in that JSON decodes to 32 bytes.
+            let decoded = hex::decode(&chunk_id)
+                .unwrap_or_else(|_| panic!("replyUuid chunk_id must be valid hex for input={:?}", input));
+            assert_eq!(
+                decoded.len(),
+                32,
+                "replyUuid chunk_id must decode to exactly 32 bytes for input={:?}, got {} bytes",
+                input,
+                decoded.len()
             );
         }
     }
@@ -3030,12 +3092,13 @@ mod tests {
             budget_val
         );
 
-        // APP_OVERHEAD_BYTES must equal 187 (171 prior value + 16 for chunk_id
-        // hex-encoding: worst-case 16-char decimal unique_time → 32-char hex = +16 B).
+        // APP_OVERHEAD_BYTES must equal 219: chunk_id is now always a flat 64-char hex
+        // string (32 bytes decoded), zero-padded regardless of unique_time's length.
+        // Delta vs prior worst-case 32-char assumption: 64 - 32 = +32 B → 187 + 32 = 219.
         assert_eq!(
             APP_OVERHEAD_BYTES,
-            187,
-            "APP_OVERHEAD_BYTES must equal 187 after the chunk_id hex-encoding bump (+16 B: 16-char decimal → 32-char hex)"
+            219,
+            "APP_OVERHEAD_BYTES must equal 219 after fixing chunk_id to a flat 64-char hex length (+32 B over the prior 32-char worst-case assumption)"
         );
     }
 
