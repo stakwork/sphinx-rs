@@ -269,11 +269,21 @@ pub fn send(
     amt_msat: u64,
     is_tribe: bool,
 ) -> Result<RunReturn> {
-    // Whole-message wire-limit check: if the full msg_json exceeds the single-send
-    // wire limit (MAX_MSG_LEN = 869 bytes), split it into chunks. This is a distinct
-    // concern from the per-chunk content budget computed by compute_available_content_bytes()
-    // inside split_and_send() — do not conflate the two.
-    if msg_json.len() > chunk::MAX_MSG_LEN {
+    // Whole-message wire-limit check: if the full msg_json would overflow the wire
+    // limit after the sphinx crate's create_onion() adds its onion-wrap overhead
+    // (sender pubkey, route_hint, contact_pubkey, alias, photo_url), split into chunks.
+    // The effective limit is dynamic per-message: MAX_MSG_LEN minus fixed protocol
+    // overhead, route-hint allowance, and the sender's real identity byte cost.
+    // See chunk::should_chunk_for_send() for the full accounting and known residual gaps.
+    // NOTE: FFI stdout/stderr is not reliably surfaced on iOS/Android host apps —
+    // the diagnostic below is a best-effort dev log only.
+    if chunk::should_chunk_for_send(msg_json.len(), &my_alias, &my_img) {
+        eprintln!(
+            "[sphinx-ffi] send: chunking triggered msg_json_len={} alias_len={} img_len={}",
+            msg_json.len(),
+            my_alias.len(),
+            my_img.len(),
+        );
         return chunk::split_and_send(
             &seed,
             &unique_time,

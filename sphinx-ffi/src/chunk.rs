@@ -63,8 +63,41 @@ pub const CHUNK_CONTENT_THRESHOLD: usize = 450; // 450 + 443 = 893 — intention
 ///     - ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES - sender_overhead
 /// computed at send time via `compute_sender_overhead()` and the checked_sub chain
 /// in `split_and_send()`. The trigger for chunking itself is in `auto::send()` and
-/// compares the full `msg_json` length against `MAX_MSG_LEN` — a separate concern.
+/// now calls `should_chunk_for_send()` — a separate concern that reads the same
+/// constants (FIXED_PROTOCOL_OVERHEAD_BYTES, ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES)
+/// without altering this guard's arithmetic.
 const _: () = assert!(CHUNK_CONTENT_THRESHOLD + MAX_OVERHEAD_BYTES <= MAX_MSG_LEN + 500);
+
+/// Decide whether a given `msg_json` length should be split via `split_and_send()`
+/// instead of sent whole. Uses the same overhead components that
+/// `compute_available_content_bytes()` / `split_and_send()` trust for per-chunk
+/// budgeting — keeping exactly one overhead model in the file.
+///
+/// Component coverage:
+/// - `FIXED_PROTOCOL_OVERHEAD_BYTES` (250 B): fixed cryptographic/pubkey/signature
+///   cost added by the sphinx crate's `create_onion()` on every send (sender pubkey,
+///   recipient pubkey, encrypted tag, uuid, Schnorr signature, JSON framing).
+/// - `ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES` (50 B): fixed allowance for the route
+///   hint embedded in every send. `contact_pubkey` and the actual route_hint are NOT
+///   available inside `send()`, so they remain covered by this and
+///   `FIXED_PROTOCOL_OVERHEAD_BYTES` as a conservative estimate — the same caveat
+///   already documented on `ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES` applies here.
+///   Resolving this gap (real measurement of onion-wrap bytes against the pinned
+///   sphinx crate rev) is a documented follow-up, not addressed by this fix.
+/// - `compute_sender_overhead(my_alias, my_img)`: dynamic JSON byte cost of the
+///   sender's identity fields (alias + photo URL) that `create_onion()` appends
+///   after the msg_json length check — scales with real sender data rather than a
+///   static guess.
+///
+/// NOTE: FFI stdout/stderr is not reliably surfaced to iOS/Android host-app log
+/// pipelines — any `eprintln!` at the call site is a best-effort dev diagnostic only.
+pub(crate) fn should_chunk_for_send(msg_len: usize, my_alias: &str, my_img: &str) -> bool {
+    let effective_limit = MAX_MSG_LEN
+        .saturating_sub(FIXED_PROTOCOL_OVERHEAD_BYTES)
+        .saturating_sub(ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES)
+        .saturating_sub(compute_sender_overhead(my_alias, my_img));
+    msg_len > effective_limit
+}
 
 /// Probe struct used only to measure the JSON byte length of the sender's
 /// identity fields (alias + profile photo URL). This is a deliberate approximation:
@@ -1305,39 +1338,298 @@ mod tests {
         assert!(over_threshold.len() > CHUNK_CONTENT_THRESHOLD);
     }
 
-    // Test N4b: auto.rs::send() chunking trigger now uses MAX_MSG_LEN (869), not
-    // CHUNK_CONTENT_THRESHOLD. Messages at or below 869 bytes must NOT chunk; messages
-    // over 869 bytes must chunk. The 450-byte case is the key regression: previously it
-    // incorrectly triggered chunking against the old 450-byte threshold.
+    // Test N4b: auto.rs::send() chunking trigger now uses should_chunk_for_send(), which
+    // subtracts the sender's real identity overhead from MAX_MSG_LEN to produce an effective
+    // limit. The 450-byte case is the key regression guard: previously it incorrectly
+    // triggered chunking against the old 450-byte threshold; the new trigger must NOT
+    // fire for short messages.
     #[test]
     fn test_send_chunking_trigger_uses_max_msg_len() {
-        // 450 bytes: old threshold — must no longer trigger chunking.
+        // Representative sender identity fixture used throughout this test.
+        let alias = "Alice";
+        let img = "https://example.com/avatar.jpg";
+
+        // 450 bytes: old threshold — must no longer trigger chunking even under the new trigger.
+        // Regression: previously chunked at 450 bytes (wrong old threshold).
         assert!(
-            !("a".repeat(450).len() > MAX_MSG_LEN),
+            !should_chunk_for_send("a".repeat(450).len(), alias, img),
             "450-byte message must NOT trigger chunking (regression: old threshold was 450)"
         );
-        // 500 bytes: between old and new threshold — must not trigger chunking.
+        // 100 bytes: short message well under any reasonable limit — must never chunk.
         assert!(
-            !("a".repeat(500).len() > MAX_MSG_LEN),
-            "500-byte message must NOT trigger chunking"
+            !should_chunk_for_send("a".repeat(100).len(), alias, img),
+            "100-byte message must NOT trigger chunking"
         );
-        // 869 bytes: exact wire limit boundary — must not chunk (uses >, not >=).
+        // Exact effective limit: must not chunk (uses >, not >=).
+        let effective_limit = MAX_MSG_LEN
+            .saturating_sub(FIXED_PROTOCOL_OVERHEAD_BYTES)
+            .saturating_sub(ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES)
+            .saturating_sub(compute_sender_overhead(alias, img));
         assert!(
-            !("a".repeat(869).len() > MAX_MSG_LEN),
-            "869-byte message (exact MAX_MSG_LEN) must NOT trigger chunking"
+            !should_chunk_for_send(effective_limit, alias, img),
+            "message exactly at effective limit must NOT trigger chunking"
         );
-        // 870 bytes: one over the wire limit — must chunk.
+        // One byte over effective limit: must chunk.
         assert!(
-            "a".repeat(870).len() > MAX_MSG_LEN,
-            "870-byte message must trigger chunking"
+            should_chunk_for_send(effective_limit + 1, alias, img),
+            "message one byte over effective limit must trigger chunking"
         );
-        // 900 bytes: well over the wire limit — must still chunk.
+        // 826 bytes: confirmed repro (attachment + ~400-char caption + tz metadata) —
+        // must now trigger chunking. Under the old raw-MAX_MSG_LEN trigger it would NOT have
+        // chunked (826 <= 869), but with the overhead subtraction it correctly does.
         assert!(
-            "a".repeat(900).len() > MAX_MSG_LEN,
-            "900-byte message must trigger chunking"
+            should_chunk_for_send(826, alias, img),
+            "826-byte repro message must trigger chunking with the new trigger"
         );
-        // Verify MAX_MSG_LEN itself is 869.
+        // Verify MAX_MSG_LEN itself is still 869 (regression guard against accidental change).
         assert_eq!(MAX_MSG_LEN, 869, "MAX_MSG_LEN must equal 869");
+    }
+
+    // Test NEW-TRIGGER-1: confirmed repro — attachment + ~400-char caption + tz metadata
+    // (~826-byte msg_json) with representative alias/photo_url must trigger chunking.
+    #[test]
+    fn test_should_chunk_for_send_repro_826_bytes() {
+        // Representative sender: short alias, typical profile image URL.
+        let alias = "Alice";
+        let img = "https://sphinx.chat/static/alice_avatar.png";
+        // 826-byte payload: the confirmed failing repro case (attachment + caption + metadata).
+        // Under the old raw-MAX_MSG_LEN (869) check this was NOT chunked → msg too long error.
+        // With the new overhead-aware trigger it MUST be chunked.
+        let msg_len = 826;
+        assert!(
+            should_chunk_for_send(msg_len, alias, img),
+            "826-byte attachment+caption+metadata repro must trigger chunking (was: msg too long)"
+        );
+    }
+
+    // Test NEW-TRIGGER-2: regression guard — a short, previously-passing message with the
+    // same sender identity must NOT trigger unnecessary chunking.
+    #[test]
+    fn test_should_chunk_for_send_short_message_no_chunk() {
+        let alias = "Alice";
+        let img = "https://sphinx.chat/static/alice_avatar.png";
+        // 80 bytes: a typical short text message; must always send whole.
+        assert!(
+            !should_chunk_for_send(80, alias, img),
+            "short 80-byte message must NOT trigger chunking (regression guard)"
+        );
+        // 200 bytes: slightly longer but still well within any sane effective limit.
+        assert!(
+            !should_chunk_for_send(200, alias, img),
+            "200-byte message must NOT trigger chunking"
+        );
+    }
+
+    // Test NEW-TRIGGER-3: boundary — one byte below and one byte above the computed
+    // effective limit for a fixed alias/img combination.
+    #[test]
+    fn test_should_chunk_for_send_boundary() {
+        let alias = "TestUser";
+        let img = "https://cdn.example.com/avatar.jpg";
+        let effective_limit = MAX_MSG_LEN
+            .saturating_sub(FIXED_PROTOCOL_OVERHEAD_BYTES)
+            .saturating_sub(ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES)
+            .saturating_sub(compute_sender_overhead(alias, img));
+        // One below: must NOT chunk.
+        if effective_limit > 0 {
+            assert!(
+                !should_chunk_for_send(effective_limit - 1, alias, img),
+                "msg_len = effective_limit - 1 must NOT trigger chunking"
+            );
+        }
+        // Exact limit: must NOT chunk (> not >=).
+        assert!(
+            !should_chunk_for_send(effective_limit, alias, img),
+            "msg_len = effective_limit must NOT trigger chunking (uses >, not >=)"
+        );
+        // One above: MUST chunk.
+        assert!(
+            should_chunk_for_send(effective_limit + 1, alias, img),
+            "msg_len = effective_limit + 1 must trigger chunking"
+        );
+    }
+
+    // Test NEW-TRIGGER-4: the effective limit scales with alias/img length — a sender with
+    // a very long alias gets a lower effective limit and therefore chunks sooner.
+    #[test]
+    fn test_should_chunk_for_send_scales_with_alias_length() {
+        let img = "";
+        let short_alias = "Bob";
+        let long_alias = "A".repeat(200);
+
+        let short_limit = MAX_MSG_LEN
+            .saturating_sub(FIXED_PROTOCOL_OVERHEAD_BYTES)
+            .saturating_sub(ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES)
+            .saturating_sub(compute_sender_overhead(short_alias, img));
+        let long_limit = MAX_MSG_LEN
+            .saturating_sub(FIXED_PROTOCOL_OVERHEAD_BYTES)
+            .saturating_sub(ROUTE_HINT_OVERHEAD_ALLOWANCE_BYTES)
+            .saturating_sub(compute_sender_overhead(&long_alias, img));
+
+        assert!(
+            short_limit > long_limit,
+            "short alias must produce a higher effective limit than a 200-char alias"
+        );
+        // A message length that sits between the two limits should chunk for the long-alias
+        // sender but not for the short-alias sender.
+        if short_limit > long_limit {
+            let mid = long_limit + 1;
+            assert!(
+                should_chunk_for_send(mid, &long_alias, img),
+                "mid-sized message must chunk for the long-alias sender"
+            );
+            assert!(
+                !should_chunk_for_send(mid, short_alias, img),
+                "same mid-sized message must NOT chunk for the short-alias sender"
+            );
+        }
+    }
+
+    // Test REASSEMBLY-1: messages in the newly-chunked 511–868 byte range (previously sent
+    // whole, now chunked by the lowered trigger) round-trip correctly through handle_chunks.
+    // Uses the same chunk_send_rr mock pattern: constructs RunReturn objects with type-34
+    // chunk msgs without calling the real bindings::send (which requires live crypto state).
+    // Verifies reassembly correctness holds at the new call frequency, not just for >869 B.
+    #[test]
+    fn test_reassembly_newly_chunked_range_511_bytes() {
+        // 511-byte payload: in the newly-chunked range (above effective limit, below old 869 B).
+        // Split into 2 chunks, both arrive in one handle_chunks call → reassembled.
+        let original = "x".repeat(511);
+        let chunk_id = "0000000000000000000000000000000000000000000000000000000000000abc".to_string();
+        let mid = original.len() / 2;
+
+        let cp0 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 0,
+            total_chunks: 2,
+            original_msg_type: 1,
+            content: original[..mid].to_string(),
+            date: Some(1706300100000),
+        };
+        let cp1 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 1,
+            total_chunks: 2,
+            original_msg_type: 1,
+            content: original[mid..].to_string(),
+            date: Some(1706300100000),
+        };
+
+        // Both chunks arrive together.
+        let mut rr = empty_run_return();
+        rr.msgs.push(make_chunk_msg(&cp0));
+        rr.msgs.push(make_chunk_msg(&cp1));
+        let result = handle_chunks(rr, &[], "").unwrap();
+
+        assert_eq!(result.msgs.len(), 1, "511-byte payload must reassemble into 1 message");
+        let msg = result.msgs[0].message.as_deref().expect("reassembled message must be Some");
+        assert!(
+            msg.contains(&original),
+            "reassembled content must contain the original 511-byte payload"
+        );
+    }
+
+    // Test REASSEMBLY-2: 700-byte payload — cross-call reassembly, second chunk arrives in a
+    // separate handle_chunks call (simulating real MQTT delivery batching).
+    #[test]
+    fn test_reassembly_newly_chunked_range_700_bytes_cross_call() {
+        let original = "m".repeat(700);
+        let chunk_id = "0000000000000000000000000000000000000000000000000000000000000def".to_string();
+        let mid = original.len() / 2;
+
+        let cp0 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 0,
+            total_chunks: 2,
+            original_msg_type: 2,
+            content: original[..mid].to_string(),
+            date: Some(1706300200000),
+        };
+        let cp1 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 1,
+            total_chunks: 2,
+            original_msg_type: 2,
+            content: original[mid..].to_string(),
+            date: Some(1706300200000),
+        };
+
+        // First chunk only — not yet reassembled.
+        let mut rr1 = empty_run_return();
+        rr1.msgs.push(make_chunk_msg(&cp0));
+        let r1 = handle_chunks(rr1, &[], "").unwrap();
+        assert!(r1.msgs.is_empty(), "partial 700-byte payload must not reassemble yet");
+        let state = r1.state_mp.expect("must have state after first chunk");
+
+        // Second chunk arrives — reassembly completes.
+        let mut rr2 = empty_run_return();
+        rr2.msgs.push(make_chunk_msg(&cp1));
+        let r2 = handle_chunks(rr2, &state, "").unwrap();
+        assert_eq!(r2.msgs.len(), 1, "700-byte payload must reassemble into 1 message on second call");
+        let msg = r2.msgs[0].message.as_deref().expect("reassembled message must be Some");
+        assert!(
+            msg.contains(&original),
+            "reassembled content must contain the original 700-byte payload"
+        );
+    }
+
+    // Test REASSEMBLY-3: 826-byte repro payload — attachment+caption+metadata size
+    // that triggered the confirmed 'msg too long' failure. Verifies end-to-end reassembly
+    // at the exact failure boundary.
+    #[test]
+    fn test_reassembly_newly_chunked_range_826_bytes_repro() {
+        let original = "a".repeat(826);
+        let chunk_id = "0000000000000000000000000000000000000000000000000000000000000ff0".to_string();
+        let third = original.len() / 3;
+
+        // 826 bytes → 3 chunks of ~276 bytes each.
+        let cp0 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 0,
+            total_chunks: 3,
+            original_msg_type: 4,
+            content: original[..third].to_string(),
+            date: Some(1706300826000),
+        };
+        let cp1 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 1,
+            total_chunks: 3,
+            original_msg_type: 4,
+            content: original[third..third * 2].to_string(),
+            date: Some(1706300826000),
+        };
+        let cp2 = ChunkPayload {
+            chunk_id: chunk_id.clone(),
+            chunk_index: 2,
+            total_chunks: 3,
+            original_msg_type: 4,
+            content: original[third * 2..].to_string(),
+            date: Some(1706300826000),
+        };
+
+        // Feed chunks one at a time to exercise stateful cross-call reassembly.
+        let mut rr1 = empty_run_return();
+        rr1.msgs.push(make_chunk_msg(&cp0));
+        let r1 = handle_chunks(rr1, &[], "").unwrap();
+        assert!(r1.msgs.is_empty());
+        let state1 = r1.state_mp.expect("state after chunk 0");
+
+        let mut rr2 = empty_run_return();
+        rr2.msgs.push(make_chunk_msg(&cp1));
+        let r2 = handle_chunks(rr2, &state1, "").unwrap();
+        assert!(r2.msgs.is_empty());
+        let state2 = r2.state_mp.expect("state after chunk 1");
+
+        let mut rr3 = empty_run_return();
+        rr3.msgs.push(make_chunk_msg(&cp2));
+        let r3 = handle_chunks(rr3, &state2, "").unwrap();
+        assert_eq!(r3.msgs.len(), 1, "826-byte repro payload must reassemble into 1 message");
+        let msg = r3.msgs[0].message.as_deref().expect("reassembled message must be Some");
+        assert!(
+            msg.contains(&original),
+            "reassembled content must contain the original 826-byte repro payload"
+        );
     }
 
     // Test N5: parity — given identical alias/img, compute_available_content_bytes returns
