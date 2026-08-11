@@ -720,6 +720,48 @@ pub fn get_msgs_counts(
         .into())
 }
 
+fn log_batch_msgs(tag: &str, rr: &RunReturn) {
+    eprintln!(
+        "[fetch-trace] fn={} msgs_len={} msgs_total={:?} rr_error={:?}",
+        tag,
+        rr.msgs.len(),
+        rr.msgs_total,
+        rr.error
+    );
+    for m in &rr.msgs {
+        let is_boost = m.r#type == Some(29);
+        let prefix = if is_boost {
+            "[boost-trace]"
+        } else {
+            "[fetch-trace]"
+        };
+        eprintln!(
+            "{} fn={} idx={:?} type={:?} uuid={:?} from_me={:?} sent_to={:?} error={:?} has_message={}",
+            prefix,
+            tag,
+            m.index,
+            m.r#type,
+            m.uuid,
+            m.from_me,
+            m.sent_to,
+            m.error,
+            m.message.is_some()
+        );
+        if m.r#type.is_none() && m.message.is_some() {
+            eprintln!(
+                "[fetch-trace] FALLBACK-SUSPECTED (parse_sphinx_msg likely failed) fn={} idx={:?}",
+                tag, m.index
+            );
+        }
+        if m.uuid.is_none() {
+            eprintln!(
+                "[fetch-trace] MISSING-UUID fn={} idx={:?} type={:?}",
+                tag, m.index, m.r#type
+            );
+        }
+    }
+}
+
 pub fn fetch_msgs_batch(
     seed: String,
     unique_time: String,
@@ -738,7 +780,10 @@ pub fn fetch_msgs_batch(
     )
     .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
     .into();
-    chunk::handle_chunks(rr, &full_state, &seed)
+    log_batch_msgs("fetch_msgs_batch_pre_chunk", &rr);
+    let result = chunk::handle_chunks(rr, &full_state, &seed)?;
+    log_batch_msgs("fetch_msgs_batch_post_chunk", &result);
+    Ok(result)
 }
 
 pub fn fetch_msgs_batch_per_contact(
@@ -761,7 +806,10 @@ pub fn fetch_msgs_batch_per_contact(
     )
     .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
     .into();
-    chunk::handle_chunks(rr, &full_state, &seed)
+    log_batch_msgs("fetch_msgs_batch_per_contact_pre_chunk", &rr);
+    let result = chunk::handle_chunks(rr, &full_state, &seed)?;
+    log_batch_msgs("fetch_msgs_batch_per_contact_post_chunk", &result);
+    Ok(result)
 }
 
 pub fn fetch_msgs_batch_okkey(
@@ -782,7 +830,10 @@ pub fn fetch_msgs_batch_okkey(
     )
     .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
     .into();
-    chunk::handle_chunks(rr, &full_state, &seed)
+    log_batch_msgs("fetch_msgs_batch_okkey_pre_chunk", &rr);
+    let result = chunk::handle_chunks(rr, &full_state, &seed)?;
+    log_batch_msgs("fetch_msgs_batch_okkey_post_chunk", &result);
+    Ok(result)
 }
 
 pub fn fetch_first_msgs_per_key(
@@ -793,7 +844,7 @@ pub fn fetch_first_msgs_per_key(
     limit: Option<u32>,
     reverse: Option<bool>,
 ) -> Result<RunReturn> {
-    Ok(bindings::fetch_first_msgs_per_key(
+    let rr: RunReturn = bindings::fetch_first_msgs_per_key(
         &seed,
         &unique_time,
         &full_state,
@@ -802,7 +853,9 @@ pub fn fetch_first_msgs_per_key(
         reverse,
     )
     .map_err(|e| SphinxError::FetchMsgsFailed { r: e.to_string() })?
-    .into())
+    .into();
+    log_batch_msgs("fetch_first_msgs_per_key", &rr);
+    Ok(rr)
 }
 
 pub fn fetch_payments(
