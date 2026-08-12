@@ -254,7 +254,35 @@ pub fn handle(
     )
     .map_err(|e| SphinxError::HandleFailed { r: e.to_string() })?
     .into();
-    chunk::handle_chunks(rr, &full_state, &seed)
+    let rr = chunk::handle_chunks(rr, &full_state, &seed)?;
+
+    eprintln!(
+        "[handle-trace] msgs_len={} rr.error={:?}",
+        rr.msgs.len(),
+        rr.error
+    );
+    for (i, m) in rr.msgs.iter().enumerate() {
+        let tag = if m.r#type == Some(29) {
+            "[boost-trace]"
+        } else {
+            "[handle-trace]"
+        };
+        eprintln!(
+            "{} idx={} type={:?} uuid={:?} from_me={:?} sent_to={:?} msg_error={:?} has_content={}",
+            tag, i, m.r#type, m.uuid, m.from_me, m.sent_to, m.error, m.message.is_some()
+        );
+        if m.r#type.is_none() && m.message.is_some() {
+            eprintln!(
+                "[handle-trace] ANOMALY idx={} type=None but message present (parse fallback path?)",
+                i
+            );
+        }
+        if m.uuid.is_none() {
+            eprintln!("[handle-trace] ANOMALY idx={} missing uuid", i);
+        }
+    }
+
+    Ok(rr)
 }
 
 pub fn send(
