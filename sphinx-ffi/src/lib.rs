@@ -19,6 +19,39 @@ use std::str::FromStr;
 #[cfg(not(feature = "wasm"))]
 uniffi::include_scaffolding!("sphinxrs");
 
+#[cfg(not(feature = "wasm"))]
+struct FfiLogger;
+
+#[cfg(not(feature = "wasm"))]
+impl log::Log for FfiLogger {
+    fn enabled(&self, _metadata: &log::Metadata) -> bool {
+        true
+    }
+    fn log(&self, record: &log::Record) {
+        // eprintln! is confirmed visible in the Xcode console (via AppLogger's
+        // stdout/stderr pipe capture on iOS/Mac).
+        eprintln!("[{}] {}: {}", record.level(), record.target(), record.args());
+    }
+    fn flush(&self) {}
+}
+
+#[cfg(not(feature = "wasm"))]
+static FFI_LOGGER: FfiLogger = FfiLogger;
+
+/// Installs the FFI logger backend so log::info!/debug!/warn! calls from this
+/// crate's dependency chain (including the pinned `sphinx` crate) become
+/// visible via eprintln!. `log::set_logger` can only succeed once
+/// process-wide; the Result is intentionally ignored (`let _ = ...`) so
+/// repeat calls are harmless no-ops -- do not "fix" this into a panic later.
+#[cfg(not(feature = "wasm"))]
+pub fn init_logs() {
+    let _ = log::set_logger(&FFI_LOGGER);
+    #[cfg(debug_assertions)]
+    log::set_max_level(log::LevelFilter::Debug);
+    #[cfg(not(debug_assertions))]
+    log::set_max_level(log::LevelFilter::Warn);
+}
+
 pub type Result<T> = std::result::Result<T, SphinxError>;
 
 #[derive(Debug, thiserror::Error)]

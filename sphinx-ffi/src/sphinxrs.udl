@@ -264,4 +264,5 @@ namespace sphinxrs {
   string id_from_macaroon(string macaroon);
   [Throws=SphinxError]
   string find_route(bytes state, string to_pubkey, string? route_hint, u64 amt_msat);
+  void init_logs();
 };
