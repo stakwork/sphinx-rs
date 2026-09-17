@@ -54,6 +54,26 @@ dictionary ParsedInvite {
     string? lsp_host;
 };
 
+dictionary ServerStatus {
+    boolean cln_ok;
+    boolean degraded;
+    string? reason;
+    u64 ts;
+};
+
+enum ServerHealth {
+    "Ok",
+    "Degraded",
+    "Unknown",
+};
+
+enum MixerErrorCode {
+    "ClnUnavailable",
+    "ClnTimeout",
+    "InsufficientBalance",
+    "Unknown",
+};
+
 dictionary RunReturn {
     sequence<Msg> msgs;
     u64? msgs_total;
@@ -264,4 +284,9 @@ namespace sphinxrs {
   string id_from_macaroon(string macaroon);
   [Throws=SphinxError]
   string find_route(bytes state, string to_pubkey, string? route_hint, u64 amt_msat);
+  [Throws=SphinxError]
+  ServerStatus parse_server_status(string payload);
+  ServerHealth evaluate_server_health(ServerStatus? last, u64 last_seen_ms, u64 now_ms, u64 interval_ms, u32 max_missed);
+  MixerErrorCode parse_mixer_error_code(string raw);
+  string server_status_topic();
 };
