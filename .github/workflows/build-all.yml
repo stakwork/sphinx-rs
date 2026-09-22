@@ -264,3 +264,8 @@ jobs:
             artifacts/macos-universal/universal-sphinxrs-mac.a
             artifacts/android-libraries/kotlin-libraries.zip
             artifacts/windows-libraries/windows-libraries.zip
+            artifacts/swift-bindings/sphinxrs.swift
+            artifacts/swift-bindings/sphinxrsFFI.h
+            artifacts/swift-bindings/sphinxrsFFI.modulemap
+            artifacts/kotlin-bindings/sphinxrs.kt
+          fail_on_unmatched_files: true
