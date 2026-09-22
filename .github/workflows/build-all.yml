@@ -7,6 +7,11 @@ on:
 env:
   CARGO_NET_GIT_FETCH_WITH_CLI: "true"
 
+# Grant contents:write so the build-apple/build-android jobs can Commit
+# regenerated UniFFI bindings back to the branch that triggered the release.
+permissions:
+  contents: write
+
 jobs:
   build-apple:
     runs-on: macos-latest
@@ -32,6 +37,29 @@ jobs:
         run: |
           cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language swift
           sed -i '' 's/module\ sphinxrsFFI/framework\ module\ sphinxrsFFI/' src/sphinxrsFFI.modulemap
+
+      - name: Commit and push regenerated Swift bindings
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- src/sphinxrs.swift src/sphinxrsFFI.h src/sphinxrsFFI.modulemap; then
+            echo "No changes to Swift bindings, skipping commit."
+          else
+            git add src/sphinxrs.swift src/sphinxrsFFI.h src/sphinxrsFFI.modulemap
+            git commit -m "chore: regenerate Swift UniFFI bindings for release ${{ github.event.release.tag_name }}"
+            # push the newly generated commit onto the branch/ref the release
+            # was cut from. The checkout for a "release: published" event is
+            # a detached HEAD at the release commit, so we push HEAD onto the
+            # target branch explicitly rather than relying on a branch
+            # checked out locally. This assumes the release was tagged from
+            # the tip of target_commitish; if that branch has since moved on,
+            # this push will be rejected as a non-fast-forward rather than
+            # silently rewriting history, which is an acceptable residual risk.
+            # Authentication reuses the PRIVATE_REPO_PAT credential already
+            # configured via git's url.insteadOf rewrite in the
+            # "Configure git for private repos" step above.
+            git push origin HEAD:${{ github.event.release.target_commitish }}
+          fi
 
       - name: Build iOS (x86_64)
         run: cargo build --features=uniffi/cli --target=x86_64-apple-ios --release
@@ -91,6 +119,12 @@ jobs:
 
   build-android:
     runs-on: ubuntu-latest
+    # Runs after build-apple so that both jobs' "commit generated bindings"
+    # steps don't try to update the same branch at the same time (which could
+    # cause a non-fast-forward rejection for whichever job updates it second).
+    # This is simpler and more reliable than trying to rebase-and-retry
+    # around a race window.
+    needs: build-apple
     defaults:
       run:
         working-directory: sphinx-ffi
@@ -111,6 +145,26 @@ jobs:
         run: |
           cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language kotlin
           sed -i 's/return "uniffi_sphinxrs"/return "sphinxrs"/' src/uniffi/sphinxrs/sphinxrs.kt
+
+      - name: Commit and push regenerated Kotlin bindings
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- src/uniffi/sphinxrs/sphinxrs.kt; then
+            echo "No changes to Kotlin bindings, skipping commit."
+          else
+            git add src/uniffi/sphinxrs/sphinxrs.kt
+            git commit -m "chore: regenerate Kotlin UniFFI bindings for release ${{ github.event.release.tag_name }}"
+            # Pull in whatever build-apple already pushed (it runs first via
+            # "needs: build-apple") so this push has a chance to fast-forward
+            # cleanly, then push onto the same branch/ref the release was cut
+            # from. Authentication reuses the PRIVATE_REPO_PAT credential
+            # already configured via git's url.insteadOf rewrite in the
+            # "Configure git for private repos" step above.
+            git fetch origin ${{ github.event.release.target_commitish }}
+            git rebase origin/${{ github.event.release.target_commitish }}
+            git push origin HEAD:${{ github.event.release.target_commitish }}
+          fi
 
       - name: Build Android targets
         run: |
