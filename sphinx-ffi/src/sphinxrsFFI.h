@@ -232,6 +232,15 @@ RustBuffer uniffi_sphinxrs_fn_func_id_from_macaroon(RustBuffer macaroon, RustCal
 );
 RustBuffer uniffi_sphinxrs_fn_func_find_route(RustBuffer state, RustBuffer to_pubkey, RustBuffer route_hint, uint64_t amt_msat, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_parse_server_status(RustBuffer payload, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_evaluate_server_health(RustBuffer last, uint64_t last_seen_ms, uint64_t now_ms, uint64_t interval_ms, uint32_t max_missed, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_parse_mixer_error_code(RustBuffer raw, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_server_status_topic(RustCallStatus *_Nonnull out_status
+    
+);
 RustBuffer ffi_sphinxrs_rustbuffer_alloc(int32_t size, RustCallStatus *_Nonnull out_status
 );
 RustBuffer ffi_sphinxrs_rustbuffer_from_bytes(ForeignBytes bytes, RustCallStatus *_Nonnull out_status
@@ -490,6 +499,18 @@ uint16_t uniffi_sphinxrs_checksum_func_id_from_macaroon(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_find_route(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_parse_server_status(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_evaluate_server_health(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_parse_mixer_error_code(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_server_status_topic(void
     
 );
 uint32_t ffi_sphinxrs_uniffi_contract_version(void

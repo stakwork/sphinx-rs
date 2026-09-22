@@ -6,11 +6,11 @@ import Foundation
 // might be in a separate module, or it might be compiled inline into
 // this module. This is a bit of light hackery to work with both.
 #if canImport(sphinxrsFFI)
-import sphinxrsFFI
+    import sphinxrsFFI
 #endif
 
-fileprivate extension RustBuffer {
-    // Allocate a new buffer, copying the contents of a `UInt8` array.
+private extension RustBuffer {
+    /// Allocate a new buffer, copying the contents of a `UInt8` array.
     init(bytes: [UInt8]) {
         let rbuf = bytes.withUnsafeBufferPointer { ptr in
             RustBuffer.from(ptr)
@@ -22,14 +22,14 @@ fileprivate extension RustBuffer {
         try! rustCall { ffi_sphinxrs_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
     }
 
-    // Frees the buffer in place.
-    // The buffer must not be used after this is called.
+    /// Frees the buffer in place.
+    /// The buffer must not be used after this is called.
     func deallocate() {
         try! rustCall { ffi_sphinxrs_rustbuffer_free(self, $0) }
     }
 }
 
-fileprivate extension ForeignBytes {
+private extension ForeignBytes {
     init(bufferPointer: UnsafeBufferPointer<UInt8>) {
         self.init(len: Int32(bufferPointer.count), data: bufferPointer.baseAddress)
     }
@@ -42,7 +42,7 @@ fileprivate extension ForeignBytes {
 // Helper classes/extensions that don't change.
 // Someday, this will be in a library of its own.
 
-fileprivate extension Data {
+private extension Data {
     init(rustBuffer: RustBuffer) {
         // TODO: This copies the buffer. Can we read directly from a
         // Rust buffer?
@@ -64,15 +64,15 @@ fileprivate extension Data {
 //
 // Instead, the read() method and these helper functions input a tuple of data
 
-fileprivate func createReader(data: Data) -> (data: Data, offset: Data.Index) {
+private func createReader(data: Data) -> (data: Data, offset: Data.Index) {
     (data: data, offset: 0)
 }
 
-// Reads an integer at the current offset, in big-endian order, and advances
-// the offset on success. Throws if reading the integer would move the
-// offset past the end of the buffer.
-fileprivate func readInt<T: FixedWidthInteger>(_ reader: inout (data: Data, offset: Data.Index)) throws -> T {
-    let range = reader.offset..<reader.offset + MemoryLayout<T>.size
+/// Reads an integer at the current offset, in big-endian order, and advances
+/// the offset on success. Throws if reading the integer would move the
+/// offset past the end of the buffer.
+private func readInt<T: FixedWidthInteger>(_ reader: inout (data: Data, offset: Data.Index)) throws -> T {
+    let range = reader.offset ..< reader.offset + MemoryLayout<T>.size
     guard reader.data.count >= range.upperBound else {
         throw UniffiInternalError.bufferOverflow
     }
@@ -82,38 +82,38 @@ fileprivate func readInt<T: FixedWidthInteger>(_ reader: inout (data: Data, offs
         return value as! T
     }
     var value: T = 0
-    let _ = withUnsafeMutableBytes(of: &value, { reader.data.copyBytes(to: $0, from: range)})
+    let _ = withUnsafeMutableBytes(of: &value) { reader.data.copyBytes(to: $0, from: range) }
     reader.offset = range.upperBound
     return value.bigEndian
 }
 
-// Reads an arbitrary number of bytes, to be used to read
-// raw bytes, this is useful when lifting strings
-fileprivate func readBytes(_ reader: inout (data: Data, offset: Data.Index), count: Int) throws -> Array<UInt8> {
-    let range = reader.offset..<(reader.offset+count)
+/// Reads an arbitrary number of bytes, to be used to read
+/// raw bytes, this is useful when lifting strings
+private func readBytes(_ reader: inout (data: Data, offset: Data.Index), count: Int) throws -> [UInt8] {
+    let range = reader.offset ..< (reader.offset + count)
     guard reader.data.count >= range.upperBound else {
         throw UniffiInternalError.bufferOverflow
     }
     var value = [UInt8](repeating: 0, count: count)
-    value.withUnsafeMutableBufferPointer({ buffer in
+    value.withUnsafeMutableBufferPointer { buffer in
         reader.data.copyBytes(to: buffer, from: range)
-    })
+    }
     reader.offset = range.upperBound
     return value
 }
 
-// Reads a float at the current offset.
-fileprivate func readFloat(_ reader: inout (data: Data, offset: Data.Index)) throws -> Float {
-    return Float(bitPattern: try readInt(&reader))
+/// Reads a float at the current offset.
+private func readFloat(_ reader: inout (data: Data, offset: Data.Index)) throws -> Float {
+    return try Float(bitPattern: readInt(&reader))
 }
 
-// Reads a float at the current offset.
-fileprivate func readDouble(_ reader: inout (data: Data, offset: Data.Index)) throws -> Double {
-    return Double(bitPattern: try readInt(&reader))
+/// Reads a float at the current offset.
+private func readDouble(_ reader: inout (data: Data, offset: Data.Index)) throws -> Double {
+    return try Double(bitPattern: readInt(&reader))
 }
 
-// Indicates if the offset has reached the end of the buffer.
-fileprivate func hasRemaining(_ reader: (data: Data, offset: Data.Index)) -> Bool {
+/// Indicates if the offset has reached the end of the buffer.
+private func hasRemaining(_ reader: (data: Data, offset: Data.Index)) -> Bool {
     return reader.offset < reader.data.count
 }
 
@@ -121,34 +121,34 @@ fileprivate func hasRemaining(_ reader: (data: Data, offset: Data.Index)) -> Boo
 // struct, but we use standalone functions instead in order to make external
 // types work.  See the above discussion on Readers for details.
 
-fileprivate func createWriter() -> [UInt8] {
+private func createWriter() -> [UInt8] {
     return []
 }
 
-fileprivate func writeBytes<S>(_ writer: inout [UInt8], _ byteArr: S) where S: Sequence, S.Element == UInt8 {
+private func writeBytes<S: Sequence>(_ writer: inout [UInt8], _ byteArr: S) where S.Element == UInt8 {
     writer.append(contentsOf: byteArr)
 }
 
-// Writes an integer in big-endian order.
-//
-// Warning: make sure what you are trying to write
-// is in the correct type!
-fileprivate func writeInt<T: FixedWidthInteger>(_ writer: inout [UInt8], _ value: T) {
+/// Writes an integer in big-endian order.
+///
+/// Warning: make sure what you are trying to write
+/// is in the correct type!
+private func writeInt<T: FixedWidthInteger>(_ writer: inout [UInt8], _ value: T) {
     var value = value.bigEndian
     withUnsafeBytes(of: &value) { writer.append(contentsOf: $0) }
 }
 
-fileprivate func writeFloat(_ writer: inout [UInt8], _ value: Float) {
+private func writeFloat(_ writer: inout [UInt8], _ value: Float) {
     writeInt(&writer, value.bitPattern)
 }
 
-fileprivate func writeDouble(_ writer: inout [UInt8], _ value: Double) {
+private func writeDouble(_ writer: inout [UInt8], _ value: Double) {
     writeInt(&writer, value.bitPattern)
 }
 
-// Protocol for types that transfer other types across the FFI. This is
-// analogous go the Rust trait of the same name.
-fileprivate protocol FfiConverter {
+/// Protocol for types that transfer other types across the FFI. This is
+/// analogous go the Rust trait of the same name.
+private protocol FfiConverter {
     associatedtype FfiType
     associatedtype SwiftType
 
@@ -158,8 +158,8 @@ fileprivate protocol FfiConverter {
     static func write(_ value: SwiftType, into buf: inout [UInt8])
 }
 
-// Types conforming to `Primitive` pass themselves directly over the FFI.
-fileprivate protocol FfiConverterPrimitive: FfiConverter where FfiType == SwiftType { }
+/// Types conforming to `Primitive` pass themselves directly over the FFI.
+private protocol FfiConverterPrimitive: FfiConverter where FfiType == SwiftType {}
 
 extension FfiConverterPrimitive {
     public static func lift(_ value: FfiType) throws -> SwiftType {
@@ -171,9 +171,9 @@ extension FfiConverterPrimitive {
     }
 }
 
-// Types conforming to `FfiConverterRustBuffer` lift and lower into a `RustBuffer`.
-// Used for complex types where it's hard to write a custom lift/lower.
-fileprivate protocol FfiConverterRustBuffer: FfiConverter where FfiType == RustBuffer {}
+/// Types conforming to `FfiConverterRustBuffer` lift and lower into a `RustBuffer`.
+/// Used for complex types where it's hard to write a custom lift/lower.
+private protocol FfiConverterRustBuffer: FfiConverter where FfiType == RustBuffer {}
 
 extension FfiConverterRustBuffer {
     public static func lift(_ buf: RustBuffer) throws -> SwiftType {
@@ -187,14 +187,15 @@ extension FfiConverterRustBuffer {
     }
 
     public static func lower(_ value: SwiftType) -> RustBuffer {
-          var writer = createWriter()
-          write(value, into: &writer)
-          return RustBuffer(bytes: writer)
+        var writer = createWriter()
+        write(value, into: &writer)
+        return RustBuffer(bytes: writer)
     }
 }
-// An error type for FFI errors. These errors occur at the UniFFI level, not
-// the library level.
-fileprivate enum UniffiInternalError: LocalizedError {
+
+/// An error type for FFI errors. These errors occur at the UniFFI level, not
+/// the library level.
+private enum UniffiInternalError: LocalizedError {
     case bufferOverflow
     case incompleteData
     case unexpectedOptionalTag
@@ -205,7 +206,7 @@ fileprivate enum UniffiInternalError: LocalizedError {
     case unexpectedStaleHandle
     case rustPanic(_ message: String)
 
-    public var errorDescription: String? {
+    var errorDescription: String? {
         switch self {
         case .bufferOverflow: return "Reading the requested value would read past the end of the buffer"
         case .incompleteData: return "The buffer still has data after lifting its containing value"
@@ -220,15 +221,15 @@ fileprivate enum UniffiInternalError: LocalizedError {
     }
 }
 
-fileprivate let CALL_SUCCESS: Int8 = 0
-fileprivate let CALL_ERROR: Int8 = 1
-fileprivate let CALL_PANIC: Int8 = 2
+private let CALL_SUCCESS: Int8 = 0
+private let CALL_ERROR: Int8 = 1
+private let CALL_PANIC: Int8 = 2
 
-fileprivate extension RustCallStatus {
+private extension RustCallStatus {
     init() {
         self.init(
             code: CALL_SUCCESS,
-            errorBuf: RustBuffer.init(
+            errorBuf: RustBuffer(
                 capacity: 0,
                 len: 0,
                 data: nil
@@ -243,7 +244,8 @@ private func rustCall<T>(_ callback: (UnsafeMutablePointer<RustCallStatus>) -> T
 
 private func rustCallWithError<T>(
     _ errorHandler: @escaping (RustBuffer) throws -> Error,
-    _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T) throws -> T {
+    _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T
+) throws -> T {
     try makeRustCall(callback, errorHandler: errorHandler)
 }
 
@@ -252,7 +254,7 @@ private func makeRustCall<T>(
     errorHandler: ((RustBuffer) throws -> Error)?
 ) throws -> T {
     uniffiEnsureInitialized()
-    var callStatus = RustCallStatus.init()
+    var callStatus = RustCallStatus()
     let returnedVal = callback(&callStatus)
     try uniffiCheckCallStatus(callStatus: callStatus, errorHandler: errorHandler)
     return returnedVal
@@ -263,101 +265,100 @@ private func uniffiCheckCallStatus(
     errorHandler: ((RustBuffer) throws -> Error)?
 ) throws {
     switch callStatus.code {
-        case CALL_SUCCESS:
-            return
+    case CALL_SUCCESS:
+        return
 
-        case CALL_ERROR:
-            if let errorHandler = errorHandler {
-                throw try errorHandler(callStatus.errorBuf)
-            } else {
-                callStatus.errorBuf.deallocate()
-                throw UniffiInternalError.unexpectedRustCallError
-            }
+    case CALL_ERROR:
+        if let errorHandler = errorHandler {
+            throw try errorHandler(callStatus.errorBuf)
+        } else {
+            callStatus.errorBuf.deallocate()
+            throw UniffiInternalError.unexpectedRustCallError
+        }
 
-        case CALL_PANIC:
-            // When the rust code sees a panic, it tries to construct a RustBuffer
-            // with the message.  But if that code panics, then it just sends back
-            // an empty buffer.
-            if callStatus.errorBuf.len > 0 {
-                throw UniffiInternalError.rustPanic(try FfiConverterString.lift(callStatus.errorBuf))
-            } else {
-                callStatus.errorBuf.deallocate()
-                throw UniffiInternalError.rustPanic("Rust panic")
-            }
+    case CALL_PANIC:
+        // When the rust code sees a panic, it tries to construct a RustBuffer
+        // with the message.  But if that code panics, then it just sends back
+        // an empty buffer.
+        if callStatus.errorBuf.len > 0 {
+            throw try UniffiInternalError.rustPanic(FfiConverterString.lift(callStatus.errorBuf))
+        } else {
+            callStatus.errorBuf.deallocate()
+            throw UniffiInternalError.rustPanic("Rust panic")
+        }
 
-        default:
-            throw UniffiInternalError.unexpectedRustCallStatusCode
+    default:
+        throw UniffiInternalError.unexpectedRustCallStatusCode
     }
 }
 
 // Public interface members begin here.
 
-
-fileprivate struct FfiConverterUInt8: FfiConverterPrimitive {
+private struct FfiConverterUInt8: FfiConverterPrimitive {
     typealias FfiType = UInt8
     typealias SwiftType = UInt8
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt8 {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt8 {
         return try lift(readInt(&buf))
     }
 
-    public static func write(_ value: UInt8, into buf: inout [UInt8]) {
+    static func write(_ value: UInt8, into buf: inout [UInt8]) {
         writeInt(&buf, lower(value))
     }
 }
 
-fileprivate struct FfiConverterUInt32: FfiConverterPrimitive {
+private struct FfiConverterUInt32: FfiConverterPrimitive {
     typealias FfiType = UInt32
     typealias SwiftType = UInt32
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt32 {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt32 {
         return try lift(readInt(&buf))
     }
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         writeInt(&buf, lower(value))
     }
 }
 
-fileprivate struct FfiConverterUInt64: FfiConverterPrimitive {
+private struct FfiConverterUInt64: FfiConverterPrimitive {
     typealias FfiType = UInt64
     typealias SwiftType = UInt64
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt64 {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt64 {
         return try lift(readInt(&buf))
     }
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         writeInt(&buf, lower(value))
     }
 }
 
-fileprivate struct FfiConverterBool : FfiConverter {
+private struct FfiConverterBool: FfiConverter {
     typealias FfiType = Int8
     typealias SwiftType = Bool
 
-    public static func lift(_ value: Int8) throws -> Bool {
+    static func lift(_ value: Int8) throws -> Bool {
         return value != 0
     }
 
-    public static func lower(_ value: Bool) -> Int8 {
+    static func lower(_ value: Bool) -> Int8 {
         return value ? 1 : 0
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Bool {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Bool {
         return try lift(readInt(&buf))
     }
 
-    public static func write(_ value: Bool, into buf: inout [UInt8]) {
+    static func write(_ value: Bool, into buf: inout [UInt8]) {
         writeInt(&buf, lower(value))
     }
 }
 
-fileprivate struct FfiConverterString: FfiConverter {
+private struct FfiConverterString: FfiConverter {
     typealias SwiftType = String
     typealias FfiType = RustBuffer
 
-    public static func lift(_ value: RustBuffer) throws -> String {
+    static func lift(_ value: RustBuffer) throws -> String {
         defer {
             value.deallocate()
         }
@@ -368,7 +369,7 @@ fileprivate struct FfiConverterString: FfiConverter {
         return String(bytes: bytes, encoding: String.Encoding.utf8)!
     }
 
-    public static func lower(_ value: String) -> RustBuffer {
+    static func lower(_ value: String) -> RustBuffer {
         return value.utf8CString.withUnsafeBufferPointer { ptr in
             // The swift string gives us int8_t, we want uint8_t.
             ptr.withMemoryRebound(to: UInt8.self) { ptr in
@@ -379,79 +380,75 @@ fileprivate struct FfiConverterString: FfiConverter {
         }
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> String {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> String {
         let len: Int32 = try readInt(&buf)
-        return String(bytes: try readBytes(&buf, count: Int(len)), encoding: String.Encoding.utf8)!
+        return try String(bytes: readBytes(&buf, count: Int(len)), encoding: String.Encoding.utf8)!
     }
 
-    public static func write(_ value: String, into buf: inout [UInt8]) {
+    static func write(_ value: String, into buf: inout [UInt8]) {
         let len = Int32(value.utf8.count)
         writeInt(&buf, len)
         writeBytes(&buf, value.utf8)
     }
 }
 
-fileprivate struct FfiConverterData: FfiConverterRustBuffer {
+private struct FfiConverterData: FfiConverterRustBuffer {
     typealias SwiftType = Data
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Data {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Data {
         let len: Int32 = try readInt(&buf)
-        return Data(bytes: try readBytes(&buf, count: Int(len)))
+        return try Data(bytes: readBytes(&buf, count: Int(len)))
     }
 
-    public static func write(_ value: Data, into buf: inout [UInt8]) {
+    static func write(_ value: Data, into buf: inout [UInt8]) {
         let len = Int32(value.count)
         writeInt(&buf, len)
         writeBytes(&buf, value)
     }
 }
 
-
 public struct Keys {
-    public var `secret`: String
-    public var `pubkey`: String
+    public var secret: String
+    public var pubkey: String
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(`secret`: String, `pubkey`: String) {
-        self.`secret` = `secret`
-        self.`pubkey` = `pubkey`
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
+    public init(secret: String, pubkey: String) {
+        self.secret = secret
+        self.pubkey = pubkey
     }
 }
 
-
 extension Keys: Equatable, Hashable {
-    public static func ==(lhs: Keys, rhs: Keys) -> Bool {
-        if lhs.`secret` != rhs.`secret` {
+    public static func == (lhs: Keys, rhs: Keys) -> Bool {
+        if lhs.secret != rhs.secret {
             return false
         }
-        if lhs.`pubkey` != rhs.`pubkey` {
+        if lhs.pubkey != rhs.pubkey {
             return false
         }
         return true
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(`secret`)
-        hasher.combine(`pubkey`)
+        hasher.combine(secret)
+        hasher.combine(pubkey)
     }
 }
-
 
 public struct FfiConverterTypeKeys: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Keys {
         return try Keys(
-            `secret`: FfiConverterString.read(from: &buf), 
-            `pubkey`: FfiConverterString.read(from: &buf)
+            secret: FfiConverterString.read(from: &buf),
+            pubkey: FfiConverterString.read(from: &buf)
         )
     }
 
     public static func write(_ value: Keys, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.`secret`, into: &buf)
-        FfiConverterString.write(value.`pubkey`, into: &buf)
+        FfiConverterString.write(value.secret, into: &buf)
+        FfiConverterString.write(value.pubkey, into: &buf)
     }
 }
-
 
 public func FfiConverterTypeKeys_lift(_ buf: RustBuffer) throws -> Keys {
     return try FfiConverterTypeKeys.lift(buf)
@@ -461,132 +458,128 @@ public func FfiConverterTypeKeys_lower(_ value: Keys) -> RustBuffer {
     return FfiConverterTypeKeys.lower(value)
 }
 
-
 public struct Msg {
-    public var `message`: String?
-    public var `type`: UInt8?
-    public var `uuid`: String?
-    public var `tag`: String?
-    public var `index`: String?
-    public var `sender`: String?
-    public var `msat`: UInt64?
-    public var `timestamp`: UInt64?
-    public var `sentTo`: String?
-    public var `fromMe`: Bool?
-    public var `paymentHash`: String?
-    public var `error`: String?
+    public var message: String?
+    public var type: UInt8?
+    public var uuid: String?
+    public var tag: String?
+    public var index: String?
+    public var sender: String?
+    public var msat: UInt64?
+    public var timestamp: UInt64?
+    public var sentTo: String?
+    public var fromMe: Bool?
+    public var paymentHash: String?
+    public var error: String?
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(`message`: String?, `type`: UInt8?, `uuid`: String?, `tag`: String?, `index`: String?, `sender`: String?, `msat`: UInt64?, `timestamp`: UInt64?, `sentTo`: String?, `fromMe`: Bool?, `paymentHash`: String?, `error`: String?) {
-        self.`message` = `message`
-        self.`type` = `type`
-        self.`uuid` = `uuid`
-        self.`tag` = `tag`
-        self.`index` = `index`
-        self.`sender` = `sender`
-        self.`msat` = `msat`
-        self.`timestamp` = `timestamp`
-        self.`sentTo` = `sentTo`
-        self.`fromMe` = `fromMe`
-        self.`paymentHash` = `paymentHash`
-        self.`error` = `error`
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
+    public init(message: String?, type: UInt8?, uuid: String?, tag: String?, index: String?, sender: String?, msat: UInt64?, timestamp: UInt64?, sentTo: String?, fromMe: Bool?, paymentHash: String?, error: String?) {
+        self.message = message
+        self.type = type
+        self.uuid = uuid
+        self.tag = tag
+        self.index = index
+        self.sender = sender
+        self.msat = msat
+        self.timestamp = timestamp
+        self.sentTo = sentTo
+        self.fromMe = fromMe
+        self.paymentHash = paymentHash
+        self.error = error
     }
 }
 
-
 extension Msg: Equatable, Hashable {
-    public static func ==(lhs: Msg, rhs: Msg) -> Bool {
-        if lhs.`message` != rhs.`message` {
+    public static func == (lhs: Msg, rhs: Msg) -> Bool {
+        if lhs.message != rhs.message {
             return false
         }
-        if lhs.`type` != rhs.`type` {
+        if lhs.type != rhs.type {
             return false
         }
-        if lhs.`uuid` != rhs.`uuid` {
+        if lhs.uuid != rhs.uuid {
             return false
         }
-        if lhs.`tag` != rhs.`tag` {
+        if lhs.tag != rhs.tag {
             return false
         }
-        if lhs.`index` != rhs.`index` {
+        if lhs.index != rhs.index {
             return false
         }
-        if lhs.`sender` != rhs.`sender` {
+        if lhs.sender != rhs.sender {
             return false
         }
-        if lhs.`msat` != rhs.`msat` {
+        if lhs.msat != rhs.msat {
             return false
         }
-        if lhs.`timestamp` != rhs.`timestamp` {
+        if lhs.timestamp != rhs.timestamp {
             return false
         }
-        if lhs.`sentTo` != rhs.`sentTo` {
+        if lhs.sentTo != rhs.sentTo {
             return false
         }
-        if lhs.`fromMe` != rhs.`fromMe` {
+        if lhs.fromMe != rhs.fromMe {
             return false
         }
-        if lhs.`paymentHash` != rhs.`paymentHash` {
+        if lhs.paymentHash != rhs.paymentHash {
             return false
         }
-        if lhs.`error` != rhs.`error` {
+        if lhs.error != rhs.error {
             return false
         }
         return true
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(`message`)
-        hasher.combine(`type`)
-        hasher.combine(`uuid`)
-        hasher.combine(`tag`)
-        hasher.combine(`index`)
-        hasher.combine(`sender`)
-        hasher.combine(`msat`)
-        hasher.combine(`timestamp`)
-        hasher.combine(`sentTo`)
-        hasher.combine(`fromMe`)
-        hasher.combine(`paymentHash`)
-        hasher.combine(`error`)
+        hasher.combine(message)
+        hasher.combine(type)
+        hasher.combine(uuid)
+        hasher.combine(tag)
+        hasher.combine(index)
+        hasher.combine(sender)
+        hasher.combine(msat)
+        hasher.combine(timestamp)
+        hasher.combine(sentTo)
+        hasher.combine(fromMe)
+        hasher.combine(paymentHash)
+        hasher.combine(error)
     }
 }
-
 
 public struct FfiConverterTypeMsg: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Msg {
         return try Msg(
-            `message`: FfiConverterOptionString.read(from: &buf), 
-            `type`: FfiConverterOptionUInt8.read(from: &buf), 
-            `uuid`: FfiConverterOptionString.read(from: &buf), 
-            `tag`: FfiConverterOptionString.read(from: &buf), 
-            `index`: FfiConverterOptionString.read(from: &buf), 
-            `sender`: FfiConverterOptionString.read(from: &buf), 
-            `msat`: FfiConverterOptionUInt64.read(from: &buf), 
-            `timestamp`: FfiConverterOptionUInt64.read(from: &buf), 
-            `sentTo`: FfiConverterOptionString.read(from: &buf), 
-            `fromMe`: FfiConverterOptionBool.read(from: &buf), 
-            `paymentHash`: FfiConverterOptionString.read(from: &buf), 
-            `error`: FfiConverterOptionString.read(from: &buf)
+            message: FfiConverterOptionString.read(from: &buf),
+            type: FfiConverterOptionUInt8.read(from: &buf),
+            uuid: FfiConverterOptionString.read(from: &buf),
+            tag: FfiConverterOptionString.read(from: &buf),
+            index: FfiConverterOptionString.read(from: &buf),
+            sender: FfiConverterOptionString.read(from: &buf),
+            msat: FfiConverterOptionUInt64.read(from: &buf),
+            timestamp: FfiConverterOptionUInt64.read(from: &buf),
+            sentTo: FfiConverterOptionString.read(from: &buf),
+            fromMe: FfiConverterOptionBool.read(from: &buf),
+            paymentHash: FfiConverterOptionString.read(from: &buf),
+            error: FfiConverterOptionString.read(from: &buf)
         )
     }
 
     public static func write(_ value: Msg, into buf: inout [UInt8]) {
-        FfiConverterOptionString.write(value.`message`, into: &buf)
-        FfiConverterOptionUInt8.write(value.`type`, into: &buf)
-        FfiConverterOptionString.write(value.`uuid`, into: &buf)
-        FfiConverterOptionString.write(value.`tag`, into: &buf)
-        FfiConverterOptionString.write(value.`index`, into: &buf)
-        FfiConverterOptionString.write(value.`sender`, into: &buf)
-        FfiConverterOptionUInt64.write(value.`msat`, into: &buf)
-        FfiConverterOptionUInt64.write(value.`timestamp`, into: &buf)
-        FfiConverterOptionString.write(value.`sentTo`, into: &buf)
-        FfiConverterOptionBool.write(value.`fromMe`, into: &buf)
-        FfiConverterOptionString.write(value.`paymentHash`, into: &buf)
-        FfiConverterOptionString.write(value.`error`, into: &buf)
+        FfiConverterOptionString.write(value.message, into: &buf)
+        FfiConverterOptionUInt8.write(value.type, into: &buf)
+        FfiConverterOptionString.write(value.uuid, into: &buf)
+        FfiConverterOptionString.write(value.tag, into: &buf)
+        FfiConverterOptionString.write(value.index, into: &buf)
+        FfiConverterOptionString.write(value.sender, into: &buf)
+        FfiConverterOptionUInt64.write(value.msat, into: &buf)
+        FfiConverterOptionUInt64.write(value.timestamp, into: &buf)
+        FfiConverterOptionString.write(value.sentTo, into: &buf)
+        FfiConverterOptionBool.write(value.fromMe, into: &buf)
+        FfiConverterOptionString.write(value.paymentHash, into: &buf)
+        FfiConverterOptionString.write(value.error, into: &buf)
     }
 }
-
 
 public func FfiConverterTypeMsg_lift(_ buf: RustBuffer) throws -> Msg {
     return try FfiConverterTypeMsg.lift(buf)
@@ -596,76 +589,72 @@ public func FfiConverterTypeMsg_lower(_ value: Msg) -> RustBuffer {
     return FfiConverterTypeMsg.lower(value)
 }
 
-
 public struct ParsedInvite {
-    public var `code`: String
-    public var `inviterContactInfo`: String?
-    public var `inviterAlias`: String?
-    public var `initialTribe`: String?
-    public var `lspHost`: String?
+    public var code: String
+    public var inviterContactInfo: String?
+    public var inviterAlias: String?
+    public var initialTribe: String?
+    public var lspHost: String?
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(`code`: String, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?) {
-        self.`code` = `code`
-        self.`inviterContactInfo` = `inviterContactInfo`
-        self.`inviterAlias` = `inviterAlias`
-        self.`initialTribe` = `initialTribe`
-        self.`lspHost` = `lspHost`
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
+    public init(code: String, inviterContactInfo: String?, inviterAlias: String?, initialTribe: String?, lspHost: String?) {
+        self.code = code
+        self.inviterContactInfo = inviterContactInfo
+        self.inviterAlias = inviterAlias
+        self.initialTribe = initialTribe
+        self.lspHost = lspHost
     }
 }
 
-
 extension ParsedInvite: Equatable, Hashable {
-    public static func ==(lhs: ParsedInvite, rhs: ParsedInvite) -> Bool {
-        if lhs.`code` != rhs.`code` {
+    public static func == (lhs: ParsedInvite, rhs: ParsedInvite) -> Bool {
+        if lhs.code != rhs.code {
             return false
         }
-        if lhs.`inviterContactInfo` != rhs.`inviterContactInfo` {
+        if lhs.inviterContactInfo != rhs.inviterContactInfo {
             return false
         }
-        if lhs.`inviterAlias` != rhs.`inviterAlias` {
+        if lhs.inviterAlias != rhs.inviterAlias {
             return false
         }
-        if lhs.`initialTribe` != rhs.`initialTribe` {
+        if lhs.initialTribe != rhs.initialTribe {
             return false
         }
-        if lhs.`lspHost` != rhs.`lspHost` {
+        if lhs.lspHost != rhs.lspHost {
             return false
         }
         return true
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(`code`)
-        hasher.combine(`inviterContactInfo`)
-        hasher.combine(`inviterAlias`)
-        hasher.combine(`initialTribe`)
-        hasher.combine(`lspHost`)
+        hasher.combine(code)
+        hasher.combine(inviterContactInfo)
+        hasher.combine(inviterAlias)
+        hasher.combine(initialTribe)
+        hasher.combine(lspHost)
     }
 }
-
 
 public struct FfiConverterTypeParsedInvite: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ParsedInvite {
         return try ParsedInvite(
-            `code`: FfiConverterString.read(from: &buf), 
-            `inviterContactInfo`: FfiConverterOptionString.read(from: &buf), 
-            `inviterAlias`: FfiConverterOptionString.read(from: &buf), 
-            `initialTribe`: FfiConverterOptionString.read(from: &buf), 
-            `lspHost`: FfiConverterOptionString.read(from: &buf)
+            code: FfiConverterString.read(from: &buf),
+            inviterContactInfo: FfiConverterOptionString.read(from: &buf),
+            inviterAlias: FfiConverterOptionString.read(from: &buf),
+            initialTribe: FfiConverterOptionString.read(from: &buf),
+            lspHost: FfiConverterOptionString.read(from: &buf)
         )
     }
 
     public static func write(_ value: ParsedInvite, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.`code`, into: &buf)
-        FfiConverterOptionString.write(value.`inviterContactInfo`, into: &buf)
-        FfiConverterOptionString.write(value.`inviterAlias`, into: &buf)
-        FfiConverterOptionString.write(value.`initialTribe`, into: &buf)
-        FfiConverterOptionString.write(value.`lspHost`, into: &buf)
+        FfiConverterString.write(value.code, into: &buf)
+        FfiConverterOptionString.write(value.inviterContactInfo, into: &buf)
+        FfiConverterOptionString.write(value.inviterAlias, into: &buf)
+        FfiConverterOptionString.write(value.initialTribe, into: &buf)
+        FfiConverterOptionString.write(value.lspHost, into: &buf)
     }
 }
-
 
 public func FfiConverterTypeParsedInvite_lift(_ buf: RustBuffer) throws -> ParsedInvite {
     return try FfiConverterTypeParsedInvite.lift(buf)
@@ -675,348 +664,344 @@ public func FfiConverterTypeParsedInvite_lower(_ value: ParsedInvite) -> RustBuf
     return FfiConverterTypeParsedInvite.lower(value)
 }
 
-
 public struct RunReturn {
-    public var `msgs`: [Msg]
-    public var `msgsTotal`: UInt64?
-    public var `msgsCounts`: String?
-    public var `subscriptionTopics`: [String]
-    public var `settleTopic`: String?
-    public var `settlePayload`: Data?
-    public var `asyncpayTopic`: String?
-    public var `asyncpayPayload`: Data?
-    public var `registerTopic`: String?
-    public var `registerPayload`: Data?
-    public var `topics`: [String]
-    public var `payloads`: [Data]
-    public var `stateMp`: Data?
-    public var `stateToDelete`: [String]
-    public var `newBalance`: UInt64?
-    public var `myContactInfo`: String?
-    public var `sentStatus`: String?
-    public var `settledStatus`: String?
-    public var `registerResponse`: String?
-    public var `asyncpayTag`: String?
-    public var `error`: String?
-    public var `newTribe`: String?
-    public var `tribeMembers`: String?
-    public var `newInvite`: String?
-    public var `inviterContactInfo`: String?
-    public var `inviterAlias`: String?
-    public var `initialTribe`: String?
-    public var `lspHost`: String?
-    public var `invoice`: String?
-    public var `route`: String?
-    public var `node`: String?
-    public var `lastRead`: String?
-    public var `muteLevels`: String?
-    public var `payments`: String?
-    public var `paymentsTotal`: UInt64?
-    public var `tags`: String?
-    public var `deletedMsgs`: String?
-    public var `newChildIdx`: UInt64?
-    public var `ping`: String?
+    public var msgs: [Msg]
+    public var msgsTotal: UInt64?
+    public var msgsCounts: String?
+    public var subscriptionTopics: [String]
+    public var settleTopic: String?
+    public var settlePayload: Data?
+    public var asyncpayTopic: String?
+    public var asyncpayPayload: Data?
+    public var registerTopic: String?
+    public var registerPayload: Data?
+    public var topics: [String]
+    public var payloads: [Data]
+    public var stateMp: Data?
+    public var stateToDelete: [String]
+    public var newBalance: UInt64?
+    public var myContactInfo: String?
+    public var sentStatus: String?
+    public var settledStatus: String?
+    public var registerResponse: String?
+    public var asyncpayTag: String?
+    public var error: String?
+    public var newTribe: String?
+    public var tribeMembers: String?
+    public var newInvite: String?
+    public var inviterContactInfo: String?
+    public var inviterAlias: String?
+    public var initialTribe: String?
+    public var lspHost: String?
+    public var invoice: String?
+    public var route: String?
+    public var node: String?
+    public var lastRead: String?
+    public var muteLevels: String?
+    public var payments: String?
+    public var paymentsTotal: UInt64?
+    public var tags: String?
+    public var deletedMsgs: String?
+    public var newChildIdx: UInt64?
+    public var ping: String?
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(`msgs`: [Msg], `msgsTotal`: UInt64?, `msgsCounts`: String?, `subscriptionTopics`: [String], `settleTopic`: String?, `settlePayload`: Data?, `asyncpayTopic`: String?, `asyncpayPayload`: Data?, `registerTopic`: String?, `registerPayload`: Data?, `topics`: [String], `payloads`: [Data], `stateMp`: Data?, `stateToDelete`: [String], `newBalance`: UInt64?, `myContactInfo`: String?, `sentStatus`: String?, `settledStatus`: String?, `registerResponse`: String?, `asyncpayTag`: String?, `error`: String?, `newTribe`: String?, `tribeMembers`: String?, `newInvite`: String?, `inviterContactInfo`: String?, `inviterAlias`: String?, `initialTribe`: String?, `lspHost`: String?, `invoice`: String?, `route`: String?, `node`: String?, `lastRead`: String?, `muteLevels`: String?, `payments`: String?, `paymentsTotal`: UInt64?, `tags`: String?, `deletedMsgs`: String?, `newChildIdx`: UInt64?, `ping`: String?) {
-        self.`msgs` = `msgs`
-        self.`msgsTotal` = `msgsTotal`
-        self.`msgsCounts` = `msgsCounts`
-        self.`subscriptionTopics` = `subscriptionTopics`
-        self.`settleTopic` = `settleTopic`
-        self.`settlePayload` = `settlePayload`
-        self.`asyncpayTopic` = `asyncpayTopic`
-        self.`asyncpayPayload` = `asyncpayPayload`
-        self.`registerTopic` = `registerTopic`
-        self.`registerPayload` = `registerPayload`
-        self.`topics` = `topics`
-        self.`payloads` = `payloads`
-        self.`stateMp` = `stateMp`
-        self.`stateToDelete` = `stateToDelete`
-        self.`newBalance` = `newBalance`
-        self.`myContactInfo` = `myContactInfo`
-        self.`sentStatus` = `sentStatus`
-        self.`settledStatus` = `settledStatus`
-        self.`registerResponse` = `registerResponse`
-        self.`asyncpayTag` = `asyncpayTag`
-        self.`error` = `error`
-        self.`newTribe` = `newTribe`
-        self.`tribeMembers` = `tribeMembers`
-        self.`newInvite` = `newInvite`
-        self.`inviterContactInfo` = `inviterContactInfo`
-        self.`inviterAlias` = `inviterAlias`
-        self.`initialTribe` = `initialTribe`
-        self.`lspHost` = `lspHost`
-        self.`invoice` = `invoice`
-        self.`route` = `route`
-        self.`node` = `node`
-        self.`lastRead` = `lastRead`
-        self.`muteLevels` = `muteLevels`
-        self.`payments` = `payments`
-        self.`paymentsTotal` = `paymentsTotal`
-        self.`tags` = `tags`
-        self.`deletedMsgs` = `deletedMsgs`
-        self.`newChildIdx` = `newChildIdx`
-        self.`ping` = `ping`
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
+    public init(msgs: [Msg], msgsTotal: UInt64?, msgsCounts: String?, subscriptionTopics: [String], settleTopic: String?, settlePayload: Data?, asyncpayTopic: String?, asyncpayPayload: Data?, registerTopic: String?, registerPayload: Data?, topics: [String], payloads: [Data], stateMp: Data?, stateToDelete: [String], newBalance: UInt64?, myContactInfo: String?, sentStatus: String?, settledStatus: String?, registerResponse: String?, asyncpayTag: String?, error: String?, newTribe: String?, tribeMembers: String?, newInvite: String?, inviterContactInfo: String?, inviterAlias: String?, initialTribe: String?, lspHost: String?, invoice: String?, route: String?, node: String?, lastRead: String?, muteLevels: String?, payments: String?, paymentsTotal: UInt64?, tags: String?, deletedMsgs: String?, newChildIdx: UInt64?, ping: String?) {
+        self.msgs = msgs
+        self.msgsTotal = msgsTotal
+        self.msgsCounts = msgsCounts
+        self.subscriptionTopics = subscriptionTopics
+        self.settleTopic = settleTopic
+        self.settlePayload = settlePayload
+        self.asyncpayTopic = asyncpayTopic
+        self.asyncpayPayload = asyncpayPayload
+        self.registerTopic = registerTopic
+        self.registerPayload = registerPayload
+        self.topics = topics
+        self.payloads = payloads
+        self.stateMp = stateMp
+        self.stateToDelete = stateToDelete
+        self.newBalance = newBalance
+        self.myContactInfo = myContactInfo
+        self.sentStatus = sentStatus
+        self.settledStatus = settledStatus
+        self.registerResponse = registerResponse
+        self.asyncpayTag = asyncpayTag
+        self.error = error
+        self.newTribe = newTribe
+        self.tribeMembers = tribeMembers
+        self.newInvite = newInvite
+        self.inviterContactInfo = inviterContactInfo
+        self.inviterAlias = inviterAlias
+        self.initialTribe = initialTribe
+        self.lspHost = lspHost
+        self.invoice = invoice
+        self.route = route
+        self.node = node
+        self.lastRead = lastRead
+        self.muteLevels = muteLevels
+        self.payments = payments
+        self.paymentsTotal = paymentsTotal
+        self.tags = tags
+        self.deletedMsgs = deletedMsgs
+        self.newChildIdx = newChildIdx
+        self.ping = ping
     }
 }
 
-
 extension RunReturn: Equatable, Hashable {
-    public static func ==(lhs: RunReturn, rhs: RunReturn) -> Bool {
-        if lhs.`msgs` != rhs.`msgs` {
+    public static func == (lhs: RunReturn, rhs: RunReturn) -> Bool {
+        if lhs.msgs != rhs.msgs {
             return false
         }
-        if lhs.`msgsTotal` != rhs.`msgsTotal` {
+        if lhs.msgsTotal != rhs.msgsTotal {
             return false
         }
-        if lhs.`msgsCounts` != rhs.`msgsCounts` {
+        if lhs.msgsCounts != rhs.msgsCounts {
             return false
         }
-        if lhs.`subscriptionTopics` != rhs.`subscriptionTopics` {
+        if lhs.subscriptionTopics != rhs.subscriptionTopics {
             return false
         }
-        if lhs.`settleTopic` != rhs.`settleTopic` {
+        if lhs.settleTopic != rhs.settleTopic {
             return false
         }
-        if lhs.`settlePayload` != rhs.`settlePayload` {
+        if lhs.settlePayload != rhs.settlePayload {
             return false
         }
-        if lhs.`asyncpayTopic` != rhs.`asyncpayTopic` {
+        if lhs.asyncpayTopic != rhs.asyncpayTopic {
             return false
         }
-        if lhs.`asyncpayPayload` != rhs.`asyncpayPayload` {
+        if lhs.asyncpayPayload != rhs.asyncpayPayload {
             return false
         }
-        if lhs.`registerTopic` != rhs.`registerTopic` {
+        if lhs.registerTopic != rhs.registerTopic {
             return false
         }
-        if lhs.`registerPayload` != rhs.`registerPayload` {
+        if lhs.registerPayload != rhs.registerPayload {
             return false
         }
-        if lhs.`topics` != rhs.`topics` {
+        if lhs.topics != rhs.topics {
             return false
         }
-        if lhs.`payloads` != rhs.`payloads` {
+        if lhs.payloads != rhs.payloads {
             return false
         }
-        if lhs.`stateMp` != rhs.`stateMp` {
+        if lhs.stateMp != rhs.stateMp {
             return false
         }
-        if lhs.`stateToDelete` != rhs.`stateToDelete` {
+        if lhs.stateToDelete != rhs.stateToDelete {
             return false
         }
-        if lhs.`newBalance` != rhs.`newBalance` {
+        if lhs.newBalance != rhs.newBalance {
             return false
         }
-        if lhs.`myContactInfo` != rhs.`myContactInfo` {
+        if lhs.myContactInfo != rhs.myContactInfo {
             return false
         }
-        if lhs.`sentStatus` != rhs.`sentStatus` {
+        if lhs.sentStatus != rhs.sentStatus {
             return false
         }
-        if lhs.`settledStatus` != rhs.`settledStatus` {
+        if lhs.settledStatus != rhs.settledStatus {
             return false
         }
-        if lhs.`registerResponse` != rhs.`registerResponse` {
+        if lhs.registerResponse != rhs.registerResponse {
             return false
         }
-        if lhs.`asyncpayTag` != rhs.`asyncpayTag` {
+        if lhs.asyncpayTag != rhs.asyncpayTag {
             return false
         }
-        if lhs.`error` != rhs.`error` {
+        if lhs.error != rhs.error {
             return false
         }
-        if lhs.`newTribe` != rhs.`newTribe` {
+        if lhs.newTribe != rhs.newTribe {
             return false
         }
-        if lhs.`tribeMembers` != rhs.`tribeMembers` {
+        if lhs.tribeMembers != rhs.tribeMembers {
             return false
         }
-        if lhs.`newInvite` != rhs.`newInvite` {
+        if lhs.newInvite != rhs.newInvite {
             return false
         }
-        if lhs.`inviterContactInfo` != rhs.`inviterContactInfo` {
+        if lhs.inviterContactInfo != rhs.inviterContactInfo {
             return false
         }
-        if lhs.`inviterAlias` != rhs.`inviterAlias` {
+        if lhs.inviterAlias != rhs.inviterAlias {
             return false
         }
-        if lhs.`initialTribe` != rhs.`initialTribe` {
+        if lhs.initialTribe != rhs.initialTribe {
             return false
         }
-        if lhs.`lspHost` != rhs.`lspHost` {
+        if lhs.lspHost != rhs.lspHost {
             return false
         }
-        if lhs.`invoice` != rhs.`invoice` {
+        if lhs.invoice != rhs.invoice {
             return false
         }
-        if lhs.`route` != rhs.`route` {
+        if lhs.route != rhs.route {
             return false
         }
-        if lhs.`node` != rhs.`node` {
+        if lhs.node != rhs.node {
             return false
         }
-        if lhs.`lastRead` != rhs.`lastRead` {
+        if lhs.lastRead != rhs.lastRead {
             return false
         }
-        if lhs.`muteLevels` != rhs.`muteLevels` {
+        if lhs.muteLevels != rhs.muteLevels {
             return false
         }
-        if lhs.`payments` != rhs.`payments` {
+        if lhs.payments != rhs.payments {
             return false
         }
-        if lhs.`paymentsTotal` != rhs.`paymentsTotal` {
+        if lhs.paymentsTotal != rhs.paymentsTotal {
             return false
         }
-        if lhs.`tags` != rhs.`tags` {
+        if lhs.tags != rhs.tags {
             return false
         }
-        if lhs.`deletedMsgs` != rhs.`deletedMsgs` {
+        if lhs.deletedMsgs != rhs.deletedMsgs {
             return false
         }
-        if lhs.`newChildIdx` != rhs.`newChildIdx` {
+        if lhs.newChildIdx != rhs.newChildIdx {
             return false
         }
-        if lhs.`ping` != rhs.`ping` {
+        if lhs.ping != rhs.ping {
             return false
         }
         return true
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(`msgs`)
-        hasher.combine(`msgsTotal`)
-        hasher.combine(`msgsCounts`)
-        hasher.combine(`subscriptionTopics`)
-        hasher.combine(`settleTopic`)
-        hasher.combine(`settlePayload`)
-        hasher.combine(`asyncpayTopic`)
-        hasher.combine(`asyncpayPayload`)
-        hasher.combine(`registerTopic`)
-        hasher.combine(`registerPayload`)
-        hasher.combine(`topics`)
-        hasher.combine(`payloads`)
-        hasher.combine(`stateMp`)
-        hasher.combine(`stateToDelete`)
-        hasher.combine(`newBalance`)
-        hasher.combine(`myContactInfo`)
-        hasher.combine(`sentStatus`)
-        hasher.combine(`settledStatus`)
-        hasher.combine(`registerResponse`)
-        hasher.combine(`asyncpayTag`)
-        hasher.combine(`error`)
-        hasher.combine(`newTribe`)
-        hasher.combine(`tribeMembers`)
-        hasher.combine(`newInvite`)
-        hasher.combine(`inviterContactInfo`)
-        hasher.combine(`inviterAlias`)
-        hasher.combine(`initialTribe`)
-        hasher.combine(`lspHost`)
-        hasher.combine(`invoice`)
-        hasher.combine(`route`)
-        hasher.combine(`node`)
-        hasher.combine(`lastRead`)
-        hasher.combine(`muteLevels`)
-        hasher.combine(`payments`)
-        hasher.combine(`paymentsTotal`)
-        hasher.combine(`tags`)
-        hasher.combine(`deletedMsgs`)
-        hasher.combine(`newChildIdx`)
-        hasher.combine(`ping`)
+        hasher.combine(msgs)
+        hasher.combine(msgsTotal)
+        hasher.combine(msgsCounts)
+        hasher.combine(subscriptionTopics)
+        hasher.combine(settleTopic)
+        hasher.combine(settlePayload)
+        hasher.combine(asyncpayTopic)
+        hasher.combine(asyncpayPayload)
+        hasher.combine(registerTopic)
+        hasher.combine(registerPayload)
+        hasher.combine(topics)
+        hasher.combine(payloads)
+        hasher.combine(stateMp)
+        hasher.combine(stateToDelete)
+        hasher.combine(newBalance)
+        hasher.combine(myContactInfo)
+        hasher.combine(sentStatus)
+        hasher.combine(settledStatus)
+        hasher.combine(registerResponse)
+        hasher.combine(asyncpayTag)
+        hasher.combine(error)
+        hasher.combine(newTribe)
+        hasher.combine(tribeMembers)
+        hasher.combine(newInvite)
+        hasher.combine(inviterContactInfo)
+        hasher.combine(inviterAlias)
+        hasher.combine(initialTribe)
+        hasher.combine(lspHost)
+        hasher.combine(invoice)
+        hasher.combine(route)
+        hasher.combine(node)
+        hasher.combine(lastRead)
+        hasher.combine(muteLevels)
+        hasher.combine(payments)
+        hasher.combine(paymentsTotal)
+        hasher.combine(tags)
+        hasher.combine(deletedMsgs)
+        hasher.combine(newChildIdx)
+        hasher.combine(ping)
     }
 }
-
 
 public struct FfiConverterTypeRunReturn: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RunReturn {
         return try RunReturn(
-            `msgs`: FfiConverterSequenceTypeMsg.read(from: &buf), 
-            `msgsTotal`: FfiConverterOptionUInt64.read(from: &buf), 
-            `msgsCounts`: FfiConverterOptionString.read(from: &buf), 
-            `subscriptionTopics`: FfiConverterSequenceString.read(from: &buf), 
-            `settleTopic`: FfiConverterOptionString.read(from: &buf), 
-            `settlePayload`: FfiConverterOptionData.read(from: &buf), 
-            `asyncpayTopic`: FfiConverterOptionString.read(from: &buf), 
-            `asyncpayPayload`: FfiConverterOptionData.read(from: &buf), 
-            `registerTopic`: FfiConverterOptionString.read(from: &buf), 
-            `registerPayload`: FfiConverterOptionData.read(from: &buf), 
-            `topics`: FfiConverterSequenceString.read(from: &buf), 
-            `payloads`: FfiConverterSequenceData.read(from: &buf), 
-            `stateMp`: FfiConverterOptionData.read(from: &buf), 
-            `stateToDelete`: FfiConverterSequenceString.read(from: &buf), 
-            `newBalance`: FfiConverterOptionUInt64.read(from: &buf), 
-            `myContactInfo`: FfiConverterOptionString.read(from: &buf), 
-            `sentStatus`: FfiConverterOptionString.read(from: &buf), 
-            `settledStatus`: FfiConverterOptionString.read(from: &buf), 
-            `registerResponse`: FfiConverterOptionString.read(from: &buf), 
-            `asyncpayTag`: FfiConverterOptionString.read(from: &buf), 
-            `error`: FfiConverterOptionString.read(from: &buf), 
-            `newTribe`: FfiConverterOptionString.read(from: &buf), 
-            `tribeMembers`: FfiConverterOptionString.read(from: &buf), 
-            `newInvite`: FfiConverterOptionString.read(from: &buf), 
-            `inviterContactInfo`: FfiConverterOptionString.read(from: &buf), 
-            `inviterAlias`: FfiConverterOptionString.read(from: &buf), 
-            `initialTribe`: FfiConverterOptionString.read(from: &buf), 
-            `lspHost`: FfiConverterOptionString.read(from: &buf), 
-            `invoice`: FfiConverterOptionString.read(from: &buf), 
-            `route`: FfiConverterOptionString.read(from: &buf), 
-            `node`: FfiConverterOptionString.read(from: &buf), 
-            `lastRead`: FfiConverterOptionString.read(from: &buf), 
-            `muteLevels`: FfiConverterOptionString.read(from: &buf), 
-            `payments`: FfiConverterOptionString.read(from: &buf), 
-            `paymentsTotal`: FfiConverterOptionUInt64.read(from: &buf), 
-            `tags`: FfiConverterOptionString.read(from: &buf), 
-            `deletedMsgs`: FfiConverterOptionString.read(from: &buf), 
-            `newChildIdx`: FfiConverterOptionUInt64.read(from: &buf), 
-            `ping`: FfiConverterOptionString.read(from: &buf)
+            msgs: FfiConverterSequenceTypeMsg.read(from: &buf),
+            msgsTotal: FfiConverterOptionUInt64.read(from: &buf),
+            msgsCounts: FfiConverterOptionString.read(from: &buf),
+            subscriptionTopics: FfiConverterSequenceString.read(from: &buf),
+            settleTopic: FfiConverterOptionString.read(from: &buf),
+            settlePayload: FfiConverterOptionData.read(from: &buf),
+            asyncpayTopic: FfiConverterOptionString.read(from: &buf),
+            asyncpayPayload: FfiConverterOptionData.read(from: &buf),
+            registerTopic: FfiConverterOptionString.read(from: &buf),
+            registerPayload: FfiConverterOptionData.read(from: &buf),
+            topics: FfiConverterSequenceString.read(from: &buf),
+            payloads: FfiConverterSequenceData.read(from: &buf),
+            stateMp: FfiConverterOptionData.read(from: &buf),
+            stateToDelete: FfiConverterSequenceString.read(from: &buf),
+            newBalance: FfiConverterOptionUInt64.read(from: &buf),
+            myContactInfo: FfiConverterOptionString.read(from: &buf),
+            sentStatus: FfiConverterOptionString.read(from: &buf),
+            settledStatus: FfiConverterOptionString.read(from: &buf),
+            registerResponse: FfiConverterOptionString.read(from: &buf),
+            asyncpayTag: FfiConverterOptionString.read(from: &buf),
+            error: FfiConverterOptionString.read(from: &buf),
+            newTribe: FfiConverterOptionString.read(from: &buf),
+            tribeMembers: FfiConverterOptionString.read(from: &buf),
+            newInvite: FfiConverterOptionString.read(from: &buf),
+            inviterContactInfo: FfiConverterOptionString.read(from: &buf),
+            inviterAlias: FfiConverterOptionString.read(from: &buf),
+            initialTribe: FfiConverterOptionString.read(from: &buf),
+            lspHost: FfiConverterOptionString.read(from: &buf),
+            invoice: FfiConverterOptionString.read(from: &buf),
+            route: FfiConverterOptionString.read(from: &buf),
+            node: FfiConverterOptionString.read(from: &buf),
+            lastRead: FfiConverterOptionString.read(from: &buf),
+            muteLevels: FfiConverterOptionString.read(from: &buf),
+            payments: FfiConverterOptionString.read(from: &buf),
+            paymentsTotal: FfiConverterOptionUInt64.read(from: &buf),
+            tags: FfiConverterOptionString.read(from: &buf),
+            deletedMsgs: FfiConverterOptionString.read(from: &buf),
+            newChildIdx: FfiConverterOptionUInt64.read(from: &buf),
+            ping: FfiConverterOptionString.read(from: &buf)
         )
     }
 
     public static func write(_ value: RunReturn, into buf: inout [UInt8]) {
-        FfiConverterSequenceTypeMsg.write(value.`msgs`, into: &buf)
-        FfiConverterOptionUInt64.write(value.`msgsTotal`, into: &buf)
-        FfiConverterOptionString.write(value.`msgsCounts`, into: &buf)
-        FfiConverterSequenceString.write(value.`subscriptionTopics`, into: &buf)
-        FfiConverterOptionString.write(value.`settleTopic`, into: &buf)
-        FfiConverterOptionData.write(value.`settlePayload`, into: &buf)
-        FfiConverterOptionString.write(value.`asyncpayTopic`, into: &buf)
-        FfiConverterOptionData.write(value.`asyncpayPayload`, into: &buf)
-        FfiConverterOptionString.write(value.`registerTopic`, into: &buf)
-        FfiConverterOptionData.write(value.`registerPayload`, into: &buf)
-        FfiConverterSequenceString.write(value.`topics`, into: &buf)
-        FfiConverterSequenceData.write(value.`payloads`, into: &buf)
-        FfiConverterOptionData.write(value.`stateMp`, into: &buf)
-        FfiConverterSequenceString.write(value.`stateToDelete`, into: &buf)
-        FfiConverterOptionUInt64.write(value.`newBalance`, into: &buf)
-        FfiConverterOptionString.write(value.`myContactInfo`, into: &buf)
-        FfiConverterOptionString.write(value.`sentStatus`, into: &buf)
-        FfiConverterOptionString.write(value.`settledStatus`, into: &buf)
-        FfiConverterOptionString.write(value.`registerResponse`, into: &buf)
-        FfiConverterOptionString.write(value.`asyncpayTag`, into: &buf)
-        FfiConverterOptionString.write(value.`error`, into: &buf)
-        FfiConverterOptionString.write(value.`newTribe`, into: &buf)
-        FfiConverterOptionString.write(value.`tribeMembers`, into: &buf)
-        FfiConverterOptionString.write(value.`newInvite`, into: &buf)
-        FfiConverterOptionString.write(value.`inviterContactInfo`, into: &buf)
-        FfiConverterOptionString.write(value.`inviterAlias`, into: &buf)
-        FfiConverterOptionString.write(value.`initialTribe`, into: &buf)
-        FfiConverterOptionString.write(value.`lspHost`, into: &buf)
-        FfiConverterOptionString.write(value.`invoice`, into: &buf)
-        FfiConverterOptionString.write(value.`route`, into: &buf)
-        FfiConverterOptionString.write(value.`node`, into: &buf)
-        FfiConverterOptionString.write(value.`lastRead`, into: &buf)
-        FfiConverterOptionString.write(value.`muteLevels`, into: &buf)
-        FfiConverterOptionString.write(value.`payments`, into: &buf)
-        FfiConverterOptionUInt64.write(value.`paymentsTotal`, into: &buf)
-        FfiConverterOptionString.write(value.`tags`, into: &buf)
-        FfiConverterOptionString.write(value.`deletedMsgs`, into: &buf)
-        FfiConverterOptionUInt64.write(value.`newChildIdx`, into: &buf)
-        FfiConverterOptionString.write(value.`ping`, into: &buf)
+        FfiConverterSequenceTypeMsg.write(value.msgs, into: &buf)
+        FfiConverterOptionUInt64.write(value.msgsTotal, into: &buf)
+        FfiConverterOptionString.write(value.msgsCounts, into: &buf)
+        FfiConverterSequenceString.write(value.subscriptionTopics, into: &buf)
+        FfiConverterOptionString.write(value.settleTopic, into: &buf)
+        FfiConverterOptionData.write(value.settlePayload, into: &buf)
+        FfiConverterOptionString.write(value.asyncpayTopic, into: &buf)
+        FfiConverterOptionData.write(value.asyncpayPayload, into: &buf)
+        FfiConverterOptionString.write(value.registerTopic, into: &buf)
+        FfiConverterOptionData.write(value.registerPayload, into: &buf)
+        FfiConverterSequenceString.write(value.topics, into: &buf)
+        FfiConverterSequenceData.write(value.payloads, into: &buf)
+        FfiConverterOptionData.write(value.stateMp, into: &buf)
+        FfiConverterSequenceString.write(value.stateToDelete, into: &buf)
+        FfiConverterOptionUInt64.write(value.newBalance, into: &buf)
+        FfiConverterOptionString.write(value.myContactInfo, into: &buf)
+        FfiConverterOptionString.write(value.sentStatus, into: &buf)
+        FfiConverterOptionString.write(value.settledStatus, into: &buf)
+        FfiConverterOptionString.write(value.registerResponse, into: &buf)
+        FfiConverterOptionString.write(value.asyncpayTag, into: &buf)
+        FfiConverterOptionString.write(value.error, into: &buf)
+        FfiConverterOptionString.write(value.newTribe, into: &buf)
+        FfiConverterOptionString.write(value.tribeMembers, into: &buf)
+        FfiConverterOptionString.write(value.newInvite, into: &buf)
+        FfiConverterOptionString.write(value.inviterContactInfo, into: &buf)
+        FfiConverterOptionString.write(value.inviterAlias, into: &buf)
+        FfiConverterOptionString.write(value.initialTribe, into: &buf)
+        FfiConverterOptionString.write(value.lspHost, into: &buf)
+        FfiConverterOptionString.write(value.invoice, into: &buf)
+        FfiConverterOptionString.write(value.route, into: &buf)
+        FfiConverterOptionString.write(value.node, into: &buf)
+        FfiConverterOptionString.write(value.lastRead, into: &buf)
+        FfiConverterOptionString.write(value.muteLevels, into: &buf)
+        FfiConverterOptionString.write(value.payments, into: &buf)
+        FfiConverterOptionUInt64.write(value.paymentsTotal, into: &buf)
+        FfiConverterOptionString.write(value.tags, into: &buf)
+        FfiConverterOptionString.write(value.deletedMsgs, into: &buf)
+        FfiConverterOptionUInt64.write(value.newChildIdx, into: &buf)
+        FfiConverterOptionString.write(value.ping, into: &buf)
     }
 }
-
 
 public func FfiConverterTypeRunReturn_lift(_ buf: RustBuffer) throws -> RunReturn {
     return try FfiConverterTypeRunReturn.lift(buf)
@@ -1026,39 +1011,205 @@ public func FfiConverterTypeRunReturn_lower(_ value: RunReturn) -> RustBuffer {
     return FfiConverterTypeRunReturn.lower(value)
 }
 
-public enum SphinxError {
+public struct ServerStatus {
+    public var clnOk: Bool
+    public var degraded: Bool
+    public var reason: String?
+    public var ts: UInt64
 
-    
-    
-    case DerivePublicKey(`r`: String)
-    case DeriveSharedSecret(`r`: String)
-    case Encrypt(`r`: String)
-    case Decrypt(`r`: String)
-    case BadPubkey(`r`: String)
-    case BadSecret(`r`: String)
-    case BadNonce(`r`: String)
-    case BadCiper(`r`: String)
-    case InvalidNetwork(`r`: String)
-    case BadRequest(`r`: String)
-    case BadResponse(`r`: String)
-    case BadArgs(`r`: String)
-    case BadChildIndex(`r`: String)
-    case BadMsg(`r`: String)
-    case AddContactFailed(`r`: String)
-    case GetContactFailed(`r`: String)
-    case HandleFailed(`r`: String)
-    case FetchMsgsFailed(`r`: String)
-    case SendFailed(`r`: String)
-    case SetNetworkFailed(`r`: String)
-    case SetBlockheightFailed(`r`: String)
-    case ParseStateFailed(`r`: String)
-    case BadState(`r`: String)
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
+    public init(clnOk: Bool, degraded: Bool, reason: String?, ts: UInt64) {
+        self.clnOk = clnOk
+        self.degraded = degraded
+        self.reason = reason
+        self.ts = ts
+    }
+}
+
+extension ServerStatus: Equatable, Hashable {
+    public static func == (lhs: ServerStatus, rhs: ServerStatus) -> Bool {
+        if lhs.clnOk != rhs.clnOk {
+            return false
+        }
+        if lhs.degraded != rhs.degraded {
+            return false
+        }
+        if lhs.reason != rhs.reason {
+            return false
+        }
+        if lhs.ts != rhs.ts {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(clnOk)
+        hasher.combine(degraded)
+        hasher.combine(reason)
+        hasher.combine(ts)
+    }
+}
+
+public struct FfiConverterTypeServerStatus: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ServerStatus {
+        return try ServerStatus(
+            clnOk: FfiConverterBool.read(from: &buf),
+            degraded: FfiConverterBool.read(from: &buf),
+            reason: FfiConverterOptionString.read(from: &buf),
+            ts: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ServerStatus, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.clnOk, into: &buf)
+        FfiConverterBool.write(value.degraded, into: &buf)
+        FfiConverterOptionString.write(value.reason, into: &buf)
+        FfiConverterUInt64.write(value.ts, into: &buf)
+    }
+}
+
+public func FfiConverterTypeServerStatus_lift(_ buf: RustBuffer) throws -> ServerStatus {
+    return try FfiConverterTypeServerStatus.lift(buf)
+}
+
+public func FfiConverterTypeServerStatus_lower(_ value: ServerStatus) -> RustBuffer {
+    return FfiConverterTypeServerStatus.lower(value)
+}
+
+/// Note that we don't yet support `indirect` for enums.
+/// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+public enum MixerErrorCode {
+    case clnUnavailable
+    case clnTimeout
+    case insufficientBalance
+    case unknown
+}
+
+public struct FfiConverterTypeMixerErrorCode: FfiConverterRustBuffer {
+    typealias SwiftType = MixerErrorCode
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MixerErrorCode {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        case 1: return .clnUnavailable
+
+        case 2: return .clnTimeout
+
+        case 3: return .insufficientBalance
+
+        case 4: return .unknown
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: MixerErrorCode, into buf: inout [UInt8]) {
+        switch value {
+        case .clnUnavailable:
+            writeInt(&buf, Int32(1))
+
+        case .clnTimeout:
+            writeInt(&buf, Int32(2))
+
+        case .insufficientBalance:
+            writeInt(&buf, Int32(3))
+
+        case .unknown:
+            writeInt(&buf, Int32(4))
+        }
+    }
+}
+
+public func FfiConverterTypeMixerErrorCode_lift(_ buf: RustBuffer) throws -> MixerErrorCode {
+    return try FfiConverterTypeMixerErrorCode.lift(buf)
+}
+
+public func FfiConverterTypeMixerErrorCode_lower(_ value: MixerErrorCode) -> RustBuffer {
+    return FfiConverterTypeMixerErrorCode.lower(value)
+}
+
+extension MixerErrorCode: Equatable, Hashable {}
+
+/// Note that we don't yet support `indirect` for enums.
+/// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+public enum ServerHealth {
+    case ok
+    case degraded
+    case unknown
+}
+
+public struct FfiConverterTypeServerHealth: FfiConverterRustBuffer {
+    typealias SwiftType = ServerHealth
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ServerHealth {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        case 1: return .ok
+
+        case 2: return .degraded
+
+        case 3: return .unknown
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ServerHealth, into buf: inout [UInt8]) {
+        switch value {
+        case .ok:
+            writeInt(&buf, Int32(1))
+
+        case .degraded:
+            writeInt(&buf, Int32(2))
+
+        case .unknown:
+            writeInt(&buf, Int32(3))
+        }
+    }
+}
+
+public func FfiConverterTypeServerHealth_lift(_ buf: RustBuffer) throws -> ServerHealth {
+    return try FfiConverterTypeServerHealth.lift(buf)
+}
+
+public func FfiConverterTypeServerHealth_lower(_ value: ServerHealth) -> RustBuffer {
+    return FfiConverterTypeServerHealth.lower(value)
+}
+
+extension ServerHealth: Equatable, Hashable {}
+
+public enum SphinxError {
+    case DerivePublicKey(r: String)
+    case DeriveSharedSecret(r: String)
+    case Encrypt(r: String)
+    case Decrypt(r: String)
+    case BadPubkey(r: String)
+    case BadSecret(r: String)
+    case BadNonce(r: String)
+    case BadCiper(r: String)
+    case InvalidNetwork(r: String)
+    case BadRequest(r: String)
+    case BadResponse(r: String)
+    case BadArgs(r: String)
+    case BadChildIndex(r: String)
+    case BadMsg(r: String)
+    case AddContactFailed(r: String)
+    case GetContactFailed(r: String)
+    case HandleFailed(r: String)
+    case FetchMsgsFailed(r: String)
+    case SendFailed(r: String)
+    case SetNetworkFailed(r: String)
+    case SetBlockheightFailed(r: String)
+    case ParseStateFailed(r: String)
+    case BadState(r: String)
+    case ContentBudgetExceeded(r: String)
 
     fileprivate static func uniffiErrorHandler(_ error: RustBuffer) throws -> Error {
         return try FfiConverterTypeSphinxError.lift(error)
     }
 }
-
 
 public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
     typealias SwiftType = SphinxError
@@ -1066,218 +1217,191 @@ public struct FfiConverterTypeSphinxError: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SphinxError {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-
-        
-
-        
-        case 1: return .DerivePublicKey(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 1: return try .DerivePublicKey(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 2: return .DeriveSharedSecret(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 2: return try .DeriveSharedSecret(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 3: return .Encrypt(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 3: return try .Encrypt(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 4: return .Decrypt(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 4: return try .Decrypt(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 5: return .BadPubkey(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 5: return try .BadPubkey(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 6: return .BadSecret(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 6: return try .BadSecret(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 7: return .BadNonce(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 7: return try .BadNonce(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 8: return .BadCiper(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 8: return try .BadCiper(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 9: return .InvalidNetwork(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 9: return try .InvalidNetwork(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 10: return .BadRequest(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 10: return try .BadRequest(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 11: return .BadResponse(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 11: return try .BadResponse(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 12: return .BadArgs(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 12: return try .BadArgs(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 13: return .BadChildIndex(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 13: return try .BadChildIndex(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 14: return .BadMsg(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 14: return try .BadMsg(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 15: return .AddContactFailed(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 15: return try .AddContactFailed(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 16: return .GetContactFailed(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 16: return try .GetContactFailed(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 17: return .HandleFailed(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 17: return try .HandleFailed(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 18: return .FetchMsgsFailed(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 18: return try .FetchMsgsFailed(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 19: return .SendFailed(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 19: return try .SendFailed(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 20: return .SetNetworkFailed(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 20: return try .SetNetworkFailed(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 21: return .SetBlockheightFailed(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 21: return try .SetBlockheightFailed(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 22: return .ParseStateFailed(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 22: return try .ParseStateFailed(
+                r: FfiConverterString.read(from: &buf)
             )
-        case 23: return .BadState(
-            `r`: try FfiConverterString.read(from: &buf)
+        case 23: return try .BadState(
+                r: FfiConverterString.read(from: &buf)
             )
-
-         default: throw UniffiInternalError.unexpectedEnumCase
+        case 24: return try .ContentBudgetExceeded(
+                r: FfiConverterString.read(from: &buf)
+            )
+        default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: SphinxError, into buf: inout [UInt8]) {
         switch value {
-
-        
-
-        
-        
-        case let .DerivePublicKey(`r`):
+        case let .DerivePublicKey(r):
             writeInt(&buf, Int32(1))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .DeriveSharedSecret(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .DeriveSharedSecret(r):
             writeInt(&buf, Int32(2))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .Encrypt(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .Encrypt(r):
             writeInt(&buf, Int32(3))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .Decrypt(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .Decrypt(r):
             writeInt(&buf, Int32(4))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .BadPubkey(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .BadPubkey(r):
             writeInt(&buf, Int32(5))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .BadSecret(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .BadSecret(r):
             writeInt(&buf, Int32(6))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .BadNonce(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .BadNonce(r):
             writeInt(&buf, Int32(7))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .BadCiper(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .BadCiper(r):
             writeInt(&buf, Int32(8))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .InvalidNetwork(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .InvalidNetwork(r):
             writeInt(&buf, Int32(9))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .BadRequest(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .BadRequest(r):
             writeInt(&buf, Int32(10))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .BadResponse(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .BadResponse(r):
             writeInt(&buf, Int32(11))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .BadArgs(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .BadArgs(r):
             writeInt(&buf, Int32(12))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .BadChildIndex(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .BadChildIndex(r):
             writeInt(&buf, Int32(13))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .BadMsg(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .BadMsg(r):
             writeInt(&buf, Int32(14))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .AddContactFailed(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .AddContactFailed(r):
             writeInt(&buf, Int32(15))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .GetContactFailed(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .GetContactFailed(r):
             writeInt(&buf, Int32(16))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .HandleFailed(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .HandleFailed(r):
             writeInt(&buf, Int32(17))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .FetchMsgsFailed(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .FetchMsgsFailed(r):
             writeInt(&buf, Int32(18))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .SendFailed(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .SendFailed(r):
             writeInt(&buf, Int32(19))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .SetNetworkFailed(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .SetNetworkFailed(r):
             writeInt(&buf, Int32(20))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .SetBlockheightFailed(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .SetBlockheightFailed(r):
             writeInt(&buf, Int32(21))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .ParseStateFailed(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .ParseStateFailed(r):
             writeInt(&buf, Int32(22))
-            FfiConverterString.write(`r`, into: &buf)
-            
-        
-        case let .BadState(`r`):
+            FfiConverterString.write(r, into: &buf)
+
+        case let .BadState(r):
             writeInt(&buf, Int32(23))
-            FfiConverterString.write(`r`, into: &buf)
-            
+            FfiConverterString.write(r, into: &buf)
+
+        case let .ContentBudgetExceeded(r):
+            writeInt(&buf, Int32(24))
+            FfiConverterString.write(r, into: &buf)
         }
     }
 }
 
-
 extension SphinxError: Equatable, Hashable {}
 
-extension SphinxError: Error { }
+extension SphinxError: Error {}
 
-fileprivate struct FfiConverterOptionUInt8: FfiConverterRustBuffer {
+private struct FfiConverterOptionUInt8: FfiConverterRustBuffer {
     typealias SwiftType = UInt8?
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
             writeInt(&buf, Int8(0))
             return
@@ -1286,7 +1410,7 @@ fileprivate struct FfiConverterOptionUInt8: FfiConverterRustBuffer {
         FfiConverterUInt8.write(value, into: &buf)
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterUInt8.read(from: &buf)
@@ -1295,10 +1419,10 @@ fileprivate struct FfiConverterOptionUInt8: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionUInt32: FfiConverterRustBuffer {
+private struct FfiConverterOptionUInt32: FfiConverterRustBuffer {
     typealias SwiftType = UInt32?
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
             writeInt(&buf, Int8(0))
             return
@@ -1307,7 +1431,7 @@ fileprivate struct FfiConverterOptionUInt32: FfiConverterRustBuffer {
         FfiConverterUInt32.write(value, into: &buf)
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterUInt32.read(from: &buf)
@@ -1316,10 +1440,10 @@ fileprivate struct FfiConverterOptionUInt32: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionUInt64: FfiConverterRustBuffer {
+private struct FfiConverterOptionUInt64: FfiConverterRustBuffer {
     typealias SwiftType = UInt64?
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
             writeInt(&buf, Int8(0))
             return
@@ -1328,7 +1452,7 @@ fileprivate struct FfiConverterOptionUInt64: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value, into: &buf)
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterUInt64.read(from: &buf)
@@ -1337,10 +1461,10 @@ fileprivate struct FfiConverterOptionUInt64: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionBool: FfiConverterRustBuffer {
+private struct FfiConverterOptionBool: FfiConverterRustBuffer {
     typealias SwiftType = Bool?
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
             writeInt(&buf, Int8(0))
             return
@@ -1349,7 +1473,7 @@ fileprivate struct FfiConverterOptionBool: FfiConverterRustBuffer {
         FfiConverterBool.write(value, into: &buf)
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterBool.read(from: &buf)
@@ -1358,10 +1482,10 @@ fileprivate struct FfiConverterOptionBool: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
+private struct FfiConverterOptionString: FfiConverterRustBuffer {
     typealias SwiftType = String?
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
             writeInt(&buf, Int8(0))
             return
@@ -1370,7 +1494,7 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
         FfiConverterString.write(value, into: &buf)
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterString.read(from: &buf)
@@ -1379,10 +1503,10 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionData: FfiConverterRustBuffer {
+private struct FfiConverterOptionData: FfiConverterRustBuffer {
     typealias SwiftType = Data?
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
             writeInt(&buf, Int8(0))
             return
@@ -1391,7 +1515,7 @@ fileprivate struct FfiConverterOptionData: FfiConverterRustBuffer {
         FfiConverterData.write(value, into: &buf)
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterData.read(from: &buf)
@@ -1400,10 +1524,31 @@ fileprivate struct FfiConverterOptionData: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionSequenceUInt64: FfiConverterRustBuffer {
+private struct FfiConverterOptionTypeServerStatus: FfiConverterRustBuffer {
+    typealias SwiftType = ServerStatus?
+
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeServerStatus.write(value, into: &buf)
+    }
+
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeServerStatus.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+private struct FfiConverterOptionSequenceUInt64: FfiConverterRustBuffer {
     typealias SwiftType = [UInt64]?
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
             writeInt(&buf, Int8(0))
             return
@@ -1412,7 +1557,7 @@ fileprivate struct FfiConverterOptionSequenceUInt64: FfiConverterRustBuffer {
         FfiConverterSequenceUInt64.write(value, into: &buf)
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterSequenceUInt64.read(from: &buf)
@@ -1421,10 +1566,10 @@ fileprivate struct FfiConverterOptionSequenceUInt64: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterSequenceUInt64: FfiConverterRustBuffer {
+private struct FfiConverterSequenceUInt64: FfiConverterRustBuffer {
     typealias SwiftType = [UInt64]
 
-    public static func write(_ value: [UInt64], into buf: inout [UInt8]) {
+    static func write(_ value: [UInt64], into buf: inout [UInt8]) {
         let len = Int32(value.count)
         writeInt(&buf, len)
         for item in value {
@@ -1432,21 +1577,21 @@ fileprivate struct FfiConverterSequenceUInt64: FfiConverterRustBuffer {
         }
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [UInt64] {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [UInt64] {
         let len: Int32 = try readInt(&buf)
         var seq = [UInt64]()
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
-            seq.append(try FfiConverterUInt64.read(from: &buf))
+            try seq.append(FfiConverterUInt64.read(from: &buf))
         }
         return seq
     }
 }
 
-fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
+private struct FfiConverterSequenceString: FfiConverterRustBuffer {
     typealias SwiftType = [String]
 
-    public static func write(_ value: [String], into buf: inout [UInt8]) {
+    static func write(_ value: [String], into buf: inout [UInt8]) {
         let len = Int32(value.count)
         writeInt(&buf, len)
         for item in value {
@@ -1454,21 +1599,21 @@ fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
         }
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [String] {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [String] {
         let len: Int32 = try readInt(&buf)
         var seq = [String]()
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
-            seq.append(try FfiConverterString.read(from: &buf))
+            try seq.append(FfiConverterString.read(from: &buf))
         }
         return seq
     }
 }
 
-fileprivate struct FfiConverterSequenceData: FfiConverterRustBuffer {
+private struct FfiConverterSequenceData: FfiConverterRustBuffer {
     typealias SwiftType = [Data]
 
-    public static func write(_ value: [Data], into buf: inout [UInt8]) {
+    static func write(_ value: [Data], into buf: inout [UInt8]) {
         let len = Int32(value.count)
         writeInt(&buf, len)
         for item in value {
@@ -1476,21 +1621,21 @@ fileprivate struct FfiConverterSequenceData: FfiConverterRustBuffer {
         }
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Data] {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Data] {
         let len: Int32 = try readInt(&buf)
         var seq = [Data]()
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
-            seq.append(try FfiConverterData.read(from: &buf))
+            try seq.append(FfiConverterData.read(from: &buf))
         }
         return seq
     }
 }
 
-fileprivate struct FfiConverterSequenceTypeMsg: FfiConverterRustBuffer {
+private struct FfiConverterSequenceTypeMsg: FfiConverterRustBuffer {
     typealias SwiftType = [Msg]
 
-    public static func write(_ value: [Msg], into buf: inout [UInt8]) {
+    static func write(_ value: [Msg], into buf: inout [UInt8]) {
         let len = Int32(value.count)
         writeInt(&buf, len)
         for item in value {
@@ -1498,1041 +1643,1167 @@ fileprivate struct FfiConverterSequenceTypeMsg: FfiConverterRustBuffer {
         }
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Msg] {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Msg] {
         let len: Int32 = try readInt(&buf)
         var seq = [Msg]()
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeMsg.read(from: &buf))
+            try seq.append(FfiConverterTypeMsg.read(from: &buf))
         }
         return seq
     }
 }
 
-public func `pubkeyFromSecretKey`(`mySecretKey`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_pubkey_from_secret_key(
-        FfiConverterString.lower(`mySecretKey`),$0)
-}
-    )
-}
-
-public func `deriveSharedSecret`(`theirPubkey`: String, `mySecretKey`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_derive_shared_secret(
-        FfiConverterString.lower(`theirPubkey`),
-        FfiConverterString.lower(`mySecretKey`),$0)
-}
-    )
-}
-
-public func `encrypt`(`plaintext`: String, `secret`: String, `nonce`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_encrypt(
-        FfiConverterString.lower(`plaintext`),
-        FfiConverterString.lower(`secret`),
-        FfiConverterString.lower(`nonce`),$0)
-}
-    )
-}
-
-public func `decrypt`(`ciphertext`: String, `secret`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_decrypt(
-        FfiConverterString.lower(`ciphertext`),
-        FfiConverterString.lower(`secret`),$0)
-}
-    )
-}
-
-public func `nodeKeys`(`net`: String, `seed`: String) throws -> Keys {
-    return try  FfiConverterTypeKeys.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_node_keys(
-        FfiConverterString.lower(`net`),
-        FfiConverterString.lower(`seed`),$0)
-}
-    )
-}
-
-public func `mnemonicFromEntropy`(`entropy`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_mnemonic_from_entropy(
-        FfiConverterString.lower(`entropy`),$0)
-}
-    )
-}
-
-public func `entropyFromMnemonic`(`mnemonic`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_entropy_from_mnemonic(
-        FfiConverterString.lower(`mnemonic`),$0)
-}
-    )
-}
-
-public func `mnemonicToSeed`(`mnemonic`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_mnemonic_to_seed(
-        FfiConverterString.lower(`mnemonic`),$0)
-}
-    )
-}
-
-public func `entropyToSeed`(`entropy`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_entropy_to_seed(
-        FfiConverterString.lower(`entropy`),$0)
-}
-    )
-}
-
-public func `buildRequest`(`msg`: String, `secret`: String, `nonce`: UInt64) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_build_request(
-        FfiConverterString.lower(`msg`),
-        FfiConverterString.lower(`secret`),
-        FfiConverterUInt64.lower(`nonce`),$0)
-}
-    )
-}
-
-public func `parseResponse`(`res`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_parse_response(
-        FfiConverterString.lower(`res`),$0)
-}
-    )
-}
-
-public func `makeAuthToken`(`ts`: UInt32, `secret`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_make_auth_token(
-        FfiConverterUInt32.lower(`ts`),
-        FfiConverterString.lower(`secret`),$0)
-}
-    )
-}
-
-public func `sha256`(`msg`: Data)  -> String {
-    return try!  FfiConverterString.lift(
-        try! rustCall() {
-    uniffi_sphinxrs_fn_func_sha_256(
-        FfiConverterData.lower(`msg`),$0)
-}
-    )
-}
-
-public func `createOnion`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String, `hops`: String, `payload`: Data) throws -> Data {
-    return try  FfiConverterData.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_create_onion(
-        FfiConverterString.lower(`seed`),
-        FfiConverterUInt64.lower(`idx`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),
-        FfiConverterString.lower(`hops`),
-        FfiConverterData.lower(`payload`),$0)
-}
-    )
-}
-
-public func `createOnionMsg`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String, `hops`: String, `json`: String) throws -> Data {
-    return try  FfiConverterData.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_create_onion_msg(
-        FfiConverterString.lower(`seed`),
-        FfiConverterUInt64.lower(`idx`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),
-        FfiConverterString.lower(`hops`),
-        FfiConverterString.lower(`json`),$0)
-}
-    )
-}
-
-public func `createKeysend`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String, `hops`: String, `msat`: UInt64, `rhash`: String, `payload`: Data, `currHeight`: UInt32, `preimage`: String) throws -> Data {
-    return try  FfiConverterData.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_create_keysend(
-        FfiConverterString.lower(`seed`),
-        FfiConverterUInt64.lower(`idx`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),
-        FfiConverterString.lower(`hops`),
-        FfiConverterUInt64.lower(`msat`),
-        FfiConverterString.lower(`rhash`),
-        FfiConverterData.lower(`payload`),
-        FfiConverterUInt32.lower(`currHeight`),
-        FfiConverterString.lower(`preimage`),$0)
-}
-    )
-}
-
-public func `createKeysendMsg`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String, `hops`: String, `msat`: UInt64, `rhash`: String, `msgJson`: String, `currHeight`: UInt32, `preimage`: String) throws -> Data {
-    return try  FfiConverterData.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_create_keysend_msg(
-        FfiConverterString.lower(`seed`),
-        FfiConverterUInt64.lower(`idx`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),
-        FfiConverterString.lower(`hops`),
-        FfiConverterUInt64.lower(`msat`),
-        FfiConverterString.lower(`rhash`),
-        FfiConverterString.lower(`msgJson`),
-        FfiConverterUInt32.lower(`currHeight`),
-        FfiConverterString.lower(`preimage`),$0)
-}
-    )
-}
-
-public func `peelOnion`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String, `payload`: Data) throws -> Data {
-    return try  FfiConverterData.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_peel_onion(
-        FfiConverterString.lower(`seed`),
-        FfiConverterUInt64.lower(`idx`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),
-        FfiConverterData.lower(`payload`),$0)
-}
-    )
-}
-
-public func `peelOnionMsg`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String, `payload`: Data) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_peel_onion_msg(
-        FfiConverterString.lower(`seed`),
-        FfiConverterUInt64.lower(`idx`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),
-        FfiConverterData.lower(`payload`),$0)
-}
-    )
-}
-
-public func `peelPayment`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String, `payload`: Data, `rhash`: String, `curHeight`: UInt32, `cltvExpiry`: UInt32) throws -> Data {
-    return try  FfiConverterData.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_peel_payment(
-        FfiConverterString.lower(`seed`),
-        FfiConverterUInt64.lower(`idx`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),
-        FfiConverterData.lower(`payload`),
-        FfiConverterString.lower(`rhash`),
-        FfiConverterUInt32.lower(`curHeight`),
-        FfiConverterUInt32.lower(`cltvExpiry`),$0)
-}
-    )
-}
-
-public func `peelPaymentMsg`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String, `payload`: Data, `rhash`: String, `curHeight`: UInt32, `cltvExpiry`: UInt32) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_peel_payment_msg(
-        FfiConverterString.lower(`seed`),
-        FfiConverterUInt64.lower(`idx`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),
-        FfiConverterData.lower(`payload`),
-        FfiConverterString.lower(`rhash`),
-        FfiConverterUInt32.lower(`curHeight`),
-        FfiConverterUInt32.lower(`cltvExpiry`),$0)
-}
-    )
-}
-
-public func `signMs`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_sign_ms(
-        FfiConverterString.lower(`seed`),
-        FfiConverterUInt64.lower(`idx`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),$0)
-}
-    )
-}
-
-public func `signedTimestamp`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_signed_timestamp(
-        FfiConverterString.lower(`seed`),
-        FfiConverterUInt64.lower(`idx`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),$0)
-}
-    )
-}
-
-public func `signBytes`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String, `msg`: Data) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_sign_bytes(
-        FfiConverterString.lower(`seed`),
-        FfiConverterUInt64.lower(`idx`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),
-        FfiConverterData.lower(`msg`),$0)
-}
-    )
-}
-
-public func `signBase64`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String, `msg`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_sign_base64(
-        FfiConverterString.lower(`seed`),
-        FfiConverterUInt64.lower(`idx`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),
-        FfiConverterString.lower(`msg`),$0)
-}
-    )
-}
-
-public func `pubkeyFromSeed`(`seed`: String, `idx`: UInt64, `time`: String, `network`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_pubkey_from_seed(
-        FfiConverterString.lower(`seed`),
-        FfiConverterUInt64.lower(`idx`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),$0)
-}
-    )
-}
-
-public func `rootSignMs`(`seed`: String, `time`: String, `network`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_root_sign_ms(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),$0)
-}
-    )
-}
-
-public func `xpubFromSeed`(`seed`: String, `time`: String, `network`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_xpub_from_seed(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`time`),
-        FfiConverterString.lower(`network`),$0)
-}
-    )
-}
-
-public func `setNetwork`(`network`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_set_network(
-        FfiConverterString.lower(`network`),$0)
-}
-    )
-}
-
-public func `setDevice`(`device`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_set_device(
-        FfiConverterString.lower(`device`),$0)
-}
-    )
-}
-
-public func `setBlockheight`(`blockheight`: UInt32) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_set_blockheight(
-        FfiConverterUInt32.lower(`blockheight`),$0)
-}
-    )
-}
-
-public func `getBlockheight`(`seed`: String, `uniqueTime`: String, `state`: Data) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_get_blockheight(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),$0)
-}
-    )
-}
-
-public func `addContact`(`seed`: String, `uniqueTime`: String, `state`: Data, `toPubkey`: String, `routeHint`: String, `myAlias`: String, `myImg`: String, `amtMsat`: UInt64, `inviteCode`: String?, `theirAlias`: String?) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_add_contact(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`toPubkey`),
-        FfiConverterString.lower(`routeHint`),
-        FfiConverterString.lower(`myAlias`),
-        FfiConverterString.lower(`myImg`),
-        FfiConverterUInt64.lower(`amtMsat`),
-        FfiConverterOptionString.lower(`inviteCode`),
-        FfiConverterOptionString.lower(`theirAlias`),$0)
-}
-    )
-}
-
-public func `getContact`(`state`: Data, `pubkey`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_get_contact(
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`pubkey`),$0)
-}
-    )
-}
-
-public func `listContacts`(`state`: Data) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_list_contacts(
-        FfiConverterData.lower(`state`),$0)
-}
-    )
-}
-
-public func `contactPubkeyByChildIndex`(`state`: Data, `childIdx`: UInt64) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_contact_pubkey_by_child_index(
-        FfiConverterData.lower(`state`),
-        FfiConverterUInt64.lower(`childIdx`),$0)
-}
-    )
-}
-
-public func `contactPubkeyByEncryptedChild`(`seed`: String, `state`: Data, `child`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(
-        FfiConverterString.lower(`seed`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`child`),$0)
-}
-    )
-}
-
-public func `getTribeManagementTopic`(`seed`: String, `uniqueTime`: String, `state`: Data) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_get_tribe_management_topic(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),$0)
-}
-    )
-}
-
-public func `initialSetup`(`seed`: String, `uniqueTime`: String, `state`: Data, `device`: String, `inviteCode`: String?) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_initial_setup(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`device`),
-        FfiConverterOptionString.lower(`inviteCode`),$0)
-}
-    )
-}
-
-public func `fetchMsgs`(`seed`: String, `uniqueTime`: String, `state`: Data, `lastMsgIdx`: UInt64, `limit`: UInt32?) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_fetch_msgs(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterUInt64.lower(`lastMsgIdx`),
-        FfiConverterOptionUInt32.lower(`limit`),$0)
-}
-    )
-}
-
-public func `handle`(`topic`: String, `payload`: Data, `seed`: String, `uniqueTime`: String, `state`: Data, `myAlias`: String, `myImg`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_handle(
-        FfiConverterString.lower(`topic`),
-        FfiConverterData.lower(`payload`),
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`myAlias`),
-        FfiConverterString.lower(`myImg`),$0)
-}
-    )
-}
-
-public func `send`(`seed`: String, `uniqueTime`: String, `to`: String, `msgType`: UInt8, `msgJson`: String, `state`: Data, `myAlias`: String, `myImg`: String, `amtMsat`: UInt64, `isTribe`: Bool = false) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_send(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterString.lower(`to`),
-        FfiConverterUInt8.lower(`msgType`),
-        FfiConverterString.lower(`msgJson`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`myAlias`),
-        FfiConverterString.lower(`myImg`),
-        FfiConverterUInt64.lower(`amtMsat`),
-        FfiConverterBool.lower(`isTribe`),$0)
-}
-    )
-}
-
-public func `keysend`(`seed`: String, `uniqueTime`: String, `to`: String, `state`: Data, `amtMsat`: UInt64, `data`: Data?, `routeHint`: String?) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_keysend(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterString.lower(`to`),
-        FfiConverterData.lower(`state`),
-        FfiConverterUInt64.lower(`amtMsat`),
-        FfiConverterOptionData.lower(`data`),
-        FfiConverterOptionString.lower(`routeHint`),$0)
-}
-    )
-}
-
-public func `pay`(`seed`: String, `uniqueTime`: String, `state`: Data, `bolt11`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_pay(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`bolt11`),$0)
-}
-    )
-}
-
-public func `makeMediaToken`(`seed`: String, `uniqueTime`: String, `state`: Data, `host`: String, `muid`: String, `to`: String, `expiry`: UInt32) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_make_media_token(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`host`),
-        FfiConverterString.lower(`muid`),
-        FfiConverterString.lower(`to`),
-        FfiConverterUInt32.lower(`expiry`),$0)
-}
-    )
-}
-
-public func `makeMediaTokenWithMeta`(`seed`: String, `uniqueTime`: String, `state`: Data, `host`: String, `muid`: String, `to`: String, `expiry`: UInt32, `meta`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_make_media_token_with_meta(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`host`),
-        FfiConverterString.lower(`muid`),
-        FfiConverterString.lower(`to`),
-        FfiConverterUInt32.lower(`expiry`),
-        FfiConverterString.lower(`meta`),$0)
-}
-    )
-}
-
-public func `makeMediaTokenWithPrice`(`seed`: String, `uniqueTime`: String, `state`: Data, `host`: String, `muid`: String, `to`: String, `expiry`: UInt32, `price`: UInt64) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_make_media_token_with_price(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`host`),
-        FfiConverterString.lower(`muid`),
-        FfiConverterString.lower(`to`),
-        FfiConverterUInt32.lower(`expiry`),
-        FfiConverterUInt64.lower(`price`),$0)
-}
-    )
-}
-
-public func `requestInvoice`(`seed`: String, `uniqueTime`: String, `state`: Data, `amtMsat`: UInt64, `description`: String?) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_request_invoice(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterUInt64.lower(`amtMsat`),
-        FfiConverterOptionString.lower(`description`),$0)
-}
-    )
-}
-
-public func `makeInvoice`(`seed`: String, `uniqueTime`: String, `state`: Data, `amtMsat`: UInt64, `description`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_make_invoice(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterUInt64.lower(`amtMsat`),
-        FfiConverterString.lower(`description`),$0)
-}
-    )
-}
-
-public func `payInvoice`(`seed`: String, `uniqueTime`: String, `state`: Data, `bolt11`: String, `overpayMsat`: UInt64?) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_pay_invoice(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`bolt11`),
-        FfiConverterOptionUInt64.lower(`overpayMsat`),$0)
-}
-    )
-}
-
-public func `payContactInvoice`(`seed`: String, `uniqueTime`: String, `state`: Data, `bolt11`: String, `myAlias`: String, `myImg`: String, `isTribe`: Bool) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_pay_contact_invoice(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`bolt11`),
-        FfiConverterString.lower(`myAlias`),
-        FfiConverterString.lower(`myImg`),
-        FfiConverterBool.lower(`isTribe`),$0)
-}
-    )
-}
-
-public func `paymentHashFromInvoice`(`bolt11`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_payment_hash_from_invoice(
-        FfiConverterString.lower(`bolt11`),$0)
-}
-    )
-}
-
-public func `parseInvoice`(`invoiceJson`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_parse_invoice(
-        FfiConverterString.lower(`invoiceJson`),$0)
-}
-    )
-}
-
-public func `createTribe`(`seed`: String, `uniqueTime`: String, `state`: Data, `tribeServerPubkey`: String, `tribeJson`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_create_tribe(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`tribeServerPubkey`),
-        FfiConverterString.lower(`tribeJson`),$0)
-}
-    )
-}
-
-public func `joinTribe`(`seed`: String, `uniqueTime`: String, `state`: Data, `tribePubkey`: String, `tribeRouteHint`: String, `alias`: String, `amtMsat`: UInt64, `isPrivate`: Bool) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_join_tribe(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`tribePubkey`),
-        FfiConverterString.lower(`tribeRouteHint`),
-        FfiConverterString.lower(`alias`),
-        FfiConverterUInt64.lower(`amtMsat`),
-        FfiConverterBool.lower(`isPrivate`),$0)
-}
-    )
-}
-
-public func `listTribeMembers`(`seed`: String, `uniqueTime`: String, `state`: Data, `tribeServerPubkey`: String, `tribePubkey`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_list_tribe_members(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`tribeServerPubkey`),
-        FfiConverterString.lower(`tribePubkey`),$0)
-}
-    )
-}
-
-public func `makeInvite`(`seed`: String, `uniqueTime`: String, `state`: Data, `host`: String, `amtMsat`: UInt64, `myAlias`: String, `tribeHost`: String?, `tribePubkey`: String?, `inviterPubkey`: String?, `inviterRouteHint`: String?) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_make_invite(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`host`),
-        FfiConverterUInt64.lower(`amtMsat`),
-        FfiConverterString.lower(`myAlias`),
-        FfiConverterOptionString.lower(`tribeHost`),
-        FfiConverterOptionString.lower(`tribePubkey`),
-        FfiConverterOptionString.lower(`inviterPubkey`),
-        FfiConverterOptionString.lower(`inviterRouteHint`),$0)
-}
-    )
-}
-
-public func `processInvite`(`seed`: String, `uniqueTime`: String, `state`: Data, `inviteQr`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_process_invite(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`inviteQr`),$0)
-}
-    )
-}
-
-public func `parseInvite`(`inviteQr`: String) throws -> ParsedInvite {
-    return try  FfiConverterTypeParsedInvite.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_parse_invite(
-        FfiConverterString.lower(`inviteQr`),$0)
-}
+public func pubkeyFromSecretKey(mySecretKey: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_pubkey_from_secret_key(
+                FfiConverterString.lower(mySecretKey), $0
+            )
+        }
     )
 }
 
-public func `codeFromInvite`(`inviteQr`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_code_from_invite(
-        FfiConverterString.lower(`inviteQr`),$0)
-}
-    )
-}
-
-public func `cancelInvite`(`seed`: String, `uniqueTime`: String, `state`: Data, `inviteCode`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_cancel_invite(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`inviteCode`),$0)
-}
-    )
-}
-
-public func `getDefaultTribeServer`(`state`: Data) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_get_default_tribe_server(
-        FfiConverterData.lower(`state`),$0)
-}
-    )
-}
-
-public func `read`(`seed`: String, `uniqueTime`: String, `state`: Data, `pubkey`: String, `msgIdx`: UInt64) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_read(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`pubkey`),
-        FfiConverterUInt64.lower(`msgIdx`),$0)
-}
-    )
-}
-
-public func `getReads`(`seed`: String, `uniqueTime`: String, `state`: Data) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_get_reads(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),$0)
-}
-    )
-}
-
-public func `mute`(`seed`: String, `uniqueTime`: String, `state`: Data, `pubkey`: String, `muteLevel`: UInt8) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_mute(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`pubkey`),
-        FfiConverterUInt8.lower(`muteLevel`),$0)
-}
-    )
-}
-
-public func `getMutes`(`seed`: String, `uniqueTime`: String, `state`: Data) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_get_mutes(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),$0)
-}
-    )
-}
-
-public func `setPushToken`(`seed`: String, `uniqueTime`: String, `state`: Data, `pushToken`: String, `pushKey`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_set_push_token(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`pushToken`),
-        FfiConverterString.lower(`pushKey`),$0)
-}
-    )
-}
-
-public func `decryptChildIndex`(`encryptedChild`: String, `pushKey`: String) throws -> UInt64 {
-    return try  FfiConverterUInt64.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_decrypt_child_index(
-        FfiConverterString.lower(`encryptedChild`),
-        FfiConverterString.lower(`pushKey`),$0)
-}
-    )
-}
-
-public func `getMsgsCounts`(`seed`: String, `uniqueTime`: String, `state`: Data) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_get_msgs_counts(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),$0)
-}
-    )
-}
-
-public func `fetchMsgsBatch`(`seed`: String, `uniqueTime`: String, `state`: Data, `lastMsgIdx`: UInt64, `limit`: UInt32?, `reverse`: Bool?) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_fetch_msgs_batch(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterUInt64.lower(`lastMsgIdx`),
-        FfiConverterOptionUInt32.lower(`limit`),
-        FfiConverterOptionBool.lower(`reverse`),$0)
-}
-    )
-}
-
-public func `fetchMsgsBatchPerContact`(`seed`: String, `uniqueTime`: String, `state`: Data, `lastMsgIdx`: UInt64, `limit`: UInt32?, `reverse`: Bool?, `contact`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_fetch_msgs_batch_per_contact(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterUInt64.lower(`lastMsgIdx`),
-        FfiConverterOptionUInt32.lower(`limit`),
-        FfiConverterOptionBool.lower(`reverse`),
-        FfiConverterString.lower(`contact`),$0)
-}
-    )
-}
-
-public func `fetchMsgsBatchOkkey`(`seed`: String, `uniqueTime`: String, `state`: Data, `lastMsgIdx`: UInt64, `limit`: UInt32?, `reverse`: Bool?) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_fetch_msgs_batch_okkey(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterUInt64.lower(`lastMsgIdx`),
-        FfiConverterOptionUInt32.lower(`limit`),
-        FfiConverterOptionBool.lower(`reverse`),$0)
-}
-    )
-}
-
-public func `fetchFirstMsgsPerKey`(`seed`: String, `uniqueTime`: String, `state`: Data, `lastMsgIdx`: UInt64, `limit`: UInt32?, `reverse`: Bool?) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_fetch_first_msgs_per_key(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterUInt64.lower(`lastMsgIdx`),
-        FfiConverterOptionUInt32.lower(`limit`),
-        FfiConverterOptionBool.lower(`reverse`),$0)
-}
-    )
-}
-
-public func `fetchPayments`(`seed`: String, `uniqueTime`: String, `state`: Data, `since`: UInt64?, `limit`: UInt32?, `scid`: UInt64?, `remoteOnly`: Bool?, `minMsat`: UInt64?, `reverse`: Bool?) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_fetch_payments(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterOptionUInt64.lower(`since`),
-        FfiConverterOptionUInt32.lower(`limit`),
-        FfiConverterOptionUInt64.lower(`scid`),
-        FfiConverterOptionBool.lower(`remoteOnly`),
-        FfiConverterOptionUInt64.lower(`minMsat`),
-        FfiConverterOptionBool.lower(`reverse`),$0)
-}
-    )
-}
-
-public func `getTags`(`seed`: String, `uniqueTime`: String, `state`: Data, `tags`: [String], `pubkey`: String?) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_get_tags(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterSequenceString.lower(`tags`),
-        FfiConverterOptionString.lower(`pubkey`),$0)
-}
-    )
-}
-
-public func `deleteMsgs`(`seed`: String, `uniqueTime`: String, `state`: Data, `pubkey`: String?, `msgIdxs`: [UInt64]?) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_delete_msgs(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterOptionString.lower(`pubkey`),
-        FfiConverterOptionSequenceUInt64.lower(`msgIdxs`),$0)
-}
-    )
-}
-
-public func `updateTribe`(`seed`: String, `uniqueTime`: String, `state`: Data, `tribeServerPubkey`: String, `tribeJson`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_update_tribe(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`tribeServerPubkey`),
-        FfiConverterString.lower(`tribeJson`),$0)
-}
+public func deriveSharedSecret(theirPubkey: String, mySecretKey: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_derive_shared_secret(
+                FfiConverterString.lower(theirPubkey),
+                FfiConverterString.lower(mySecretKey), $0
+            )
+        }
     )
 }
 
-public func `deleteTribe`(`seed`: String, `uniqueTime`: String, `state`: Data, `tribeServerPubkey`: String, `tribePubkey`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_delete_tribe(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`tribeServerPubkey`),
-        FfiConverterString.lower(`tribePubkey`),$0)
-}
+public func encrypt(plaintext: String, secret: String, nonce: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_encrypt(
+                FfiConverterString.lower(plaintext),
+                FfiConverterString.lower(secret),
+                FfiConverterString.lower(nonce), $0
+            )
+        }
     )
 }
 
-public func `addNode`(`node`: String) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_add_node(
-        FfiConverterString.lower(`node`),$0)
-}
+public func decrypt(ciphertext: String, secret: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_decrypt(
+                FfiConverterString.lower(ciphertext),
+                FfiConverterString.lower(secret), $0
+            )
+        }
     )
 }
 
-public func `concatRoute`(`state`: Data, `endHops`: String, `routerPubkey`: String, `amtMsat`: UInt64) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_concat_route(
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`endHops`),
-        FfiConverterString.lower(`routerPubkey`),
-        FfiConverterUInt64.lower(`amtMsat`),$0)
-}
+public func nodeKeys(net: String, seed: String) throws -> Keys {
+    return try FfiConverterTypeKeys.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_node_keys(
+                FfiConverterString.lower(net),
+                FfiConverterString.lower(seed), $0
+            )
+        }
     )
 }
 
-public func `pingDone`(`seed`: String, `uniqueTime`: String, `state`: Data, `pingTs`: UInt64) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_ping_done(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),
-        FfiConverterUInt64.lower(`pingTs`),$0)
-}
+public func mnemonicFromEntropy(entropy: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_mnemonic_from_entropy(
+                FfiConverterString.lower(entropy), $0
+            )
+        }
     )
 }
 
-public func `fetchPings`(`seed`: String, `uniqueTime`: String, `state`: Data) throws -> RunReturn {
-    return try  FfiConverterTypeRunReturn.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_fetch_pings(
-        FfiConverterString.lower(`seed`),
-        FfiConverterString.lower(`uniqueTime`),
-        FfiConverterData.lower(`state`),$0)
-}
+public func entropyFromMnemonic(mnemonic: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_entropy_from_mnemonic(
+                FfiConverterString.lower(mnemonic), $0
+            )
+        }
     )
 }
 
-public func `idFromMacaroon`(`macaroon`: String) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_id_from_macaroon(
-        FfiConverterString.lower(`macaroon`),$0)
-}
+public func mnemonicToSeed(mnemonic: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_mnemonic_to_seed(
+                FfiConverterString.lower(mnemonic), $0
+            )
+        }
+    )
+}
+
+public func entropyToSeed(entropy: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_entropy_to_seed(
+                FfiConverterString.lower(entropy), $0
+            )
+        }
     )
-}
-
-public func `findRoute`(`state`: Data, `toPubkey`: String, `routeHint`: String?, `amtMsat`: UInt64) throws -> String {
-    return try  FfiConverterString.lift(
-        try rustCallWithError(FfiConverterTypeSphinxError.lift) {
-    uniffi_sphinxrs_fn_func_find_route(
-        FfiConverterData.lower(`state`),
-        FfiConverterString.lower(`toPubkey`),
-        FfiConverterOptionString.lower(`routeHint`),
-        FfiConverterUInt64.lower(`amtMsat`),$0)
-}
+}
+
+public func buildRequest(msg: String, secret: String, nonce: UInt64) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_build_request(
+                FfiConverterString.lower(msg),
+                FfiConverterString.lower(secret),
+                FfiConverterUInt64.lower(nonce), $0
+            )
+        }
+    )
+}
+
+public func parseResponse(res: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_parse_response(
+                FfiConverterString.lower(res), $0
+            )
+        }
+    )
+}
+
+public func makeAuthToken(ts: UInt32, secret: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_make_auth_token(
+                FfiConverterUInt32.lower(ts),
+                FfiConverterString.lower(secret), $0
+            )
+        }
+    )
+}
+
+public func sha256(msg: Data) -> String {
+    return try! FfiConverterString.lift(
+        try! rustCall {
+            uniffi_sphinxrs_fn_func_sha_256(
+                FfiConverterData.lower(msg), $0
+            )
+        }
+    )
+}
+
+public func createOnion(seed: String, idx: UInt64, time: String, network: String, hops: String, payload: Data) throws -> Data {
+    return try FfiConverterData.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_create_onion(
+                FfiConverterString.lower(seed),
+                FfiConverterUInt64.lower(idx),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network),
+                FfiConverterString.lower(hops),
+                FfiConverterData.lower(payload), $0
+            )
+        }
+    )
+}
+
+public func createOnionMsg(seed: String, idx: UInt64, time: String, network: String, hops: String, json: String) throws -> Data {
+    return try FfiConverterData.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_create_onion_msg(
+                FfiConverterString.lower(seed),
+                FfiConverterUInt64.lower(idx),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network),
+                FfiConverterString.lower(hops),
+                FfiConverterString.lower(json), $0
+            )
+        }
+    )
+}
+
+public func createKeysend(seed: String, idx: UInt64, time: String, network: String, hops: String, msat: UInt64, rhash: String, payload: Data, currHeight: UInt32, preimage: String) throws -> Data {
+    return try FfiConverterData.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_create_keysend(
+                FfiConverterString.lower(seed),
+                FfiConverterUInt64.lower(idx),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network),
+                FfiConverterString.lower(hops),
+                FfiConverterUInt64.lower(msat),
+                FfiConverterString.lower(rhash),
+                FfiConverterData.lower(payload),
+                FfiConverterUInt32.lower(currHeight),
+                FfiConverterString.lower(preimage), $0
+            )
+        }
+    )
+}
+
+public func createKeysendMsg(seed: String, idx: UInt64, time: String, network: String, hops: String, msat: UInt64, rhash: String, msgJson: String, currHeight: UInt32, preimage: String) throws -> Data {
+    return try FfiConverterData.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_create_keysend_msg(
+                FfiConverterString.lower(seed),
+                FfiConverterUInt64.lower(idx),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network),
+                FfiConverterString.lower(hops),
+                FfiConverterUInt64.lower(msat),
+                FfiConverterString.lower(rhash),
+                FfiConverterString.lower(msgJson),
+                FfiConverterUInt32.lower(currHeight),
+                FfiConverterString.lower(preimage), $0
+            )
+        }
+    )
+}
+
+public func peelOnion(seed: String, idx: UInt64, time: String, network: String, payload: Data) throws -> Data {
+    return try FfiConverterData.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_peel_onion(
+                FfiConverterString.lower(seed),
+                FfiConverterUInt64.lower(idx),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network),
+                FfiConverterData.lower(payload), $0
+            )
+        }
+    )
+}
+
+public func peelOnionMsg(seed: String, idx: UInt64, time: String, network: String, payload: Data) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_peel_onion_msg(
+                FfiConverterString.lower(seed),
+                FfiConverterUInt64.lower(idx),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network),
+                FfiConverterData.lower(payload), $0
+            )
+        }
+    )
+}
+
+public func peelPayment(seed: String, idx: UInt64, time: String, network: String, payload: Data, rhash: String, curHeight: UInt32, cltvExpiry: UInt32) throws -> Data {
+    return try FfiConverterData.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_peel_payment(
+                FfiConverterString.lower(seed),
+                FfiConverterUInt64.lower(idx),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network),
+                FfiConverterData.lower(payload),
+                FfiConverterString.lower(rhash),
+                FfiConverterUInt32.lower(curHeight),
+                FfiConverterUInt32.lower(cltvExpiry), $0
+            )
+        }
+    )
+}
+
+public func peelPaymentMsg(seed: String, idx: UInt64, time: String, network: String, payload: Data, rhash: String, curHeight: UInt32, cltvExpiry: UInt32) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_peel_payment_msg(
+                FfiConverterString.lower(seed),
+                FfiConverterUInt64.lower(idx),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network),
+                FfiConverterData.lower(payload),
+                FfiConverterString.lower(rhash),
+                FfiConverterUInt32.lower(curHeight),
+                FfiConverterUInt32.lower(cltvExpiry), $0
+            )
+        }
+    )
+}
+
+public func signMs(seed: String, idx: UInt64, time: String, network: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_sign_ms(
+                FfiConverterString.lower(seed),
+                FfiConverterUInt64.lower(idx),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network), $0
+            )
+        }
+    )
+}
+
+public func signedTimestamp(seed: String, idx: UInt64, time: String, network: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_signed_timestamp(
+                FfiConverterString.lower(seed),
+                FfiConverterUInt64.lower(idx),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network), $0
+            )
+        }
+    )
+}
+
+public func signBytes(seed: String, idx: UInt64, time: String, network: String, msg: Data) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_sign_bytes(
+                FfiConverterString.lower(seed),
+                FfiConverterUInt64.lower(idx),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network),
+                FfiConverterData.lower(msg), $0
+            )
+        }
+    )
+}
+
+public func signBase64(seed: String, idx: UInt64, time: String, network: String, msg: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_sign_base64(
+                FfiConverterString.lower(seed),
+                FfiConverterUInt64.lower(idx),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network),
+                FfiConverterString.lower(msg), $0
+            )
+        }
+    )
+}
+
+public func pubkeyFromSeed(seed: String, idx: UInt64, time: String, network: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_pubkey_from_seed(
+                FfiConverterString.lower(seed),
+                FfiConverterUInt64.lower(idx),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network), $0
+            )
+        }
+    )
+}
+
+public func rootSignMs(seed: String, time: String, network: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_root_sign_ms(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network), $0
+            )
+        }
+    )
+}
+
+public func xpubFromSeed(seed: String, time: String, network: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_xpub_from_seed(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(time),
+                FfiConverterString.lower(network), $0
+            )
+        }
+    )
+}
+
+public func setNetwork(network: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_set_network(
+                FfiConverterString.lower(network), $0
+            )
+        }
+    )
+}
+
+public func setDevice(device: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_set_device(
+                FfiConverterString.lower(device), $0
+            )
+        }
+    )
+}
+
+public func setBlockheight(blockheight: UInt32) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_set_blockheight(
+                FfiConverterUInt32.lower(blockheight), $0
+            )
+        }
+    )
+}
+
+public func getBlockheight(seed: String, uniqueTime: String, state: Data) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_get_blockheight(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state), $0
+            )
+        }
+    )
+}
+
+public func addContact(seed: String, uniqueTime: String, state: Data, toPubkey: String, routeHint: String, myAlias: String, myImg: String, amtMsat: UInt64, inviteCode: String?, theirAlias: String?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_add_contact(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(toPubkey),
+                FfiConverterString.lower(routeHint),
+                FfiConverterString.lower(myAlias),
+                FfiConverterString.lower(myImg),
+                FfiConverterUInt64.lower(amtMsat),
+                FfiConverterOptionString.lower(inviteCode),
+                FfiConverterOptionString.lower(theirAlias), $0
+            )
+        }
+    )
+}
+
+public func getContact(state: Data, pubkey: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_get_contact(
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(pubkey), $0
+            )
+        }
+    )
+}
+
+public func listContacts(state: Data) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_list_contacts(
+                FfiConverterData.lower(state), $0
+            )
+        }
+    )
+}
+
+public func contactPubkeyByChildIndex(state: Data, childIdx: UInt64) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_contact_pubkey_by_child_index(
+                FfiConverterData.lower(state),
+                FfiConverterUInt64.lower(childIdx), $0
+            )
+        }
+    )
+}
+
+public func contactPubkeyByEncryptedChild(seed: String, state: Data, child: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(
+                FfiConverterString.lower(seed),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(child), $0
+            )
+        }
+    )
+}
+
+public func getTribeManagementTopic(seed: String, uniqueTime: String, state: Data) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_get_tribe_management_topic(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state), $0
+            )
+        }
+    )
+}
+
+public func initialSetup(seed: String, uniqueTime: String, state: Data, device: String, inviteCode: String?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_initial_setup(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(device),
+                FfiConverterOptionString.lower(inviteCode), $0
+            )
+        }
+    )
+}
+
+public func fetchMsgs(seed: String, uniqueTime: String, state: Data, lastMsgIdx: UInt64, limit: UInt32?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_fetch_msgs(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterUInt64.lower(lastMsgIdx),
+                FfiConverterOptionUInt32.lower(limit), $0
+            )
+        }
+    )
+}
+
+public func handle(topic: String, payload: Data, seed: String, uniqueTime: String, state: Data, myAlias: String, myImg: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_handle(
+                FfiConverterString.lower(topic),
+                FfiConverterData.lower(payload),
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(myAlias),
+                FfiConverterString.lower(myImg), $0
+            )
+        }
+    )
+}
+
+public func send(seed: String, uniqueTime: String, to: String, msgType: UInt8, msgJson: String, state: Data, myAlias: String, myImg: String, amtMsat: UInt64, isTribe: Bool = false) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_send(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterString.lower(to),
+                FfiConverterUInt8.lower(msgType),
+                FfiConverterString.lower(msgJson),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(myAlias),
+                FfiConverterString.lower(myImg),
+                FfiConverterUInt64.lower(amtMsat),
+                FfiConverterBool.lower(isTribe), $0
+            )
+        }
+    )
+}
+
+public func keysend(seed: String, uniqueTime: String, to: String, state: Data, amtMsat: UInt64, data: Data?, routeHint: String?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_keysend(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterString.lower(to),
+                FfiConverterData.lower(state),
+                FfiConverterUInt64.lower(amtMsat),
+                FfiConverterOptionData.lower(data),
+                FfiConverterOptionString.lower(routeHint), $0
+            )
+        }
+    )
+}
+
+public func pay(seed: String, uniqueTime: String, state: Data, bolt11: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_pay(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(bolt11), $0
+            )
+        }
+    )
+}
+
+public func makeMediaToken(seed: String, uniqueTime: String, state: Data, host: String, muid: String, to: String, expiry: UInt32) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_make_media_token(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(host),
+                FfiConverterString.lower(muid),
+                FfiConverterString.lower(to),
+                FfiConverterUInt32.lower(expiry), $0
+            )
+        }
+    )
+}
+
+public func makeMediaTokenWithMeta(seed: String, uniqueTime: String, state: Data, host: String, muid: String, to: String, expiry: UInt32, meta: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_make_media_token_with_meta(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(host),
+                FfiConverterString.lower(muid),
+                FfiConverterString.lower(to),
+                FfiConverterUInt32.lower(expiry),
+                FfiConverterString.lower(meta), $0
+            )
+        }
+    )
+}
+
+public func makeMediaTokenWithPrice(seed: String, uniqueTime: String, state: Data, host: String, muid: String, to: String, expiry: UInt32, price: UInt64) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_make_media_token_with_price(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(host),
+                FfiConverterString.lower(muid),
+                FfiConverterString.lower(to),
+                FfiConverterUInt32.lower(expiry),
+                FfiConverterUInt64.lower(price), $0
+            )
+        }
+    )
+}
+
+public func requestInvoice(seed: String, uniqueTime: String, state: Data, amtMsat: UInt64, description: String?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_request_invoice(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterUInt64.lower(amtMsat),
+                FfiConverterOptionString.lower(description), $0
+            )
+        }
+    )
+}
+
+public func makeInvoice(seed: String, uniqueTime: String, state: Data, amtMsat: UInt64, description: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_make_invoice(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterUInt64.lower(amtMsat),
+                FfiConverterString.lower(description), $0
+            )
+        }
+    )
+}
+
+public func payInvoice(seed: String, uniqueTime: String, state: Data, bolt11: String, overpayMsat: UInt64?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_pay_invoice(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(bolt11),
+                FfiConverterOptionUInt64.lower(overpayMsat), $0
+            )
+        }
+    )
+}
+
+public func payContactInvoice(seed: String, uniqueTime: String, state: Data, bolt11: String, myAlias: String, myImg: String, isTribe: Bool) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_pay_contact_invoice(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(bolt11),
+                FfiConverterString.lower(myAlias),
+                FfiConverterString.lower(myImg),
+                FfiConverterBool.lower(isTribe), $0
+            )
+        }
+    )
+}
+
+public func paymentHashFromInvoice(bolt11: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_payment_hash_from_invoice(
+                FfiConverterString.lower(bolt11), $0
+            )
+        }
+    )
+}
+
+public func parseInvoice(invoiceJson: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_parse_invoice(
+                FfiConverterString.lower(invoiceJson), $0
+            )
+        }
+    )
+}
+
+public func createTribe(seed: String, uniqueTime: String, state: Data, tribeServerPubkey: String, tribeJson: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_create_tribe(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(tribeServerPubkey),
+                FfiConverterString.lower(tribeJson), $0
+            )
+        }
+    )
+}
+
+public func joinTribe(seed: String, uniqueTime: String, state: Data, tribePubkey: String, tribeRouteHint: String, alias: String, amtMsat: UInt64, isPrivate: Bool) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_join_tribe(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(tribePubkey),
+                FfiConverterString.lower(tribeRouteHint),
+                FfiConverterString.lower(alias),
+                FfiConverterUInt64.lower(amtMsat),
+                FfiConverterBool.lower(isPrivate), $0
+            )
+        }
+    )
+}
+
+public func listTribeMembers(seed: String, uniqueTime: String, state: Data, tribeServerPubkey: String, tribePubkey: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_list_tribe_members(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(tribeServerPubkey),
+                FfiConverterString.lower(tribePubkey), $0
+            )
+        }
+    )
+}
+
+public func makeInvite(seed: String, uniqueTime: String, state: Data, host: String, amtMsat: UInt64, myAlias: String, tribeHost: String?, tribePubkey: String?, inviterPubkey: String?, inviterRouteHint: String?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_make_invite(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(host),
+                FfiConverterUInt64.lower(amtMsat),
+                FfiConverterString.lower(myAlias),
+                FfiConverterOptionString.lower(tribeHost),
+                FfiConverterOptionString.lower(tribePubkey),
+                FfiConverterOptionString.lower(inviterPubkey),
+                FfiConverterOptionString.lower(inviterRouteHint), $0
+            )
+        }
+    )
+}
+
+public func processInvite(seed: String, uniqueTime: String, state: Data, inviteQr: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_process_invite(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(inviteQr), $0
+            )
+        }
+    )
+}
+
+public func parseInvite(inviteQr: String) throws -> ParsedInvite {
+    return try FfiConverterTypeParsedInvite.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_parse_invite(
+                FfiConverterString.lower(inviteQr), $0
+            )
+        }
+    )
+}
+
+public func codeFromInvite(inviteQr: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_code_from_invite(
+                FfiConverterString.lower(inviteQr), $0
+            )
+        }
+    )
+}
+
+public func cancelInvite(seed: String, uniqueTime: String, state: Data, inviteCode: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_cancel_invite(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(inviteCode), $0
+            )
+        }
+    )
+}
+
+public func getDefaultTribeServer(state: Data) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_get_default_tribe_server(
+                FfiConverterData.lower(state), $0
+            )
+        }
+    )
+}
+
+public func read(seed: String, uniqueTime: String, state: Data, pubkey: String, msgIdx: UInt64) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_read(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(pubkey),
+                FfiConverterUInt64.lower(msgIdx), $0
+            )
+        }
+    )
+}
+
+public func getReads(seed: String, uniqueTime: String, state: Data) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_get_reads(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state), $0
+            )
+        }
+    )
+}
+
+public func mute(seed: String, uniqueTime: String, state: Data, pubkey: String, muteLevel: UInt8) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_mute(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(pubkey),
+                FfiConverterUInt8.lower(muteLevel), $0
+            )
+        }
+    )
+}
+
+public func getMutes(seed: String, uniqueTime: String, state: Data) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_get_mutes(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state), $0
+            )
+        }
+    )
+}
+
+public func setPushToken(seed: String, uniqueTime: String, state: Data, pushToken: String, pushKey: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_set_push_token(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(pushToken),
+                FfiConverterString.lower(pushKey), $0
+            )
+        }
+    )
+}
+
+public func decryptChildIndex(encryptedChild: String, pushKey: String) throws -> UInt64 {
+    return try FfiConverterUInt64.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_decrypt_child_index(
+                FfiConverterString.lower(encryptedChild),
+                FfiConverterString.lower(pushKey), $0
+            )
+        }
+    )
+}
+
+public func getMsgsCounts(seed: String, uniqueTime: String, state: Data) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_get_msgs_counts(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state), $0
+            )
+        }
+    )
+}
+
+public func fetchMsgsBatch(seed: String, uniqueTime: String, state: Data, lastMsgIdx: UInt64, limit: UInt32?, reverse: Bool?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_fetch_msgs_batch(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterUInt64.lower(lastMsgIdx),
+                FfiConverterOptionUInt32.lower(limit),
+                FfiConverterOptionBool.lower(reverse), $0
+            )
+        }
+    )
+}
+
+public func fetchMsgsBatchPerContact(seed: String, uniqueTime: String, state: Data, lastMsgIdx: UInt64, limit: UInt32?, reverse: Bool?, contact: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_fetch_msgs_batch_per_contact(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterUInt64.lower(lastMsgIdx),
+                FfiConverterOptionUInt32.lower(limit),
+                FfiConverterOptionBool.lower(reverse),
+                FfiConverterString.lower(contact), $0
+            )
+        }
+    )
+}
+
+public func fetchMsgsBatchOkkey(seed: String, uniqueTime: String, state: Data, lastMsgIdx: UInt64, limit: UInt32?, reverse: Bool?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_fetch_msgs_batch_okkey(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterUInt64.lower(lastMsgIdx),
+                FfiConverterOptionUInt32.lower(limit),
+                FfiConverterOptionBool.lower(reverse), $0
+            )
+        }
+    )
+}
+
+public func fetchFirstMsgsPerKey(seed: String, uniqueTime: String, state: Data, lastMsgIdx: UInt64, limit: UInt32?, reverse: Bool?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_fetch_first_msgs_per_key(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterUInt64.lower(lastMsgIdx),
+                FfiConverterOptionUInt32.lower(limit),
+                FfiConverterOptionBool.lower(reverse), $0
+            )
+        }
+    )
+}
+
+public func fetchPayments(seed: String, uniqueTime: String, state: Data, since: UInt64?, limit: UInt32?, scid: UInt64?, remoteOnly: Bool?, minMsat: UInt64?, reverse: Bool?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_fetch_payments(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterOptionUInt64.lower(since),
+                FfiConverterOptionUInt32.lower(limit),
+                FfiConverterOptionUInt64.lower(scid),
+                FfiConverterOptionBool.lower(remoteOnly),
+                FfiConverterOptionUInt64.lower(minMsat),
+                FfiConverterOptionBool.lower(reverse), $0
+            )
+        }
+    )
+}
+
+public func getTags(seed: String, uniqueTime: String, state: Data, tags: [String], pubkey: String?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_get_tags(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterSequenceString.lower(tags),
+                FfiConverterOptionString.lower(pubkey), $0
+            )
+        }
+    )
+}
+
+public func deleteMsgs(seed: String, uniqueTime: String, state: Data, pubkey: String?, msgIdxs: [UInt64]?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_delete_msgs(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterOptionString.lower(pubkey),
+                FfiConverterOptionSequenceUInt64.lower(msgIdxs), $0
+            )
+        }
+    )
+}
+
+public func updateTribe(seed: String, uniqueTime: String, state: Data, tribeServerPubkey: String, tribeJson: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_update_tribe(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(tribeServerPubkey),
+                FfiConverterString.lower(tribeJson), $0
+            )
+        }
+    )
+}
+
+public func deleteTribe(seed: String, uniqueTime: String, state: Data, tribeServerPubkey: String, tribePubkey: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_delete_tribe(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(tribeServerPubkey),
+                FfiConverterString.lower(tribePubkey), $0
+            )
+        }
+    )
+}
+
+public func addNode(node: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_add_node(
+                FfiConverterString.lower(node), $0
+            )
+        }
+    )
+}
+
+public func concatRoute(state: Data, endHops: String, routerPubkey: String, amtMsat: UInt64) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_concat_route(
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(endHops),
+                FfiConverterString.lower(routerPubkey),
+                FfiConverterUInt64.lower(amtMsat), $0
+            )
+        }
+    )
+}
+
+public func pingDone(seed: String, uniqueTime: String, state: Data, pingTs: UInt64) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_ping_done(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterUInt64.lower(pingTs), $0
+            )
+        }
+    )
+}
+
+public func fetchPings(seed: String, uniqueTime: String, state: Data) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_fetch_pings(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state), $0
+            )
+        }
+    )
+}
+
+public func idFromMacaroon(macaroon: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_id_from_macaroon(
+                FfiConverterString.lower(macaroon), $0
+            )
+        }
+    )
+}
+
+public func findRoute(state: Data, toPubkey: String, routeHint: String?, amtMsat: UInt64) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_find_route(
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(toPubkey),
+                FfiConverterOptionString.lower(routeHint),
+                FfiConverterUInt64.lower(amtMsat), $0
+            )
+        }
+    )
+}
+
+public func parseServerStatus(payload: String) throws -> ServerStatus {
+    return try FfiConverterTypeServerStatus.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_parse_server_status(
+                FfiConverterString.lower(payload), $0
+            )
+        }
+    )
+}
+
+public func evaluateServerHealth(last: ServerStatus?, lastSeenMs: UInt64, nowMs: UInt64, intervalMs: UInt64, maxMissed: UInt32) -> ServerHealth {
+    return try! FfiConverterTypeServerHealth.lift(
+        try! rustCall {
+            uniffi_sphinxrs_fn_func_evaluate_server_health(
+                FfiConverterOptionTypeServerStatus.lower(last),
+                FfiConverterUInt64.lower(lastSeenMs),
+                FfiConverterUInt64.lower(nowMs),
+                FfiConverterUInt64.lower(intervalMs),
+                FfiConverterUInt32.lower(maxMissed), $0
+            )
+        }
+    )
+}
+
+public func parseMixerErrorCode(raw: String) -> MixerErrorCode {
+    return try! FfiConverterTypeMixerErrorCode.lift(
+        try! rustCall {
+            uniffi_sphinxrs_fn_func_parse_mixer_error_code(
+                FfiConverterString.lower(raw), $0
+            )
+        }
+    )
+}
+
+public func serverStatusTopic() -> String {
+    return try! FfiConverterString.lift(
+        try! rustCall {
+            uniffi_sphinxrs_fn_func_server_status_topic($0)
+        }
     )
 }
 
@@ -2541,8 +2812,9 @@ private enum InitializationResult {
     case contractVersionMismatch
     case apiChecksumMismatch
 }
-// Use a global variables to perform the versioning checks. Swift ensures that
-// the code inside is only computed once.
+
+/// Use a global variables to perform the versioning checks. Swift ensures that
+/// the code inside is only computed once.
 private var initializationResult: InitializationResult {
     // Get the bindings contract version from our ComponentInterface
     let bindings_contract_version = 22
@@ -2551,256 +2823,268 @@ private var initializationResult: InitializationResult {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_pubkey_from_secret_key() != 14435) {
+    if uniffi_sphinxrs_checksum_func_pubkey_from_secret_key() != 14435 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_derive_shared_secret() != 20125) {
+    if uniffi_sphinxrs_checksum_func_derive_shared_secret() != 20125 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_encrypt() != 43446) {
+    if uniffi_sphinxrs_checksum_func_encrypt() != 43446 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_decrypt() != 47725) {
+    if uniffi_sphinxrs_checksum_func_decrypt() != 47725 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_node_keys() != 21192) {
+    if uniffi_sphinxrs_checksum_func_node_keys() != 21192 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_mnemonic_from_entropy() != 32309) {
+    if uniffi_sphinxrs_checksum_func_mnemonic_from_entropy() != 32309 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_entropy_from_mnemonic() != 33294) {
+    if uniffi_sphinxrs_checksum_func_entropy_from_mnemonic() != 33294 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_mnemonic_to_seed() != 23084) {
+    if uniffi_sphinxrs_checksum_func_mnemonic_to_seed() != 23084 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_entropy_to_seed() != 33710) {
+    if uniffi_sphinxrs_checksum_func_entropy_to_seed() != 33710 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_build_request() != 31264) {
+    if uniffi_sphinxrs_checksum_func_build_request() != 31264 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_parse_response() != 12980) {
+    if uniffi_sphinxrs_checksum_func_parse_response() != 12980 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_make_auth_token() != 13236) {
+    if uniffi_sphinxrs_checksum_func_make_auth_token() != 13236 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_sha_256() != 54805) {
+    if uniffi_sphinxrs_checksum_func_sha_256() != 54805 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_create_onion() != 44069) {
+    if uniffi_sphinxrs_checksum_func_create_onion() != 44069 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_create_onion_msg() != 23896) {
+    if uniffi_sphinxrs_checksum_func_create_onion_msg() != 23896 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_create_keysend() != 23547) {
+    if uniffi_sphinxrs_checksum_func_create_keysend() != 23547 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_create_keysend_msg() != 950) {
+    if uniffi_sphinxrs_checksum_func_create_keysend_msg() != 950 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_peel_onion() != 12462) {
+    if uniffi_sphinxrs_checksum_func_peel_onion() != 12462 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_peel_onion_msg() != 5286) {
+    if uniffi_sphinxrs_checksum_func_peel_onion_msg() != 5286 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_peel_payment() != 53060) {
+    if uniffi_sphinxrs_checksum_func_peel_payment() != 53060 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_peel_payment_msg() != 53779) {
+    if uniffi_sphinxrs_checksum_func_peel_payment_msg() != 53779 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_sign_ms() != 10078) {
+    if uniffi_sphinxrs_checksum_func_sign_ms() != 10078 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_signed_timestamp() != 14238) {
+    if uniffi_sphinxrs_checksum_func_signed_timestamp() != 14238 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_sign_bytes() != 53352) {
+    if uniffi_sphinxrs_checksum_func_sign_bytes() != 53352 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_sign_base64() != 25886) {
+    if uniffi_sphinxrs_checksum_func_sign_base64() != 25886 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_pubkey_from_seed() != 23394) {
+    if uniffi_sphinxrs_checksum_func_pubkey_from_seed() != 23394 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_root_sign_ms() != 52594) {
+    if uniffi_sphinxrs_checksum_func_root_sign_ms() != 52594 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_xpub_from_seed() != 14922) {
+    if uniffi_sphinxrs_checksum_func_xpub_from_seed() != 14922 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_set_network() != 65135) {
+    if uniffi_sphinxrs_checksum_func_set_network() != 65135 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_set_device() != 19820) {
+    if uniffi_sphinxrs_checksum_func_set_device() != 19820 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_set_blockheight() != 43943) {
+    if uniffi_sphinxrs_checksum_func_set_blockheight() != 43943 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_get_blockheight() != 25615) {
+    if uniffi_sphinxrs_checksum_func_get_blockheight() != 25615 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_add_contact() != 30931) {
+    if uniffi_sphinxrs_checksum_func_add_contact() != 30931 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_get_contact() != 19847) {
+    if uniffi_sphinxrs_checksum_func_get_contact() != 19847 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_list_contacts() != 18133) {
+    if uniffi_sphinxrs_checksum_func_list_contacts() != 18133 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_contact_pubkey_by_child_index() != 7496) {
+    if uniffi_sphinxrs_checksum_func_contact_pubkey_by_child_index() != 7496 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_contact_pubkey_by_encrypted_child() != 6829) {
+    if uniffi_sphinxrs_checksum_func_contact_pubkey_by_encrypted_child() != 6829 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_get_tribe_management_topic() != 29476) {
+    if uniffi_sphinxrs_checksum_func_get_tribe_management_topic() != 29476 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_initial_setup() != 44485) {
+    if uniffi_sphinxrs_checksum_func_initial_setup() != 44485 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_fetch_msgs() != 12460) {
+    if uniffi_sphinxrs_checksum_func_fetch_msgs() != 12460 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_handle() != 58131) {
+    if uniffi_sphinxrs_checksum_func_handle() != 58131 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_send() != 56750) {
+    if uniffi_sphinxrs_checksum_func_send() != 56750 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_keysend() != 58116) {
+    if uniffi_sphinxrs_checksum_func_keysend() != 58116 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_pay() != 1388) {
+    if uniffi_sphinxrs_checksum_func_pay() != 1388 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_make_media_token() != 53931) {
+    if uniffi_sphinxrs_checksum_func_make_media_token() != 53931 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_make_media_token_with_meta() != 21693) {
+    if uniffi_sphinxrs_checksum_func_make_media_token_with_meta() != 21693 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_make_media_token_with_price() != 53555) {
+    if uniffi_sphinxrs_checksum_func_make_media_token_with_price() != 53555 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_request_invoice() != 4786) {
+    if uniffi_sphinxrs_checksum_func_request_invoice() != 4786 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_make_invoice() != 12949) {
+    if uniffi_sphinxrs_checksum_func_make_invoice() != 12949 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_pay_invoice() != 40951) {
+    if uniffi_sphinxrs_checksum_func_pay_invoice() != 40951 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_pay_contact_invoice() != 2604) {
+    if uniffi_sphinxrs_checksum_func_pay_contact_invoice() != 2604 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_payment_hash_from_invoice() != 3194) {
+    if uniffi_sphinxrs_checksum_func_payment_hash_from_invoice() != 3194 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_parse_invoice() != 31785) {
+    if uniffi_sphinxrs_checksum_func_parse_invoice() != 31785 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_create_tribe() != 28873) {
+    if uniffi_sphinxrs_checksum_func_create_tribe() != 28873 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_join_tribe() != 6857) {
+    if uniffi_sphinxrs_checksum_func_join_tribe() != 6857 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_list_tribe_members() != 48922) {
+    if uniffi_sphinxrs_checksum_func_list_tribe_members() != 48922 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_make_invite() != 8421) {
+    if uniffi_sphinxrs_checksum_func_make_invite() != 8421 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_process_invite() != 52237) {
+    if uniffi_sphinxrs_checksum_func_process_invite() != 52237 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_parse_invite() != 63135) {
+    if uniffi_sphinxrs_checksum_func_parse_invite() != 63135 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_code_from_invite() != 40279) {
+    if uniffi_sphinxrs_checksum_func_code_from_invite() != 40279 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_cancel_invite() != 49457) {
+    if uniffi_sphinxrs_checksum_func_cancel_invite() != 49457 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_get_default_tribe_server() != 13603) {
+    if uniffi_sphinxrs_checksum_func_get_default_tribe_server() != 13603 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_read() != 47440) {
+    if uniffi_sphinxrs_checksum_func_read() != 47440 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_get_reads() != 13726) {
+    if uniffi_sphinxrs_checksum_func_get_reads() != 13726 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_mute() != 58453) {
+    if uniffi_sphinxrs_checksum_func_mute() != 58453 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_get_mutes() != 4885) {
+    if uniffi_sphinxrs_checksum_func_get_mutes() != 4885 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_set_push_token() != 52747) {
+    if uniffi_sphinxrs_checksum_func_set_push_token() != 52747 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_decrypt_child_index() != 2032) {
+    if uniffi_sphinxrs_checksum_func_decrypt_child_index() != 2032 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_get_msgs_counts() != 29743) {
+    if uniffi_sphinxrs_checksum_func_get_msgs_counts() != 29743 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_fetch_msgs_batch() != 22256) {
+    if uniffi_sphinxrs_checksum_func_fetch_msgs_batch() != 22256 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_fetch_msgs_batch_per_contact() != 46524) {
+    if uniffi_sphinxrs_checksum_func_fetch_msgs_batch_per_contact() != 46524 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_fetch_msgs_batch_okkey() != 330) {
+    if uniffi_sphinxrs_checksum_func_fetch_msgs_batch_okkey() != 330 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_fetch_first_msgs_per_key() != 29398) {
+    if uniffi_sphinxrs_checksum_func_fetch_first_msgs_per_key() != 29398 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_fetch_payments() != 58291) {
+    if uniffi_sphinxrs_checksum_func_fetch_payments() != 58291 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_get_tags() != 42493) {
+    if uniffi_sphinxrs_checksum_func_get_tags() != 42493 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_delete_msgs() != 39403) {
+    if uniffi_sphinxrs_checksum_func_delete_msgs() != 39403 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_update_tribe() != 26002) {
+    if uniffi_sphinxrs_checksum_func_update_tribe() != 26002 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_delete_tribe() != 11926) {
+    if uniffi_sphinxrs_checksum_func_delete_tribe() != 11926 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_add_node() != 49737) {
+    if uniffi_sphinxrs_checksum_func_add_node() != 49737 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_concat_route() != 19565) {
+    if uniffi_sphinxrs_checksum_func_concat_route() != 19565 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_ping_done() != 13787) {
+    if uniffi_sphinxrs_checksum_func_ping_done() != 13787 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_fetch_pings() != 13806) {
+    if uniffi_sphinxrs_checksum_func_fetch_pings() != 13806 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_id_from_macaroon() != 36424) {
+    if uniffi_sphinxrs_checksum_func_id_from_macaroon() != 36424 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sphinxrs_checksum_func_find_route() != 27285) {
+    if uniffi_sphinxrs_checksum_func_find_route() != 27285 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_sphinxrs_checksum_func_parse_server_status() != 55294 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_sphinxrs_checksum_func_evaluate_server_health() != 25525 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_sphinxrs_checksum_func_parse_mixer_error_code() != 52624 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_sphinxrs_checksum_func_server_status_topic() != 58976 {
         return InitializationResult.apiChecksumMismatch
     }
 
