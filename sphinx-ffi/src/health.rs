@@ -14,7 +14,7 @@ pub const SERVER_STATUS_MAX_MISSED_INTERVALS: u32 = 3;
 /// Follows the same convention as the global retained `blockheight` topic in
 /// `sphinx/src/topics.rs` (single global topic, not per-root). Update this
 /// constant in one place if the mixer contract finalizes a different name.
-const SERVER_STATUS_TOPIC: &str = "server_status";
+const SERVER_STATUS_TOPIC: &str = "health";
 
 const CODE_CLN_UNAVAILABLE: &str = "CLN_UNAVAILABLE";
 const CODE_CLN_TIMEOUT: &str = "CLN_TIMEOUT";
@@ -382,7 +382,7 @@ mod tests {
 
     #[test]
     fn server_status_topic_is_single_global_constant() {
-        assert_eq!(server_status_topic(), "server_status");
+        assert_eq!(server_status_topic(), "health");
         assert_eq!(SERVER_STATUS_MAX_MISSED_INTERVALS, 3);
         assert_eq!(SERVER_STATUS_HEARTBEAT_INTERVAL_MS, 30_000);
     }
