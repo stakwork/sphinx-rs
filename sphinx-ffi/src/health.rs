@@ -9,6 +9,12 @@ pub const SERVER_STATUS_HEARTBEAT_INTERVAL_MS: u64 = 30_000;
 /// is treated as [`ServerHealth::Unknown`].
 pub const SERVER_STATUS_MAX_MISSED_INTERVALS: u32 = 3;
 
+/// Small allowance for clock skew between the payload's `ts` and local `now_ms`.
+/// A payload timestamp up to this far in the future of the local clock is still
+/// treated as valid (not `Unknown`) - normal NTP drift/network jitter between the
+/// mixer's clock and the device's clock, not a sign of a bad/retained sample.
+pub const SERVER_STATUS_CLOCK_SKEW_TOLERANCE_MS: u64 = 5_000;
+
 /// MQTT topic for mixer server-health heartbeats.
 ///
 /// Follows the same convention as the global retained `blockheight` topic in
@@ -81,7 +87,7 @@ pub fn evaluate_server_health(
 
     // Payload `ts` is metadata / freshness only. Future or unusable timestamps,
     // and retained samples older than N intervals, must not extend Ok.
-    if last.ts == 0 || last.ts > now_ms {
+    if last.ts == 0 || last.ts > now_ms.saturating_add(SERVER_STATUS_CLOCK_SKEW_TOLERANCE_MS) {
         return ServerHealth::Unknown;
     }
     let payload_age_ms = now_ms.saturating_sub(last.ts);
@@ -289,16 +295,65 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_future_or_unusable_ts_is_unknown() {
+    fn evaluate_future_ts_within_clock_skew_tolerance_is_ok() {
         let interval = SERVER_STATUS_HEARTBEAT_INTERVAL_MS;
         let n = SERVER_STATUS_MAX_MISSED_INTERVALS;
         let now = 1_700_000_090_000;
 
-        let future = evaluate_server_health(Some(healthy(now + 1)), now, now, interval, n);
-        assert_eq!(future, ServerHealth::Unknown);
+        // Slightly in the future: within tolerance, should not be Unknown.
+        let just_future = evaluate_server_health(Some(healthy(now + 1)), now, now, interval, n);
+        assert_eq!(just_future, ServerHealth::Ok);
+
+        // Exactly at the tolerance boundary: still within tolerance.
+        let at_boundary = evaluate_server_health(
+            Some(healthy(now + SERVER_STATUS_CLOCK_SKEW_TOLERANCE_MS)),
+            now,
+            now,
+            interval,
+            n,
+        );
+        assert_eq!(at_boundary, ServerHealth::Ok);
+    }
+
+    #[test]
+    fn evaluate_future_ts_beyond_clock_skew_tolerance_is_unknown() {
+        let interval = SERVER_STATUS_HEARTBEAT_INTERVAL_MS;
+        let n = SERVER_STATUS_MAX_MISSED_INTERVALS;
+        let now = 1_700_000_090_000;
+
+        let beyond_tolerance = evaluate_server_health(
+            Some(healthy(now + SERVER_STATUS_CLOCK_SKEW_TOLERANCE_MS + 1)),
+            now,
+            now,
+            interval,
+            n,
+        );
+        assert_eq!(beyond_tolerance, ServerHealth::Unknown);
+    }
+
+    #[test]
+    fn evaluate_unusable_zero_ts_is_unknown() {
+        let interval = SERVER_STATUS_HEARTBEAT_INTERVAL_MS;
+        let n = SERVER_STATUS_MAX_MISSED_INTERVALS;
+        let now = 1_700_000_090_000;
 
         let unusable = evaluate_server_health(Some(healthy(0)), now, now, interval, n);
         assert_eq!(unusable, ServerHealth::Unknown);
+    }
+
+    #[test]
+    fn evaluate_future_ts_beyond_tolerance_does_not_slip_through_staleness_window() {
+        // Even though the payload age (now - ts) would look "fresh" under the
+        // staleness window, a ts far enough in the future must still be rejected
+        // as Unknown - the clock-skew tolerance is a bounded window, not an
+        // unbounded allowance that could be exploited by a wildly-future ts.
+        let interval = SERVER_STATUS_HEARTBEAT_INTERVAL_MS;
+        let n = SERVER_STATUS_MAX_MISSED_INTERVALS;
+        let now = 1_700_000_090_000;
+
+        let far_future_ts = now + SERVER_STATUS_CLOCK_SKEW_TOLERANCE_MS + 1;
+        let health = evaluate_server_health(Some(healthy(far_future_ts)), now, now, interval, n);
+        assert_eq!(health, ServerHealth::Unknown);
     }
 
     #[test]
