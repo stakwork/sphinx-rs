@@ -382,6 +382,8 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_entropy_to_seed(`entropy`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_agent_seed(`seed`: RustBuffer.ByValue,`n`: Int,_uniffi_out_err: RustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_build_request(`msg`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,`nonce`: Long,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_parse_response(`res`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
@@ -565,6 +567,8 @@ internal interface _UniFFILib : Library {
     fun uniffi_sphinxrs_checksum_func_mnemonic_to_seed(
     ): Short
     fun uniffi_sphinxrs_checksum_func_entropy_to_seed(
+    ): Short
+    fun uniffi_sphinxrs_checksum_func_agent_seed(
     ): Short
     fun uniffi_sphinxrs_checksum_func_build_request(
     ): Short
@@ -766,6 +770,9 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_entropy_to_seed() != 33710.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_sphinxrs_checksum_func_agent_seed() != 23720.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_build_request() != 31264.toShort()) {
@@ -2476,6 +2483,15 @@ fun `entropyToSeed`(`entropy`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
     _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_entropy_to_seed(FfiConverterString.lower(`entropy`),_status)
+})
+}
+
+@Throws(SphinxException::class)
+
+fun `agentSeed`(`seed`: String, `n`: UInt): String {
+    return FfiConverterString.lift(
+    rustCallWithError(SphinxException) { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_agent_seed(FfiConverterString.lower(`seed`),FfiConverterUInt.lower(`n`),_status)
 })
 }
 
