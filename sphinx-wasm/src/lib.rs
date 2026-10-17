@@ -71,6 +71,11 @@ pub fn entropy_to_seed(entropy: &str) -> Result<String> {
 }
 
 #[wasm_bindgen]
+pub fn agent_seed(seed: &str, n: u32) -> Result<String> {
+    Ok(cy::agent_seed(seed.to_string(), n)?)
+}
+
+#[wasm_bindgen]
 pub fn make_auth_token(ts: u32, secret: &str) -> Result<String> {
     Ok(cy::make_auth_token(ts, secret.to_string())?)
 }

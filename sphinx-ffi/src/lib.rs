@@ -181,6 +181,17 @@ pub fn entropy_to_seed(entropy: String) -> Result<String> {
     Ok(hex::encode(m))
 }
 
+// the seed of agent `n` (the first is 1), derived from the person's seed
+pub fn agent_seed(seed: String, n: u32) -> Result<String> {
+    if n == 0 {
+        return Err(SphinxError::BadArgs {
+            r: "agent numbers start at 1".to_string(),
+        });
+    }
+    let seed = parse::parse_secret_string(seed)?;
+    Ok(hex::encode(sphinx::derive::agent_seed(&seed, n)))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
@@ -248,6 +259,34 @@ mod tests {
         //                  201,241,221,208,161,150,214,73,215,119,205,145,70,156,15,179]
         let vector = "02592d423c4e7c6d18947713b47f7957c9f1ddd0a196d649d777cd91469c0fb3";
         assert_eq!(seed, vector);
+        Ok(())
+    }
+
+    #[test]
+    fn test_agent_seed() -> Result<()> {
+        // vectors from sphinx/src/signer/derive.rs::agent_seed_vectors
+        let zero = "00".repeat(32);
+        assert_eq!(
+            agent_seed(zero.clone(), 1)?,
+            "6b7c00dcafc11be785c740e8bde0cc5ec5458e2666940788f406abc258509071"
+        );
+        assert_eq!(
+            agent_seed(zero.clone(), 2)?,
+            "a1d8805df73ab1a657815b746f1922da2c5308619fab2a84fc52ce7d72ec4ec0"
+        );
+        let seq: String = (0u8..32).map(|i| format!("{:02x}", i)).collect();
+        assert_eq!(
+            agent_seed(seq, 1)?,
+            "b13c64eb614fc62c744d1a3f0b82cdb5ab219fe985f725226392814693c30492"
+        );
+        assert!(matches!(
+            agent_seed(zero, 0),
+            Err(SphinxError::BadArgs { .. })
+        ));
+        assert!(matches!(
+            agent_seed("00".repeat(31), 1),
+            Err(SphinxError::BadSecret { .. })
+        ));
         Ok(())
     }
 }
