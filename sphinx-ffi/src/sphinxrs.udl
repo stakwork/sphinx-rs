@@ -136,6 +136,8 @@ namespace sphinxrs {
   [Throws=SphinxError]
   string entropy_to_seed(string entropy);
   [Throws=SphinxError]
+  string agent_seed(string seed, u32 n);
+  [Throws=SphinxError]
   string build_request(string msg, string secret, u64 nonce);
   [Throws=SphinxError]
   string parse_response(string res);
