@@ -82,6 +82,8 @@ RustBuffer uniffi_sphinxrs_fn_func_mnemonic_to_seed(RustBuffer mnemonic, RustCal
 );
 RustBuffer uniffi_sphinxrs_fn_func_entropy_to_seed(RustBuffer entropy, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_agent_seed(RustBuffer seed, uint32_t n, RustCallStatus *_Nonnull out_status
+);
 RustBuffer uniffi_sphinxrs_fn_func_build_request(RustBuffer msg, RustBuffer secret, uint64_t nonce, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_parse_response(RustBuffer res, RustCallStatus *_Nonnull out_status
@@ -274,6 +276,9 @@ uint16_t uniffi_sphinxrs_checksum_func_mnemonic_to_seed(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_entropy_to_seed(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_agent_seed(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_build_request(void

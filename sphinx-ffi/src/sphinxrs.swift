@@ -1749,6 +1749,17 @@ public func entropyToSeed(entropy: String) throws -> String {
     )
 }
 
+public func agentSeed(seed: String, n: UInt32) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_agent_seed(
+                FfiConverterString.lower(seed),
+                FfiConverterUInt32.lower(n), $0
+            )
+        }
+    )
+}
+
 public func buildRequest(msg: String, secret: String, nonce: UInt64) throws -> String {
     return try FfiConverterString.lift(
         rustCallWithError(FfiConverterTypeSphinxError.lift) {
@@ -2848,6 +2859,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_sphinxrs_checksum_func_entropy_to_seed() != 33710 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_sphinxrs_checksum_func_agent_seed() != 23720 {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_sphinxrs_checksum_func_build_request() != 31264 {
