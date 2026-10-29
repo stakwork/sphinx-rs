@@ -18,7 +18,9 @@ sphinx-crypter = { path = "../crypter" }
 rmp-utils = { version = "0.1.0", path = "../rmp-utils" }
 sphinx-derive = { path = "../derive" }
 sphinx-glyph = { path = "../glyph", default-features = false, features = ["std"] }
-sphinx = { git = "https://github.com/stakwork/sphinx", rev = "0fb78cea33cdb6a7a0c176667a78ef3ea2ead9ed", features = [
+# NOTE: rev points at the commit of stakwork/sphinx PR #399 (branch
+# feat/multi-app-push-registrations); re-pin to the merge commit once it merges.
+sphinx = { git = "https://github.com/stakwork/sphinx", rev = "46e3d69df10d1dad83eeb30876fcb8aeab891ca0", features = [
     "msg",
     "bindings",
     "macaroon",
