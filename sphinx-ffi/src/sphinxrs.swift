@@ -2547,6 +2547,22 @@ public func setPushToken(seed: String, uniqueTime: String, state: Data, pushToke
     )
 }
 
+public func setPushTokenForApp(seed: String, uniqueTime: String, state: Data, pushToken: String, pushKey: String, appId: String?, pushEnvironment: String?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_set_push_token_for_app(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(pushToken),
+                FfiConverterString.lower(pushKey),
+                FfiConverterOptionString.lower(appId),
+                FfiConverterOptionString.lower(pushEnvironment), $0
+            )
+        }
+    )
+}
+
 public func decryptChildIndex(encryptedChild: String, pushKey: String) throws -> UInt64 {
     return try FfiConverterUInt64.lift(
         rustCallWithError(FfiConverterTypeSphinxError.lift) {
@@ -3036,6 +3052,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_sphinxrs_checksum_func_set_push_token() != 52747 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_sphinxrs_checksum_func_set_push_token_for_app() != 1696 {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_sphinxrs_checksum_func_decrypt_child_index() != 2032 {
