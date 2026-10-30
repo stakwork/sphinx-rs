@@ -500,6 +500,8 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_set_push_token(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pushToken`: RustBuffer.ByValue,`pushKey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_set_push_token_for_app(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pushToken`: RustBuffer.ByValue,`pushKey`: RustBuffer.ByValue,`appId`: RustBuffer.ByValue,`pushEnvironment`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_decrypt_child_index(`encryptedChild`: RustBuffer.ByValue,`pushKey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): Long
     fun uniffi_sphinxrs_fn_func_get_msgs_counts(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
@@ -685,6 +687,8 @@ internal interface _UniFFILib : Library {
     fun uniffi_sphinxrs_checksum_func_get_mutes(
     ): Short
     fun uniffi_sphinxrs_checksum_func_set_push_token(
+    ): Short
+    fun uniffi_sphinxrs_checksum_func_set_push_token_for_app(
     ): Short
     fun uniffi_sphinxrs_checksum_func_decrypt_child_index(
     ): Short
@@ -947,6 +951,9 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_set_push_token() != 52747.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_sphinxrs_checksum_func_set_push_token_for_app() != 1696.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_decrypt_child_index() != 2032.toShort()) {
@@ -3013,6 +3020,15 @@ fun `setPushToken`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `pu
     return FfiConverterTypeRunReturn.lift(
     rustCallWithError(SphinxException) { _status ->
     _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_set_push_token(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`pushToken`),FfiConverterString.lower(`pushKey`),_status)
+})
+}
+
+@Throws(SphinxException::class)
+
+fun `setPushTokenForApp`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `pushToken`: String, `pushKey`: String, `appId`: String?, `pushEnvironment`: String?): RunReturn {
+    return FfiConverterTypeRunReturn.lift(
+    rustCallWithError(SphinxException) { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_set_push_token_for_app(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`pushToken`),FfiConverterString.lower(`pushKey`),FfiConverterOptionalString.lower(`appId`),FfiConverterOptionalString.lower(`pushEnvironment`),_status)
 })
 }
 
