@@ -748,6 +748,28 @@ pub fn set_push_token(
     )
 }
 
+pub fn set_push_token_for_app(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    push_token: String,
+    push_key: String,
+    app_id: Option<String>,
+    push_environment: Option<String>,
+) -> Result<RunReturn> {
+    Ok(bindings::set_push_token_for_app(
+        &seed,
+        &unique_time,
+        &full_state,
+        &push_token,
+        &push_key,
+        app_id.as_deref(),
+        push_environment.as_deref(),
+    )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
+}
+
 pub fn get_msgs_counts(
     seed: String,
     unique_time: String,
