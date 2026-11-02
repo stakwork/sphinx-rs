@@ -579,6 +579,62 @@ pub fn delete_tribe(
     .into())
 }
 
+/// The tribe owner marks a member (`on: true`) or unmarks them (`on: false`).
+/// While marked, the tribe server sends that member a `SentBy` message
+/// (type 38) after each message it forwards, naming who sent it
+/// (stakwork/sphinx docs/tribe-sender-identity.md §3). Sent as a
+/// `TribeCmd::ShowSenders` on the tribe server's MQTT topic, like
+/// `update_tribe`; answered with the member list. Peel uses this form.
+pub fn show_senders(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    tribe_server_pubkey: String,
+    tribe_pubkey: String,
+    member_pubkey: String,
+    on: bool,
+) -> Result<RunReturn> {
+    Ok(bindings::show_senders(
+        &seed,
+        &unique_time,
+        &full_state,
+        &tribe_server_pubkey,
+        &tribe_pubkey,
+        &member_pubkey,
+        on,
+    )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
+}
+
+/// `show_senders` as an onion (`MsgType::TribeCmd`, type 36) to the tribe's
+/// key, paying `amt_msat` like a tribe message, from the child this account
+/// has for the tribe; the server answers with a `TribeRes` onion. For a
+/// client on the onion command path; Peel calls `show_senders`.
+pub fn show_senders_onion(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    tribe_pubkey: String,
+    member_pubkey: String,
+    on: bool,
+    amt_msat: u64,
+    alias: String,
+) -> Result<RunReturn> {
+    Ok(bindings::show_senders_onion(
+        &seed,
+        &unique_time,
+        &full_state,
+        &tribe_pubkey,
+        &member_pubkey,
+        on,
+        amt_msat,
+        &alias,
+    )
+    .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+    .into())
+}
+
 pub fn join_tribe(
     seed: String,
     unique_time: String,

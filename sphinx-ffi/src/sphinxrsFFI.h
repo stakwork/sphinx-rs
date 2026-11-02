@@ -224,6 +224,10 @@ RustBuffer uniffi_sphinxrs_fn_func_update_tribe(RustBuffer seed, RustBuffer uniq
 );
 RustBuffer uniffi_sphinxrs_fn_func_delete_tribe(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_pubkey, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_show_senders(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_pubkey, RustBuffer member_pubkey, int8_t on, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_show_senders_onion(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_pubkey, RustBuffer member_pubkey, int8_t on, uint64_t amt_msat, RustBuffer alias, RustCallStatus *_Nonnull out_status
+);
 RustBuffer uniffi_sphinxrs_fn_func_add_node(RustBuffer node, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_concat_route(RustBuffer state, RustBuffer end_hops, RustBuffer router_pubkey, uint64_t amt_msat, RustCallStatus *_Nonnull out_status
@@ -491,6 +495,12 @@ uint16_t uniffi_sphinxrs_checksum_func_update_tribe(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_delete_tribe(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_show_senders(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_show_senders_onion(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_add_node(void

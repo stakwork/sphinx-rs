@@ -277,6 +277,10 @@ namespace sphinxrs {
   [Throws=SphinxError]
   RunReturn delete_tribe(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_pubkey);
   [Throws=SphinxError]
+  RunReturn show_senders(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_pubkey, string member_pubkey, boolean on);
+  [Throws=SphinxError]
+  RunReturn show_senders_onion(string seed, string unique_time, bytes state, string tribe_pubkey, string member_pubkey, boolean on, u64 amt_msat, string alias);
+  [Throws=SphinxError]
   RunReturn add_node(string node);
   [Throws=SphinxError]
   RunReturn concat_route(bytes state, string end_hops, string router_pubkey, u64 amt_msat);
