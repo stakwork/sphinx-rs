@@ -2721,6 +2721,39 @@ public func deleteTribe(seed: String, uniqueTime: String, state: Data, tribeServ
     )
 }
 
+public func showSenders(seed: String, uniqueTime: String, state: Data, tribeServerPubkey: String, tribePubkey: String, memberPubkey: String, on: Bool) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_show_senders(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(tribeServerPubkey),
+                FfiConverterString.lower(tribePubkey),
+                FfiConverterString.lower(memberPubkey),
+                FfiConverterBool.lower(on), $0
+            )
+        }
+    )
+}
+
+public func showSendersOnion(seed: String, uniqueTime: String, state: Data, tribePubkey: String, memberPubkey: String, on: Bool, amtMsat: UInt64, alias: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_show_senders_onion(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(tribePubkey),
+                FfiConverterString.lower(memberPubkey),
+                FfiConverterBool.lower(on),
+                FfiConverterUInt64.lower(amtMsat),
+                FfiConverterString.lower(alias), $0
+            )
+        }
+    )
+}
+
 public func addNode(node: String) throws -> RunReturn {
     return try FfiConverterTypeRunReturn.lift(
         rustCallWithError(FfiConverterTypeSphinxError.lift) {
@@ -3088,6 +3121,12 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_sphinxrs_checksum_func_delete_tribe() != 11926 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_sphinxrs_checksum_func_show_senders() != 42925 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_sphinxrs_checksum_func_show_senders_onion() != 14493 {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_sphinxrs_checksum_func_add_node() != 49737 {
