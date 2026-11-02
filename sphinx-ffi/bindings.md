@@ -104,6 +104,10 @@ RunReturn `join_tribe(string seed, string unique_time, bytes state, string tribe
 
 RunReturn `list_tribe_members(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_pubkey)`
 
+RunReturn `show_senders(string seed, string unique_time, bytes state, string tribe_server_pubkey, string tribe_pubkey, string member_pubkey, boolean on)`
+
+RunReturn `show_senders_onion(string seed, string unique_time, bytes state, string tribe_pubkey, string member_pubkey, boolean on, u64 amt_msat, string alias)`
+
 RunReturn `make_invite(string seed, string unique_time, bytes state, string host, u64 amt_msat, string my_alias, string? tribe_host, string? tribe_pubkey)`
 
 RunReturn `process_invite(string seed, string unique_time, bytes state, string invite_qr)`

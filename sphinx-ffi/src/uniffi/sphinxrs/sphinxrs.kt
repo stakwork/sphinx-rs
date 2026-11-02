@@ -524,6 +524,10 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_delete_tribe(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribeServerPubkey`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_show_senders(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribeServerPubkey`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,`memberPubkey`: RustBuffer.ByValue,`on`: Byte,_uniffi_out_err: RustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_show_senders_onion(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,`memberPubkey`: RustBuffer.ByValue,`on`: Byte,`amtMsat`: Long,`alias`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_add_node(`node`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_concat_route(`state`: RustBuffer.ByValue,`endHops`: RustBuffer.ByValue,`routerPubkey`: RustBuffer.ByValue,`amtMsat`: Long,_uniffi_out_err: RustCallStatus, 
@@ -711,6 +715,10 @@ internal interface _UniFFILib : Library {
     fun uniffi_sphinxrs_checksum_func_update_tribe(
     ): Short
     fun uniffi_sphinxrs_checksum_func_delete_tribe(
+    ): Short
+    fun uniffi_sphinxrs_checksum_func_show_senders(
+    ): Short
+    fun uniffi_sphinxrs_checksum_func_show_senders_onion(
     ): Short
     fun uniffi_sphinxrs_checksum_func_add_node(
     ): Short
@@ -987,6 +995,12 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_delete_tribe() != 11926.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_sphinxrs_checksum_func_show_senders() != 42925.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_sphinxrs_checksum_func_show_senders_onion() != 14493.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_add_node() != 49737.toShort()) {
@@ -3128,6 +3142,24 @@ fun `deleteTribe`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `tri
     return FfiConverterTypeRunReturn.lift(
     rustCallWithError(SphinxException) { _status ->
     _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_delete_tribe(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribeServerPubkey`),FfiConverterString.lower(`tribePubkey`),_status)
+})
+}
+
+@Throws(SphinxException::class)
+
+fun `showSenders`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `tribeServerPubkey`: String, `tribePubkey`: String, `memberPubkey`: String, `on`: Boolean): RunReturn {
+    return FfiConverterTypeRunReturn.lift(
+    rustCallWithError(SphinxException) { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_show_senders(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribeServerPubkey`),FfiConverterString.lower(`tribePubkey`),FfiConverterString.lower(`memberPubkey`),FfiConverterBoolean.lower(`on`),_status)
+})
+}
+
+@Throws(SphinxException::class)
+
+fun `showSendersOnion`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `tribePubkey`: String, `memberPubkey`: String, `on`: Boolean, `amtMsat`: ULong, `alias`: String): RunReturn {
+    return FfiConverterTypeRunReturn.lift(
+    rustCallWithError(SphinxException) { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_show_senders_onion(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribePubkey`),FfiConverterString.lower(`memberPubkey`),FfiConverterBoolean.lower(`on`),FfiConverterULong.lower(`amtMsat`),FfiConverterString.lower(`alias`),_status)
 })
 }
 
