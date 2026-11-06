@@ -202,6 +202,12 @@ RustBuffer uniffi_sphinxrs_fn_func_set_push_token(RustBuffer seed, RustBuffer un
 );
 RustBuffer uniffi_sphinxrs_fn_func_set_push_token_for_app(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer push_token, RustBuffer push_key, RustBuffer app_id, RustBuffer push_environment, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_set_active(RustBuffer seed, RustBuffer unique_time, RustBuffer state, int8_t active, RustBuffer ttl_secs, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_read_all(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_unregister_push_token_for_app(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer app_id, RustCallStatus *_Nonnull out_status
+);
 uint64_t uniffi_sphinxrs_fn_func_decrypt_child_index(RustBuffer encrypted_child, RustBuffer push_key, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_get_msgs_counts(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
@@ -462,6 +468,15 @@ uint16_t uniffi_sphinxrs_checksum_func_set_push_token(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_set_push_token_for_app(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_set_active(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_read_all(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_unregister_push_token_for_app(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_decrypt_child_index(void
