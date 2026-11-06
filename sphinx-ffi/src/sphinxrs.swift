@@ -2563,6 +2563,45 @@ public func setPushTokenForApp(seed: String, uniqueTime: String, state: Data, pu
     )
 }
 
+public func setActive(seed: String, uniqueTime: String, state: Data, active: Bool, ttlSecs: UInt64?) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_set_active(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterBool.lower(active),
+                FfiConverterOptionUInt64.lower(ttlSecs), $0
+            )
+        }
+    )
+}
+
+public func readAll(seed: String, uniqueTime: String, state: Data) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_read_all(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state), $0
+            )
+        }
+    )
+}
+
+public func unregisterPushTokenForApp(seed: String, uniqueTime: String, state: Data, appId: String) throws -> RunReturn {
+    return try FfiConverterTypeRunReturn.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_unregister_push_token_for_app(
+                FfiConverterString.lower(seed),
+                FfiConverterString.lower(uniqueTime),
+                FfiConverterData.lower(state),
+                FfiConverterString.lower(appId), $0
+            )
+        }
+    )
+}
+
 public func decryptChildIndex(encryptedChild: String, pushKey: String) throws -> UInt64 {
     return try FfiConverterUInt64.lift(
         rustCallWithError(FfiConverterTypeSphinxError.lift) {
@@ -3088,6 +3127,15 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_sphinxrs_checksum_func_set_push_token_for_app() != 1696 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_sphinxrs_checksum_func_set_active() != 14660 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_sphinxrs_checksum_func_read_all() != 37322 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_sphinxrs_checksum_func_unregister_push_token_for_app() != 1662 {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_sphinxrs_checksum_func_decrypt_child_index() != 2032 {
