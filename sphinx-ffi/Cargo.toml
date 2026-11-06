@@ -18,7 +18,7 @@ sphinx-crypter = { path = "../crypter" }
 rmp-utils = { version = "0.1.0", path = "../rmp-utils" }
 sphinx-derive = { path = "../derive" }
 sphinx-glyph = { path = "../glyph", default-features = false, features = ["std"] }
-sphinx = { git = "https://github.com/stakwork/sphinx", rev = "91466814325e9c09b76c6d98d495ff6dfb8d3e17", features = [
+sphinx = { git = "https://github.com/stakwork/sphinx", rev = "70605f3bda5941fd0d5682395dea0d6640a7a248", features = [
     "msg",
     "bindings",
     "macaroon",

@@ -826,6 +826,39 @@ pub fn set_push_token_for_app(
     .into())
 }
 
+pub fn set_active(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    active: bool,
+    ttl_secs: Option<u64>,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::set_active(&seed, &unique_time, &full_state, active, ttl_secs)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
+pub fn read_all(seed: String, unique_time: String, full_state: Vec<u8>) -> Result<RunReturn> {
+    Ok(bindings::read_all(&seed, &unique_time, &full_state)
+        .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+        .into())
+}
+
+pub fn unregister_push_token_for_app(
+    seed: String,
+    unique_time: String,
+    full_state: Vec<u8>,
+    app_id: String,
+) -> Result<RunReturn> {
+    Ok(
+        bindings::unregister_push_token_for_app(&seed, &unique_time, &full_state, &app_id)
+            .map_err(|e| SphinxError::SendFailed { r: e.to_string() })?
+            .into(),
+    )
+}
+
 pub fn get_msgs_counts(
     seed: String,
     unique_time: String,
