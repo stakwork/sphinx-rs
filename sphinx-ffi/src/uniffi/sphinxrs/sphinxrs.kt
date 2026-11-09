@@ -3,14 +3,14 @@
 
 @file:Suppress("NAME_SHADOWING")
 
-package uniffi.sphinxrs;
+package uniffi.sphinxrs
 
 // Common helper code.
 //
 // Ideally this would live in a separate .kt file where it can be unittested etc
 // in isolation, and perhaps even published as a re-useable package.
 //
-// However, it's important that the detils of how this helper code works (e.g. the
+// However, it's important that the details of how this helper code works (e.g. the
 // way that different builtin types are passed across the FFI) exactly match what's
 // expected by the Rust code on the other side of the interface. In practice right
 // now that means coming from the exact some version of `uniffi` that was used to
@@ -26,72 +26,63 @@ import com.sun.jna.Callback
 import com.sun.jna.ptr.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.CharBuffer
+import java.nio.charset.CodingErrorAction
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.ConcurrentHashMap
 
 // This is a helper for safely working with byte buffers returned from the Rust code.
 // A rust-owned buffer is represented by its capacity, its current length, and a
 // pointer to the underlying data.
 
+/**
+ * @suppress
+ */
 @Structure.FieldOrder("capacity", "len", "data")
 open class RustBuffer : Structure() {
-    @JvmField var capacity: Int = 0
-    @JvmField var len: Int = 0
+    // Note: `capacity` and `len` are actually `ULong` values, but JVM only supports signed values.
+    // When dealing with these fields, make sure to call `toULong()`.
+    @JvmField var capacity: Long = 0
+    @JvmField var len: Long = 0
     @JvmField var data: Pointer? = null
 
     class ByValue: RustBuffer(), Structure.ByValue
     class ByReference: RustBuffer(), Structure.ByReference
 
+   internal fun setValue(other: RustBuffer) {
+        capacity = other.capacity
+        len = other.len
+        data = other.data
+    }
+
     companion object {
-        internal fun alloc(size: Int = 0) = rustCall() { status ->
-            _UniFFILib.INSTANCE.ffi_sphinxrs_rustbuffer_alloc(size, status).also {
-                if(it.data == null) {
-                   throw RuntimeException("RustBuffer.alloc() returned null data pointer (size=${size})")
-               }
-            }
+        internal fun alloc(size: ULong = 0UL) = uniffiRustCall() { status ->
+            // Note: need to convert the size to a `Long` value to make this work with JVM.
+            UniffiLib.ffi_sphinxrs_rustbuffer_alloc(size.toLong(), status)
+        }.also {
+            if(it.data == null) {
+               throw RuntimeException("RustBuffer.alloc() returned null data pointer (size=${size})")
+           }
         }
 
-        internal fun free(buf: RustBuffer.ByValue) = rustCall() { status ->
-            _UniFFILib.INSTANCE.ffi_sphinxrs_rustbuffer_free(buf, status)
+        internal fun create(capacity: ULong, len: ULong, data: Pointer?): RustBuffer.ByValue {
+            var buf = RustBuffer.ByValue()
+            buf.capacity = capacity.toLong()
+            buf.len = len.toLong()
+            buf.data = data
+            return buf
+        }
+
+        internal fun free(buf: RustBuffer.ByValue) = uniffiRustCall() { status ->
+            UniffiLib.ffi_sphinxrs_rustbuffer_free(buf, status)
         }
     }
 
     @Suppress("TooGenericExceptionThrown")
     fun asByteBuffer() =
-        this.data?.getByteBuffer(0, this.len.toLong())?.also {
+        this.data?.getByteBuffer(0, this.len)?.also {
             it.order(ByteOrder.BIG_ENDIAN)
         }
-}
-
-/**
- * The equivalent of the `*mut RustBuffer` type.
- * Required for callbacks taking in an out pointer.
- *
- * Size is the sum of all values in the struct.
- */
-class RustBufferByReference : ByReference(16) {
-    /**
-     * Set the pointed-to `RustBuffer` to the given value.
-     */
-    fun setValue(value: RustBuffer.ByValue) {
-        // NOTE: The offsets are as they are in the C-like struct.
-        val pointer = getPointer()
-        pointer.setInt(0, value.capacity)
-        pointer.setInt(4, value.len)
-        pointer.setPointer(8, value.data)
-    }
-
-    /**
-     * Get a `RustBuffer.ByValue` from this reference.
-     */
-    fun getValue(): RustBuffer.ByValue {
-        val pointer = getPointer()
-        val value = RustBuffer.ByValue()
-        value.writeField("capacity", pointer.getInt(0))
-        value.writeField("len", pointer.getInt(4))
-        value.writeField("data", pointer.getPointer(8))
-
-        return value
-    }
 }
 
 // This is a helper for safely passing byte references into the rust code.
@@ -101,16 +92,20 @@ class RustBufferByReference : ByReference(16) {
 // completeness.
 
 @Structure.FieldOrder("len", "data")
-open class ForeignBytes : Structure() {
+internal open class ForeignBytes : Structure() {
     @JvmField var len: Int = 0
     @JvmField var data: Pointer? = null
 
     class ByValue : ForeignBytes(), Structure.ByValue
 }
-// The FfiConverter interface handles converter types to and from the FFI
-//
-// All implementing objects should be public to support external types.  When a
-// type is external we need to import it's FfiConverter.
+/**
+ * The FfiConverter interface handles converter types to and from the FFI
+ *
+ * All implementing objects should be public to support external types.  When a
+ * type is external we need to import it's FfiConverter.
+ *
+ * @suppress
+ */
 public interface FfiConverter<KotlinType, FfiType> {
     // Convert an FFI type to a Kotlin type
     fun lift(value: FfiType): KotlinType
@@ -129,7 +124,7 @@ public interface FfiConverter<KotlinType, FfiType> {
     // encoding, so we pessimistically allocate the largest size possible (3
     // bytes per codepoint).  Allocating extra bytes is not really a big deal
     // because the `RustBuffer` is short-lived.
-    fun allocationSize(value: KotlinType): Int
+    fun allocationSize(value: KotlinType): ULong
 
     // Write a Kotlin type to a `ByteBuffer`
     fun write(value: KotlinType, buf: ByteBuffer)
@@ -143,11 +138,11 @@ public interface FfiConverter<KotlinType, FfiType> {
     fun lowerIntoRustBuffer(value: KotlinType): RustBuffer.ByValue {
         val rbuf = RustBuffer.alloc(allocationSize(value))
         try {
-            val bbuf = rbuf.data!!.getByteBuffer(0, rbuf.capacity.toLong()).also {
+            val bbuf = rbuf.data!!.getByteBuffer(0, rbuf.capacity).also {
                 it.order(ByteOrder.BIG_ENDIAN)
             }
             write(value, bbuf)
-            rbuf.writeField("len", bbuf.position())
+            rbuf.writeField("len", bbuf.position().toLong())
             return rbuf
         } catch (e: Throwable) {
             RustBuffer.free(rbuf)
@@ -173,38 +168,59 @@ public interface FfiConverter<KotlinType, FfiType> {
     }
 }
 
-// FfiConverter that uses `RustBuffer` as the FfiType
+/**
+ * FfiConverter that uses `RustBuffer` as the FfiType
+ *
+ * @suppress
+ */
 public interface FfiConverterRustBuffer<KotlinType>: FfiConverter<KotlinType, RustBuffer.ByValue> {
     override fun lift(value: RustBuffer.ByValue) = liftFromRustBuffer(value)
     override fun lower(value: KotlinType) = lowerIntoRustBuffer(value)
 }
 // A handful of classes and functions to support the generated data structures.
 // This would be a good candidate for isolating in its own ffi-support lib.
-// Error runtime.
+
+internal const val UNIFFI_CALL_SUCCESS = 0.toByte()
+internal const val UNIFFI_CALL_ERROR = 1.toByte()
+internal const val UNIFFI_CALL_UNEXPECTED_ERROR = 2.toByte()
+
 @Structure.FieldOrder("code", "error_buf")
-internal open class RustCallStatus : Structure() {
+internal open class UniffiRustCallStatus : Structure() {
     @JvmField var code: Byte = 0
     @JvmField var error_buf: RustBuffer.ByValue = RustBuffer.ByValue()
 
-    class ByValue: RustCallStatus(), Structure.ByValue
+    class ByValue: UniffiRustCallStatus(), Structure.ByValue
 
     fun isSuccess(): Boolean {
-        return code == 0.toByte()
+        return code == UNIFFI_CALL_SUCCESS
     }
 
     fun isError(): Boolean {
-        return code == 1.toByte()
+        return code == UNIFFI_CALL_ERROR
     }
 
     fun isPanic(): Boolean {
-        return code == 2.toByte()
+        return code == UNIFFI_CALL_UNEXPECTED_ERROR
+    }
+
+    companion object {
+        fun create(code: Byte, errorBuf: RustBuffer.ByValue): UniffiRustCallStatus.ByValue {
+            val callStatus = UniffiRustCallStatus.ByValue()
+            callStatus.code = code
+            callStatus.error_buf = errorBuf
+            return callStatus
+        }
     }
 }
 
-class InternalException(message: String) : Exception(message)
+class InternalException(message: String) : kotlin.Exception(message)
 
-// Each top-level error class has a companion object that can lift the error from the call status's rust buffer
-interface CallStatusErrorHandler<E> {
+/**
+ * Each top-level error class has a companion object that can lift the error from the call status's rust buffer
+ *
+ * @suppress
+ */
+interface UniffiRustCallStatusErrorHandler<E> {
     fun lift(error_buf: RustBuffer.ByValue): E;
 }
 
@@ -213,15 +229,15 @@ interface CallStatusErrorHandler<E> {
 // synchronize itself
 
 // Call a rust function that returns a Result<>.  Pass in the Error class companion that corresponds to the Err
-private inline fun <U, E: Exception> rustCallWithError(errorHandler: CallStatusErrorHandler<E>, callback: (RustCallStatus) -> U): U {
-    var status = RustCallStatus();
+private inline fun <U, E: kotlin.Exception> uniffiRustCallWithError(errorHandler: UniffiRustCallStatusErrorHandler<E>, callback: (UniffiRustCallStatus) -> U): U {
+    var status = UniffiRustCallStatus()
     val return_value = callback(status)
-    checkCallStatus(errorHandler, status)
+    uniffiCheckCallStatus(errorHandler, status)
     return return_value
 }
 
-// Check RustCallStatus and throw an error if the call wasn't successful
-private fun<E: Exception> checkCallStatus(errorHandler: CallStatusErrorHandler<E>, status: RustCallStatus) {
+// Check UniffiRustCallStatus and throw an error if the call wasn't successful
+private fun<E: kotlin.Exception> uniffiCheckCallStatus(errorHandler: UniffiRustCallStatusErrorHandler<E>, status: UniffiRustCallStatus) {
     if (status.isSuccess()) {
         return
     } else if (status.isError()) {
@@ -240,8 +256,12 @@ private fun<E: Exception> checkCallStatus(errorHandler: CallStatusErrorHandler<E
     }
 }
 
-// CallStatusErrorHandler implementation for times when we don't expect a CALL_ERROR
-object NullCallStatusErrorHandler: CallStatusErrorHandler<InternalException> {
+/**
+ * UniffiRustCallStatusErrorHandler implementation for times when we don't expect a CALL_ERROR
+ *
+ * @suppress
+ */
+object UniffiNullRustCallStatusErrorHandler: UniffiRustCallStatusErrorHandler<InternalException> {
     override fun lift(error_buf: RustBuffer.ByValue): InternalException {
         RustBuffer.free(error_buf)
         return InternalException("Unexpected CALL_ERROR")
@@ -249,87 +269,80 @@ object NullCallStatusErrorHandler: CallStatusErrorHandler<InternalException> {
 }
 
 // Call a rust function that returns a plain value
-private inline fun <U> rustCall(callback: (RustCallStatus) -> U): U {
-    return rustCallWithError(NullCallStatusErrorHandler, callback);
+private inline fun <U> uniffiRustCall(callback: (UniffiRustCallStatus) -> U): U {
+    return uniffiRustCallWithError(UniffiNullRustCallStatusErrorHandler, callback)
 }
 
-// IntegerType that matches Rust's `usize` / C's `size_t`
-public class USize(value: Long = 0) : IntegerType(Native.SIZE_T_SIZE, value, true) {
-    // This is needed to fill in the gaps of IntegerType's implementation of Number for Kotlin.
-    override fun toByte() = toInt().toByte()
-    override fun toChar() = toInt().toChar()
-    override fun toShort() = toInt().toShort()
-
-    fun writeToBuffer(buf: ByteBuffer) {
-        // Make sure we always write usize integers using native byte-order, since they may be
-        // casted to pointer values
-        buf.order(ByteOrder.nativeOrder())
-        try {
-            when (Native.SIZE_T_SIZE) {
-                4 -> buf.putInt(toInt())
-                8 -> buf.putLong(toLong())
-                else -> throw RuntimeException("Invalid SIZE_T_SIZE: ${Native.SIZE_T_SIZE}")
-            }
-        } finally {
-            buf.order(ByteOrder.BIG_ENDIAN)
-        }
-    }
-
-    companion object {
-        val size: Int
-            get() = Native.SIZE_T_SIZE
-
-        fun readFromBuffer(buf: ByteBuffer) : USize {
-            // Make sure we always read usize integers using native byte-order, since they may be
-            // casted from pointer values
-            buf.order(ByteOrder.nativeOrder())
-            try {
-                return when (Native.SIZE_T_SIZE) {
-                    4 -> USize(buf.getInt().toLong())
-                    8 -> USize(buf.getLong())
-                    else -> throw RuntimeException("Invalid SIZE_T_SIZE: ${Native.SIZE_T_SIZE}")
-                }
-            } finally {
-                buf.order(ByteOrder.BIG_ENDIAN)
-            }
-        }
+internal inline fun<T> uniffiTraitInterfaceCall(
+    callStatus: UniffiRustCallStatus,
+    makeCall: () -> T,
+    writeReturn: (T) -> Unit,
+) {
+    try {
+        writeReturn(makeCall())
+    } catch(e: kotlin.Exception) {
+        val err = try { e.stackTraceToString() } catch(_: Throwable) { "" }
+        callStatus.code = UNIFFI_CALL_UNEXPECTED_ERROR
+        callStatus.error_buf = FfiConverterString.lower(err)
     }
 }
 
+internal inline fun<T, reified E: Throwable> uniffiTraitInterfaceCallWithError(
+    callStatus: UniffiRustCallStatus,
+    makeCall: () -> T,
+    writeReturn: (T) -> Unit,
+    lowerError: (E) -> RustBuffer.ByValue
+) {
+    try {
+        writeReturn(makeCall())
+    } catch(e: kotlin.Exception) {
+        if (e is E) {
+            callStatus.code = UNIFFI_CALL_ERROR
+            callStatus.error_buf = lowerError(e)
+        } else {
+            val err = try { e.stackTraceToString() } catch(_: Throwable) { "" }
+            callStatus.code = UNIFFI_CALL_UNEXPECTED_ERROR
+            callStatus.error_buf = FfiConverterString.lower(err)
+        }
+    }
+}
+// Initial value and increment amount for handles. 
+// These ensure that Kotlin-generated handles always have the lowest bit set
+private const val UNIFFI_HANDLEMAP_INITIAL = 1.toLong()
+private const val UNIFFI_HANDLEMAP_DELTA = 2.toLong()
 
 // Map handles to objects
 //
-// This is used when the Rust code expects an opaque pointer to represent some foreign object.
-// Normally we would pass a pointer to the object, but JNA doesn't support getting a pointer from an
-// object reference , nor does it support leaking a reference to Rust.
-//
-// Instead, this class maps USize values to objects so that we can pass a pointer-sized type to
-// Rust when it needs an opaque pointer.
-//
-// TODO: refactor callbacks to use this class
-internal class UniFfiHandleMap<T: Any> {
-    private val map = ConcurrentHashMap<USize, T>()
-    // Use AtomicInteger for our counter, since we may be on a 32-bit system.  4 billion possible
-    // values seems like enough. If somehow we generate 4 billion handles, then this will wrap
-    // around back to zero and we can assume the first handle generated will have been dropped by
-    // then.
-    private val counter = java.util.concurrent.atomic.AtomicInteger(0)
+// This is used pass an opaque 64-bit handle representing a foreign object to the Rust code.
+internal class UniffiHandleMap<T: Any> {
+    private val map = ConcurrentHashMap<Long, T>()
+    // Start 
+    private val counter = java.util.concurrent.atomic.AtomicLong(UNIFFI_HANDLEMAP_INITIAL)
 
     val size: Int
         get() = map.size
 
-    fun insert(obj: T): USize {
-        val handle = USize(counter.getAndAdd(1).toLong())
+    // Insert a new object into the handle map and get a handle for it
+    fun insert(obj: T): Long {
+        val handle = counter.getAndAdd(UNIFFI_HANDLEMAP_DELTA)
         map.put(handle, obj)
         return handle
     }
 
-    fun get(handle: USize): T? {
-        return map.get(handle)
+    // Clone a handle, creating a new one
+    fun clone(handle: Long): Long {
+        val obj = map.get(handle) ?: throw InternalException("UniffiHandleMap.clone: Invalid handle")
+        return insert(obj)
     }
 
-    fun remove(handle: USize) {
-        map.remove(handle)
+    // Get an object from the handle map
+    fun get(handle: Long): T {
+        return map.get(handle) ?: throw InternalException("UniffiHandleMap.get: Invalid handle")
+    }
+
+    // Remove an entry from the handlemap and get the Kotlin object back
+    fun remove(handle: Long): T {
+        return map.remove(handle) ?: throw InternalException("UniffiHandleMap: Invalid handle")
     }
 }
 
@@ -344,422 +357,787 @@ private fun findLibraryName(componentName: String): String {
     return "sphinxrs"
 }
 
-private inline fun <reified Lib : Library> loadIndirect(
-    componentName: String
-): Lib {
-    return Native.load<Lib>(findLibraryName(componentName), Lib::class.java)
+// Define FFI callback types
+internal interface UniffiRustFutureContinuationCallback : com.sun.jna.Callback {
+    fun callback(`data`: Long,`pollResult`: Byte,)
+}
+internal interface UniffiForeignFutureDroppedCallback : com.sun.jna.Callback {
+    fun callback(`handle`: Long,)
+}
+internal interface UniffiCallbackInterfaceFree : com.sun.jna.Callback {
+    fun callback(`handle`: Long,)
+}
+internal interface UniffiCallbackInterfaceClone : com.sun.jna.Callback {
+    fun callback(`handle`: Long,)
+    : Long
+}
+@Structure.FieldOrder("handle", "free")
+internal open class UniffiForeignFutureDroppedCallbackStruct(
+    @JvmField internal var `handle`: Long = 0.toLong(),
+    @JvmField internal var `free`: UniffiForeignFutureDroppedCallback? = null,
+) : Structure() {
+    class UniffiByValue(
+        `handle`: Long = 0.toLong(),
+        `free`: UniffiForeignFutureDroppedCallback? = null,
+    ): UniffiForeignFutureDroppedCallbackStruct(`handle`,`free`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiForeignFutureDroppedCallbackStruct) {
+        `handle` = other.`handle`
+        `free` = other.`free`
+    }
+
+}
+@Structure.FieldOrder("returnValue", "callStatus")
+internal open class UniffiForeignFutureResultU8(
+    @JvmField internal var `returnValue`: Byte = 0.toByte(),
+    @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+) : Structure() {
+    class UniffiByValue(
+        `returnValue`: Byte = 0.toByte(),
+        `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+    ): UniffiForeignFutureResultU8(`returnValue`,`callStatus`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultU8) {
+        `returnValue` = other.`returnValue`
+        `callStatus` = other.`callStatus`
+    }
+
+}
+internal interface UniffiForeignFutureCompleteU8 : com.sun.jna.Callback {
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultU8.UniffiByValue,)
+}
+@Structure.FieldOrder("returnValue", "callStatus")
+internal open class UniffiForeignFutureResultI8(
+    @JvmField internal var `returnValue`: Byte = 0.toByte(),
+    @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+) : Structure() {
+    class UniffiByValue(
+        `returnValue`: Byte = 0.toByte(),
+        `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+    ): UniffiForeignFutureResultI8(`returnValue`,`callStatus`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultI8) {
+        `returnValue` = other.`returnValue`
+        `callStatus` = other.`callStatus`
+    }
+
+}
+internal interface UniffiForeignFutureCompleteI8 : com.sun.jna.Callback {
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultI8.UniffiByValue,)
+}
+@Structure.FieldOrder("returnValue", "callStatus")
+internal open class UniffiForeignFutureResultU16(
+    @JvmField internal var `returnValue`: Short = 0.toShort(),
+    @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+) : Structure() {
+    class UniffiByValue(
+        `returnValue`: Short = 0.toShort(),
+        `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+    ): UniffiForeignFutureResultU16(`returnValue`,`callStatus`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultU16) {
+        `returnValue` = other.`returnValue`
+        `callStatus` = other.`callStatus`
+    }
+
+}
+internal interface UniffiForeignFutureCompleteU16 : com.sun.jna.Callback {
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultU16.UniffiByValue,)
+}
+@Structure.FieldOrder("returnValue", "callStatus")
+internal open class UniffiForeignFutureResultI16(
+    @JvmField internal var `returnValue`: Short = 0.toShort(),
+    @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+) : Structure() {
+    class UniffiByValue(
+        `returnValue`: Short = 0.toShort(),
+        `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+    ): UniffiForeignFutureResultI16(`returnValue`,`callStatus`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultI16) {
+        `returnValue` = other.`returnValue`
+        `callStatus` = other.`callStatus`
+    }
+
+}
+internal interface UniffiForeignFutureCompleteI16 : com.sun.jna.Callback {
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultI16.UniffiByValue,)
+}
+@Structure.FieldOrder("returnValue", "callStatus")
+internal open class UniffiForeignFutureResultU32(
+    @JvmField internal var `returnValue`: Int = 0,
+    @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+) : Structure() {
+    class UniffiByValue(
+        `returnValue`: Int = 0,
+        `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+    ): UniffiForeignFutureResultU32(`returnValue`,`callStatus`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultU32) {
+        `returnValue` = other.`returnValue`
+        `callStatus` = other.`callStatus`
+    }
+
+}
+internal interface UniffiForeignFutureCompleteU32 : com.sun.jna.Callback {
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultU32.UniffiByValue,)
+}
+@Structure.FieldOrder("returnValue", "callStatus")
+internal open class UniffiForeignFutureResultI32(
+    @JvmField internal var `returnValue`: Int = 0,
+    @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+) : Structure() {
+    class UniffiByValue(
+        `returnValue`: Int = 0,
+        `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+    ): UniffiForeignFutureResultI32(`returnValue`,`callStatus`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultI32) {
+        `returnValue` = other.`returnValue`
+        `callStatus` = other.`callStatus`
+    }
+
+}
+internal interface UniffiForeignFutureCompleteI32 : com.sun.jna.Callback {
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultI32.UniffiByValue,)
+}
+@Structure.FieldOrder("returnValue", "callStatus")
+internal open class UniffiForeignFutureResultU64(
+    @JvmField internal var `returnValue`: Long = 0.toLong(),
+    @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+) : Structure() {
+    class UniffiByValue(
+        `returnValue`: Long = 0.toLong(),
+        `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+    ): UniffiForeignFutureResultU64(`returnValue`,`callStatus`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultU64) {
+        `returnValue` = other.`returnValue`
+        `callStatus` = other.`callStatus`
+    }
+
+}
+internal interface UniffiForeignFutureCompleteU64 : com.sun.jna.Callback {
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultU64.UniffiByValue,)
+}
+@Structure.FieldOrder("returnValue", "callStatus")
+internal open class UniffiForeignFutureResultI64(
+    @JvmField internal var `returnValue`: Long = 0.toLong(),
+    @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+) : Structure() {
+    class UniffiByValue(
+        `returnValue`: Long = 0.toLong(),
+        `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+    ): UniffiForeignFutureResultI64(`returnValue`,`callStatus`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultI64) {
+        `returnValue` = other.`returnValue`
+        `callStatus` = other.`callStatus`
+    }
+
+}
+internal interface UniffiForeignFutureCompleteI64 : com.sun.jna.Callback {
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultI64.UniffiByValue,)
+}
+@Structure.FieldOrder("returnValue", "callStatus")
+internal open class UniffiForeignFutureResultF32(
+    @JvmField internal var `returnValue`: Float = 0.0f,
+    @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+) : Structure() {
+    class UniffiByValue(
+        `returnValue`: Float = 0.0f,
+        `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+    ): UniffiForeignFutureResultF32(`returnValue`,`callStatus`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultF32) {
+        `returnValue` = other.`returnValue`
+        `callStatus` = other.`callStatus`
+    }
+
+}
+internal interface UniffiForeignFutureCompleteF32 : com.sun.jna.Callback {
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultF32.UniffiByValue,)
+}
+@Structure.FieldOrder("returnValue", "callStatus")
+internal open class UniffiForeignFutureResultF64(
+    @JvmField internal var `returnValue`: Double = 0.0,
+    @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+) : Structure() {
+    class UniffiByValue(
+        `returnValue`: Double = 0.0,
+        `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+    ): UniffiForeignFutureResultF64(`returnValue`,`callStatus`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultF64) {
+        `returnValue` = other.`returnValue`
+        `callStatus` = other.`callStatus`
+    }
+
+}
+internal interface UniffiForeignFutureCompleteF64 : com.sun.jna.Callback {
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultF64.UniffiByValue,)
+}
+@Structure.FieldOrder("returnValue", "callStatus")
+internal open class UniffiForeignFutureResultRustBuffer(
+    @JvmField internal var `returnValue`: RustBuffer.ByValue = RustBuffer.ByValue(),
+    @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+) : Structure() {
+    class UniffiByValue(
+        `returnValue`: RustBuffer.ByValue = RustBuffer.ByValue(),
+        `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+    ): UniffiForeignFutureResultRustBuffer(`returnValue`,`callStatus`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultRustBuffer) {
+        `returnValue` = other.`returnValue`
+        `callStatus` = other.`callStatus`
+    }
+
+}
+internal interface UniffiForeignFutureCompleteRustBuffer : com.sun.jna.Callback {
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultRustBuffer.UniffiByValue,)
+}
+@Structure.FieldOrder("callStatus")
+internal open class UniffiForeignFutureResultVoid(
+    @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+) : Structure() {
+    class UniffiByValue(
+        `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
+    ): UniffiForeignFutureResultVoid(`callStatus`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultVoid) {
+        `callStatus` = other.`callStatus`
+    }
+
+}
+internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultVoid.UniffiByValue,)
 }
 
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
-internal interface _UniFFILib : Library {
-    companion object {
-        internal val INSTANCE: _UniFFILib by lazy {
-            loadIndirect<_UniFFILib>(componentName = "sphinxrs")
-            .also { lib: _UniFFILib ->
-                uniffiCheckContractApiVersion(lib)
-                uniffiCheckApiChecksums(lib)
-                }
-        }
+// For large crates we prevent `MethodTooLargeException` (see #2340)
+// N.B. the name of the extension is very misleading, since it is
+// rather `InterfaceTooLargeException`, caused by too many methods
+// in the interface for large crates.
+//
+// By splitting the otherwise huge interface into two parts
+// * UniffiLib (this)
+// * IntegrityCheckingUniffiLib
+// And all checksum methods are put into `IntegrityCheckingUniffiLib`
+// we allow for ~2x as many methods in the UniffiLib interface.
+//
+// Note: above all written when we used JNA's `loadIndirect` etc.
+// We now use JNA's "direct mapping" - unclear if same considerations apply exactly.
+internal object IntegrityCheckingUniffiLib {
+    init {
+        Native.register(IntegrityCheckingUniffiLib::class.java, findLibraryName(componentName = "sphinxrs"))
+        uniffiCheckContractApiVersion(this)
     }
-
-    fun uniffi_sphinxrs_fn_func_pubkey_from_secret_key(`mySecretKey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_derive_shared_secret(`theirPubkey`: RustBuffer.ByValue,`mySecretKey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_encrypt(`plaintext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,`nonce`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_decrypt(`ciphertext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_node_keys(`net`: RustBuffer.ByValue,`seed`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_mnemonic_from_entropy(`entropy`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_entropy_from_mnemonic(`mnemonic`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_mnemonic_to_seed(`mnemonic`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_entropy_to_seed(`entropy`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_agent_seed(`seed`: RustBuffer.ByValue,`n`: Int,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_build_request(`msg`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,`nonce`: Long,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_parse_response(`res`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_make_auth_token(`ts`: Int,`secret`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_sha_256(`msg`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_create_onion(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`hops`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_create_onion_msg(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`hops`: RustBuffer.ByValue,`json`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_create_keysend(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`hops`: RustBuffer.ByValue,`msat`: Long,`rhash`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,`currHeight`: Int,`preimage`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_create_keysend_msg(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`hops`: RustBuffer.ByValue,`msat`: Long,`rhash`: RustBuffer.ByValue,`msgJson`: RustBuffer.ByValue,`currHeight`: Int,`preimage`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_peel_onion(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_peel_onion_msg(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_peel_payment(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,`rhash`: RustBuffer.ByValue,`curHeight`: Int,`cltvExpiry`: Int,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_peel_payment_msg(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,`rhash`: RustBuffer.ByValue,`curHeight`: Int,`cltvExpiry`: Int,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_sign_ms(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_signed_timestamp(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_sign_bytes(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`msg`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_sign_base64(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`msg`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_pubkey_from_seed(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_root_sign_ms(`seed`: RustBuffer.ByValue,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_xpub_from_seed(`seed`: RustBuffer.ByValue,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_set_network(`network`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_set_device(`device`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_set_blockheight(`blockheight`: Int,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_get_blockheight(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_add_contact(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`toPubkey`: RustBuffer.ByValue,`routeHint`: RustBuffer.ByValue,`myAlias`: RustBuffer.ByValue,`myImg`: RustBuffer.ByValue,`amtMsat`: Long,`inviteCode`: RustBuffer.ByValue,`theirAlias`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_get_contact(`state`: RustBuffer.ByValue,`pubkey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_list_contacts(`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_contact_pubkey_by_child_index(`state`: RustBuffer.ByValue,`childIdx`: Long,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(`seed`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`child`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_get_tribe_management_topic(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_initial_setup(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`device`: RustBuffer.ByValue,`inviteCode`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_fetch_msgs(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`lastMsgIdx`: Long,`limit`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_handle(`topic`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`myAlias`: RustBuffer.ByValue,`myImg`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_send(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,`msgType`: Byte,`msgJson`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`myAlias`: RustBuffer.ByValue,`myImg`: RustBuffer.ByValue,`amtMsat`: Long,`isTribe`: Byte,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_keysend(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`amtMsat`: Long,`data`: RustBuffer.ByValue,`routeHint`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_pay(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`bolt11`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_make_media_token(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`host`: RustBuffer.ByValue,`muid`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,`expiry`: Int,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_make_media_token_with_meta(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`host`: RustBuffer.ByValue,`muid`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,`expiry`: Int,`meta`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_make_media_token_with_price(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`host`: RustBuffer.ByValue,`muid`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,`expiry`: Int,`price`: Long,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_request_invoice(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`amtMsat`: Long,`description`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_make_invoice(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`amtMsat`: Long,`description`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_pay_invoice(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`bolt11`: RustBuffer.ByValue,`overpayMsat`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_pay_contact_invoice(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`bolt11`: RustBuffer.ByValue,`myAlias`: RustBuffer.ByValue,`myImg`: RustBuffer.ByValue,`isTribe`: Byte,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_payment_hash_from_invoice(`bolt11`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_parse_invoice(`invoiceJson`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_create_tribe(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribeServerPubkey`: RustBuffer.ByValue,`tribeJson`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_join_tribe(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,`tribeRouteHint`: RustBuffer.ByValue,`alias`: RustBuffer.ByValue,`amtMsat`: Long,`isPrivate`: Byte,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_list_tribe_members(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribeServerPubkey`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_make_invite(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`host`: RustBuffer.ByValue,`amtMsat`: Long,`myAlias`: RustBuffer.ByValue,`tribeHost`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,`inviterPubkey`: RustBuffer.ByValue,`inviterRouteHint`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_process_invite(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`inviteQr`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_parse_invite(`inviteQr`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_code_from_invite(`inviteQr`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_cancel_invite(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`inviteCode`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_get_default_tribe_server(`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_read(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pubkey`: RustBuffer.ByValue,`msgIdx`: Long,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_get_reads(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_mute(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pubkey`: RustBuffer.ByValue,`muteLevel`: Byte,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_get_mutes(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_set_push_token(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pushToken`: RustBuffer.ByValue,`pushKey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_set_push_token_for_app(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pushToken`: RustBuffer.ByValue,`pushKey`: RustBuffer.ByValue,`appId`: RustBuffer.ByValue,`pushEnvironment`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_set_active(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`active`: Byte,`ttlSecs`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_read_all(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_unregister_push_token_for_app(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`appId`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_decrypt_child_index(`encryptedChild`: RustBuffer.ByValue,`pushKey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): Long
-    fun uniffi_sphinxrs_fn_func_get_msgs_counts(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_fetch_msgs_batch(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`lastMsgIdx`: Long,`limit`: RustBuffer.ByValue,`reverse`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_fetch_msgs_batch_per_contact(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`lastMsgIdx`: Long,`limit`: RustBuffer.ByValue,`reverse`: RustBuffer.ByValue,`contact`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_fetch_msgs_batch_okkey(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`lastMsgIdx`: Long,`limit`: RustBuffer.ByValue,`reverse`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_fetch_first_msgs_per_key(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`lastMsgIdx`: Long,`limit`: RustBuffer.ByValue,`reverse`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_fetch_payments(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`since`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,`scid`: RustBuffer.ByValue,`remoteOnly`: RustBuffer.ByValue,`minMsat`: RustBuffer.ByValue,`reverse`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_get_tags(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tags`: RustBuffer.ByValue,`pubkey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_delete_msgs(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pubkey`: RustBuffer.ByValue,`msgIdxs`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_update_tribe(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribeServerPubkey`: RustBuffer.ByValue,`tribeJson`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_delete_tribe(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribeServerPubkey`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_show_senders(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribeServerPubkey`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,`memberPubkey`: RustBuffer.ByValue,`on`: Byte,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_show_senders_onion(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,`memberPubkey`: RustBuffer.ByValue,`on`: Byte,`amtMsat`: Long,`alias`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_add_node(`node`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_concat_route(`state`: RustBuffer.ByValue,`endHops`: RustBuffer.ByValue,`routerPubkey`: RustBuffer.ByValue,`amtMsat`: Long,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_ping_done(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pingTs`: Long,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_fetch_pings(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_id_from_macaroon(`macaroon`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_find_route(`state`: RustBuffer.ByValue,`toPubkey`: RustBuffer.ByValue,`routeHint`: RustBuffer.ByValue,`amtMsat`: Long,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_parse_server_status(`payload`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_evaluate_server_health(`last`: RustBuffer.ByValue,`lastSeenMs`: Long,`nowMs`: Long,`intervalMs`: Long,`maxMissed`: Int,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_parse_mixer_error_code(`raw`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_fn_func_server_status_topic(_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_sphinxrs_rustbuffer_alloc(`size`: Int,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_sphinxrs_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_sphinxrs_rustbuffer_free(`buf`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
-    ): Unit
-    fun ffi_sphinxrs_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Int,_uniffi_out_err: RustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_sphinxrs_checksum_func_pubkey_from_secret_key(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_derive_shared_secret(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_encrypt(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_decrypt(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_node_keys(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_mnemonic_from_entropy(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_entropy_from_mnemonic(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_mnemonic_to_seed(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_entropy_to_seed(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_agent_seed(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_build_request(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_parse_response(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_make_auth_token(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_sha_256(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_create_onion(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_create_onion_msg(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_create_keysend(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_create_keysend_msg(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_peel_onion(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_peel_onion_msg(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_peel_payment(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_peel_payment_msg(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_sign_ms(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_signed_timestamp(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_sign_bytes(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_sign_base64(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_pubkey_from_seed(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_root_sign_ms(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_xpub_from_seed(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_set_network(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_set_device(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_set_blockheight(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_get_blockheight(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_add_contact(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_get_contact(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_list_contacts(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_contact_pubkey_by_child_index(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_contact_pubkey_by_encrypted_child(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_get_tribe_management_topic(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_initial_setup(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_fetch_msgs(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_handle(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_send(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_keysend(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_pay(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_make_media_token(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_make_media_token_with_meta(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_make_media_token_with_price(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_request_invoice(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_make_invoice(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_pay_invoice(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_pay_contact_invoice(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_payment_hash_from_invoice(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_parse_invoice(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_create_tribe(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_join_tribe(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_list_tribe_members(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_make_invite(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_process_invite(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_parse_invite(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_code_from_invite(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_cancel_invite(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_get_default_tribe_server(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_read(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_get_reads(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_mute(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_get_mutes(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_set_push_token(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_set_push_token_for_app(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_set_active(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_read_all(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_unregister_push_token_for_app(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_decrypt_child_index(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_get_msgs_counts(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_fetch_msgs_batch(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_fetch_msgs_batch_per_contact(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_fetch_msgs_batch_okkey(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_fetch_first_msgs_per_key(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_fetch_payments(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_get_tags(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_delete_msgs(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_update_tribe(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_delete_tribe(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_show_senders(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_show_senders_onion(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_add_node(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_concat_route(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_ping_done(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_fetch_pings(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_id_from_macaroon(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_find_route(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_parse_server_status(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_evaluate_server_health(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_parse_mixer_error_code(
-    ): Short
-    fun uniffi_sphinxrs_checksum_func_server_status_topic(
-    ): Short
-    fun ffi_sphinxrs_uniffi_contract_version(
+    external fun uniffi_sphinxrs_checksum_func_add_contact(
     ): Int
+    external fun uniffi_sphinxrs_checksum_func_add_node(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_agent_seed(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_build_request(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_cancel_invite(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_code_from_invite(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_concat_route(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_contact_pubkey_by_child_index(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_contact_pubkey_by_encrypted_child(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_create_keysend(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_create_keysend_msg(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_create_onion(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_create_onion_msg(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_create_tribe(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_decrypt(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_decrypt_child_index(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_delete_msgs(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_delete_tribe(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_derive_shared_secret(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_encrypt(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_entropy_from_mnemonic(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_entropy_to_seed(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_evaluate_server_health(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_fetch_first_msgs_per_key(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_fetch_msgs(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_fetch_msgs_batch(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_fetch_msgs_batch_okkey(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_fetch_msgs_batch_per_contact(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_fetch_payments(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_fetch_pings(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_find_route(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_get_blockheight(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_get_contact(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_get_default_tribe_server(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_get_msgs_counts(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_get_mutes(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_get_reads(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_get_tags(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_get_tribe_management_topic(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_handle(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_id_from_macaroon(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_initial_setup(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_join_tribe(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_keysend(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_list_contacts(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_list_tribe_members(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_make_auth_token(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_make_invite(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_make_invoice(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_make_media_token(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_make_media_token_with_meta(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_make_media_token_with_price(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_mnemonic_from_entropy(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_mnemonic_to_seed(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_mute(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_node_keys(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_parse_invite(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_parse_invoice(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_parse_mixer_error_code(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_parse_response(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_parse_server_status(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_pay(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_pay_contact_invoice(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_pay_invoice(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_payment_hash_from_invoice(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_peel_onion(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_peel_onion_msg(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_peel_payment(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_peel_payment_msg(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_ping_done(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_process_invite(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_pubkey_from_secret_key(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_pubkey_from_seed(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_read(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_read_all(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_request_invoice(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_root_sign_ms(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_send(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_server_status_topic(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_set_active(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_set_blockheight(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_set_device(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_set_network(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_set_push_token(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_set_push_token_for_app(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_sha_256(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_show_senders(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_show_senders_onion(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_sign_base64(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_sign_bytes(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_sign_ms(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_signed_timestamp(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_unregister_push_token_for_app(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_update_tribe(
+    ): Int
+    external fun uniffi_sphinxrs_checksum_func_xpub_from_seed(
+    ): Int
+    external fun ffi_sphinxrs_uniffi_contract_version(
+    ): Int
+
+        
+}
+
+internal object UniffiLib {
+    
+
+    init {
+        Native.register(UniffiLib::class.java, findLibraryName(componentName = "sphinxrs"))
+        
+    }
+    external fun uniffi_sphinxrs_fn_func_add_contact(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`toPubkey`: RustBuffer.ByValue,`routeHint`: RustBuffer.ByValue,`myAlias`: RustBuffer.ByValue,`myImg`: RustBuffer.ByValue,`amtMsat`: Long,`inviteCode`: RustBuffer.ByValue,`theirAlias`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_add_node(`node`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_agent_seed(`seed`: RustBuffer.ByValue,`n`: Int,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_build_request(`msg`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,`nonce`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_cancel_invite(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`inviteCode`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_code_from_invite(`inviteQr`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_concat_route(`state`: RustBuffer.ByValue,`endHops`: RustBuffer.ByValue,`routerPubkey`: RustBuffer.ByValue,`amtMsat`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_contact_pubkey_by_child_index(`state`: RustBuffer.ByValue,`childIdx`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(`seed`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`child`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_create_keysend(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`hops`: RustBuffer.ByValue,`msat`: Long,`rhash`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,`currHeight`: Int,`preimage`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_create_keysend_msg(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`hops`: RustBuffer.ByValue,`msat`: Long,`rhash`: RustBuffer.ByValue,`msgJson`: RustBuffer.ByValue,`currHeight`: Int,`preimage`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_create_onion(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`hops`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_create_onion_msg(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`hops`: RustBuffer.ByValue,`json`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_create_tribe(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribeServerPubkey`: RustBuffer.ByValue,`tribeJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_decrypt(`ciphertext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_decrypt_child_index(`encryptedChild`: RustBuffer.ByValue,`pushKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun uniffi_sphinxrs_fn_func_delete_msgs(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pubkey`: RustBuffer.ByValue,`msgIdxs`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_delete_tribe(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribeServerPubkey`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_derive_shared_secret(`theirPubkey`: RustBuffer.ByValue,`mySecretKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_encrypt(`plaintext`: RustBuffer.ByValue,`secret`: RustBuffer.ByValue,`nonce`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_entropy_from_mnemonic(`mnemonic`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_entropy_to_seed(`entropy`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_evaluate_server_health(`last`: RustBuffer.ByValue,`lastSeenMs`: Long,`nowMs`: Long,`intervalMs`: Long,`maxMissed`: Int,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_fetch_first_msgs_per_key(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`lastMsgIdx`: Long,`limit`: RustBuffer.ByValue,`reverse`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_fetch_msgs(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`lastMsgIdx`: Long,`limit`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_fetch_msgs_batch(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`lastMsgIdx`: Long,`limit`: RustBuffer.ByValue,`reverse`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_fetch_msgs_batch_okkey(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`lastMsgIdx`: Long,`limit`: RustBuffer.ByValue,`reverse`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_fetch_msgs_batch_per_contact(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`lastMsgIdx`: Long,`limit`: RustBuffer.ByValue,`reverse`: RustBuffer.ByValue,`contact`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_fetch_payments(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`since`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,`scid`: RustBuffer.ByValue,`remoteOnly`: RustBuffer.ByValue,`minMsat`: RustBuffer.ByValue,`reverse`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_fetch_pings(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_find_route(`state`: RustBuffer.ByValue,`toPubkey`: RustBuffer.ByValue,`routeHint`: RustBuffer.ByValue,`amtMsat`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_get_blockheight(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_get_contact(`state`: RustBuffer.ByValue,`pubkey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_get_default_tribe_server(`state`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_get_msgs_counts(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_get_mutes(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_get_reads(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_get_tags(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tags`: RustBuffer.ByValue,`pubkey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_get_tribe_management_topic(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_handle(`topic`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`myAlias`: RustBuffer.ByValue,`myImg`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_id_from_macaroon(`macaroon`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_initial_setup(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`device`: RustBuffer.ByValue,`inviteCode`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_join_tribe(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,`tribeRouteHint`: RustBuffer.ByValue,`alias`: RustBuffer.ByValue,`amtMsat`: Long,`isPrivate`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_keysend(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`amtMsat`: Long,`data`: RustBuffer.ByValue,`routeHint`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_list_contacts(`state`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_list_tribe_members(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribeServerPubkey`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_make_auth_token(`ts`: Int,`secret`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_make_invite(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`host`: RustBuffer.ByValue,`amtMsat`: Long,`myAlias`: RustBuffer.ByValue,`tribeHost`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,`inviterPubkey`: RustBuffer.ByValue,`inviterRouteHint`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_make_invoice(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`amtMsat`: Long,`description`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_make_media_token(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`host`: RustBuffer.ByValue,`muid`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,`expiry`: Int,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_make_media_token_with_meta(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`host`: RustBuffer.ByValue,`muid`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,`expiry`: Int,`meta`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_make_media_token_with_price(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`host`: RustBuffer.ByValue,`muid`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,`expiry`: Int,`price`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_mnemonic_from_entropy(`entropy`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_mnemonic_to_seed(`mnemonic`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_mute(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pubkey`: RustBuffer.ByValue,`muteLevel`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_node_keys(`net`: RustBuffer.ByValue,`seed`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_parse_invite(`inviteQr`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_parse_invoice(`invoiceJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_parse_mixer_error_code(`raw`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_parse_response(`res`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_parse_server_status(`payload`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_pay(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`bolt11`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_pay_contact_invoice(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`bolt11`: RustBuffer.ByValue,`myAlias`: RustBuffer.ByValue,`myImg`: RustBuffer.ByValue,`isTribe`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_pay_invoice(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`bolt11`: RustBuffer.ByValue,`overpayMsat`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_payment_hash_from_invoice(`bolt11`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_peel_onion(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_peel_onion_msg(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_peel_payment(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,`rhash`: RustBuffer.ByValue,`curHeight`: Int,`cltvExpiry`: Int,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_peel_payment_msg(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,`rhash`: RustBuffer.ByValue,`curHeight`: Int,`cltvExpiry`: Int,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_ping_done(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pingTs`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_process_invite(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`inviteQr`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_pubkey_from_secret_key(`mySecretKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_pubkey_from_seed(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_read(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pubkey`: RustBuffer.ByValue,`msgIdx`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_read_all(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_request_invoice(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`amtMsat`: Long,`description`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_root_sign_ms(`seed`: RustBuffer.ByValue,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_send(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,`msgType`: Byte,`msgJson`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`myAlias`: RustBuffer.ByValue,`myImg`: RustBuffer.ByValue,`amtMsat`: Long,`isTribe`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_server_status_topic(uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_set_active(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`active`: Byte,`ttlSecs`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_set_blockheight(`blockheight`: Int,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_set_device(`device`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_set_network(`network`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_set_push_token(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pushToken`: RustBuffer.ByValue,`pushKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_set_push_token_for_app(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`pushToken`: RustBuffer.ByValue,`pushKey`: RustBuffer.ByValue,`appId`: RustBuffer.ByValue,`pushEnvironment`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_sha_256(`msg`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_show_senders(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribeServerPubkey`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,`memberPubkey`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_show_senders_onion(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribePubkey`: RustBuffer.ByValue,`memberPubkey`: RustBuffer.ByValue,`on`: Byte,`amtMsat`: Long,`alias`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_sign_base64(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`msg`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_sign_bytes(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`msg`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_sign_ms(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_signed_timestamp(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_unregister_push_token_for_app(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`appId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_update_tribe(`seed`: RustBuffer.ByValue,`uniqueTime`: RustBuffer.ByValue,`state`: RustBuffer.ByValue,`tribeServerPubkey`: RustBuffer.ByValue,`tribeJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_sphinxrs_fn_func_xpub_from_seed(`seed`: RustBuffer.ByValue,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun ffi_sphinxrs_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun ffi_sphinxrs_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun ffi_sphinxrs_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+external fun ffi_sphinxrs_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun ffi_sphinxrs_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_cancel_u8(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_free_u8(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Int
+external fun ffi_sphinxrs_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_cancel_i8(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_free_i8(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+external fun ffi_sphinxrs_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_cancel_u16(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_free_u16(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Int
+external fun ffi_sphinxrs_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_cancel_i16(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_free_i16(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Short
+external fun ffi_sphinxrs_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_cancel_u32(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_free_u32(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Int
+external fun ffi_sphinxrs_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_cancel_i32(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_free_i32(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Int
+external fun ffi_sphinxrs_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_cancel_u64(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_free_u64(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun ffi_sphinxrs_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_cancel_i64(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_free_i64(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun ffi_sphinxrs_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_cancel_f32(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_free_f32(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Float
+external fun ffi_sphinxrs_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_cancel_f64(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_free_f64(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Double
+external fun ffi_sphinxrs_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_cancel_rust_buffer(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_free_rust_buffer(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun ffi_sphinxrs_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_cancel_void(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_free_void(`handle`: Long,
+): Unit
+external fun ffi_sphinxrs_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+
     
 }
 
-private fun uniffiCheckContractApiVersion(lib: _UniFFILib) {
+private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
     // Get the bindings contract version from our ComponentInterface
-    val bindings_contract_version = 22
+    val bindings_contract_version = 30
     // Get the scaffolding contract version by calling the into the dylib
     val scaffolding_contract_version = lib.ffi_sphinxrs_uniffi_contract_version()
     if (bindings_contract_version != scaffolding_contract_version) {
@@ -767,300 +1145,106 @@ private fun uniffiCheckContractApiVersion(lib: _UniFFILib) {
     }
 }
 
-@Suppress("UNUSED_PARAMETER")
-private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
-    if (lib.uniffi_sphinxrs_checksum_func_pubkey_from_secret_key() != 14435.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_derive_shared_secret() != 20125.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_encrypt() != 43446.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_decrypt() != 47725.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_node_keys() != 21192.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_mnemonic_from_entropy() != 32309.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_entropy_from_mnemonic() != 33294.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_mnemonic_to_seed() != 23084.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_entropy_to_seed() != 33710.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_agent_seed() != 23720.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_build_request() != 31264.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_parse_response() != 12980.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_make_auth_token() != 13236.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_sha_256() != 54805.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_create_onion() != 44069.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_create_onion_msg() != 23896.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_create_keysend() != 23547.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_create_keysend_msg() != 950.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_peel_onion() != 12462.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_peel_onion_msg() != 5286.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_peel_payment() != 53060.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_peel_payment_msg() != 53779.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_sign_ms() != 10078.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_signed_timestamp() != 14238.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_sign_bytes() != 53352.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_sign_base64() != 25886.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_pubkey_from_seed() != 23394.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_root_sign_ms() != 52594.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_xpub_from_seed() != 14922.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_set_network() != 65135.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_set_device() != 19820.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_set_blockheight() != 43943.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_get_blockheight() != 25615.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_add_contact() != 30931.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_get_contact() != 19847.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_list_contacts() != 18133.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_contact_pubkey_by_child_index() != 7496.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_contact_pubkey_by_encrypted_child() != 6829.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_get_tribe_management_topic() != 29476.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_initial_setup() != 44485.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_fetch_msgs() != 12460.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_handle() != 58131.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_send() != 56750.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_keysend() != 58116.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_pay() != 1388.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_make_media_token() != 53931.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_make_media_token_with_meta() != 21693.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_make_media_token_with_price() != 53555.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_request_invoice() != 4786.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_make_invoice() != 12949.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_pay_invoice() != 40951.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_pay_contact_invoice() != 2604.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_payment_hash_from_invoice() != 3194.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_parse_invoice() != 31785.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_create_tribe() != 28873.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_join_tribe() != 6857.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_list_tribe_members() != 48922.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_make_invite() != 8421.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_process_invite() != 52237.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_parse_invite() != 63135.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_code_from_invite() != 40279.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_cancel_invite() != 49457.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_get_default_tribe_server() != 13603.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_read() != 47440.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_get_reads() != 13726.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_mute() != 58453.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_get_mutes() != 4885.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_set_push_token() != 52747.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_set_push_token_for_app() != 1696.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_set_active() != 14660.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_read_all() != 37322.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_unregister_push_token_for_app() != 1662.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_decrypt_child_index() != 2032.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_get_msgs_counts() != 29743.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_fetch_msgs_batch() != 22256.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_fetch_msgs_batch_per_contact() != 46524.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_fetch_msgs_batch_okkey() != 330.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_fetch_first_msgs_per_key() != 29398.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_fetch_payments() != 58291.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_get_tags() != 42493.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_delete_msgs() != 39403.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_update_tribe() != 26002.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_delete_tribe() != 11926.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_show_senders() != 42925.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_show_senders_onion() != 14493.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_add_node() != 49737.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_concat_route() != 19565.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_ping_done() != 13787.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_fetch_pings() != 13806.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_id_from_macaroon() != 36424.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_find_route() != 27285.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_parse_server_status() != 55294.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_evaluate_server_health() != 25525.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_parse_mixer_error_code() != 52624.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_sphinxrs_checksum_func_server_status_topic() != 58976.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
+/**
+ * @suppress
+ */
+public fun uniffiEnsureInitialized() {
+    IntegrityCheckingUniffiLib
+    // UniffiLib() initialized as objects are used, but we still need to explicitly
+    // reference it so initialization across crates works as expected.
+    UniffiLib
 }
+
+// Async support
 
 // Public interface members begin here.
 
 
+// Interface implemented by anything that can contain an object reference.
+//
+// Such types expose a `destroy()` method that must be called to cleanly
+// dispose of the contained objects. Failure to call this method may result
+// in memory leaks.
+//
+// The easiest way to ensure this method is called is to use the `.use`
+// helper method to execute a block and destroy the object at the end.
+interface Disposable {
+    fun destroy()
+    companion object {
+        fun destroy(vararg args: Any?) {
+            for (arg in args) {
+                when (arg) {
+                    is Disposable -> arg.destroy()
+                    is ArrayList<*> -> {
+                        for (idx in arg.indices) {
+                            val element = arg[idx]
+                            if (element is Disposable) {
+                                element.destroy()
+                            }
+                        }
+                    }
+                    is Map<*, *> -> {
+                        for (element in arg.values) {
+                            if (element is Disposable) {
+                                element.destroy()
+                            }
+                        }
+                    }
+                    is Iterable<*> -> {
+                        for (element in arg) {
+                            if (element is Disposable) {
+                                element.destroy()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @suppress
+ */
+inline fun <T : Disposable?, R> T.use(block: (T) -> R) =
+    try {
+        block(this)
+    } finally {
+        try {
+            // N.B. our implementation is on the nullable type `Disposable?`.
+            this?.destroy()
+        } catch (e: Throwable) {
+            // swallow
+        }
+    }
+
+/** 
+ * Placeholder object used to signal that we're constructing an interface with a FFI handle.
+ *
+ * This is the first argument for interface constructors that input a raw handle. It exists is that
+ * so we can avoid signature conflicts when an interface has a regular constructor than inputs a
+ * Long.
+ *
+ * @suppress
+ * */
+object UniffiWithHandle
+
+/** 
+ * Used to instantiate an interface without an actual pointer, for fakes in tests, mostly.
+ *
+ * @suppress
+ * */
+object NoHandle
+
+/**
+ * @suppress
+ */
 public object FfiConverterUByte: FfiConverter<UByte, Byte> {
     override fun lift(value: Byte): UByte {
+        return value.toUByte()
+    }
+
+    fun lift(value: Int): UByte {
         return value.toUByte()
     }
 
@@ -1072,13 +1256,16 @@ public object FfiConverterUByte: FfiConverter<UByte, Byte> {
         return value.toByte()
     }
 
-    override fun allocationSize(value: UByte) = 1
+    override fun allocationSize(value: UByte) = 1UL
 
     override fun write(value: UByte, buf: ByteBuffer) {
         buf.put(value.toByte())
     }
 }
 
+/**
+ * @suppress
+ */
 public object FfiConverterUInt: FfiConverter<UInt, Int> {
     override fun lift(value: Int): UInt {
         return value.toUInt()
@@ -1092,13 +1279,16 @@ public object FfiConverterUInt: FfiConverter<UInt, Int> {
         return value.toInt()
     }
 
-    override fun allocationSize(value: UInt) = 4
+    override fun allocationSize(value: UInt) = 4UL
 
     override fun write(value: UInt, buf: ByteBuffer) {
         buf.putInt(value.toInt())
     }
 }
 
+/**
+ * @suppress
+ */
 public object FfiConverterULong: FfiConverter<ULong, Long> {
     override fun lift(value: Long): ULong {
         return value.toULong()
@@ -1112,13 +1302,16 @@ public object FfiConverterULong: FfiConverter<ULong, Long> {
         return value.toLong()
     }
 
-    override fun allocationSize(value: ULong) = 8
+    override fun allocationSize(value: ULong) = 8UL
 
     override fun write(value: ULong, buf: ByteBuffer) {
         buf.putLong(value.toLong())
     }
 }
 
+/**
+ * @suppress
+ */
 public object FfiConverterBoolean: FfiConverter<Boolean, Byte> {
     override fun lift(value: Byte): Boolean {
         return value.toInt() != 0
@@ -1132,20 +1325,23 @@ public object FfiConverterBoolean: FfiConverter<Boolean, Byte> {
         return if (value) 1.toByte() else 0.toByte()
     }
 
-    override fun allocationSize(value: Boolean) = 1
+    override fun allocationSize(value: Boolean) = 1UL
 
     override fun write(value: Boolean, buf: ByteBuffer) {
         buf.put(lower(value))
     }
 }
 
+/**
+ * @suppress
+ */
 public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
     // Note: we don't inherit from FfiConverterRustBuffer, because we use a
     // special encoding when lowering/lifting.  We can use `RustBuffer.len` to
     // store our length and avoid writing it out to the buffer.
     override fun lift(value: RustBuffer.ByValue): String {
         try {
-            val byteArr = ByteArray(value.len)
+            val byteArr = ByteArray(value.len.toInt())
             value.asByteBuffer()!!.get(byteArr)
             return byteArr.toString(Charsets.UTF_8)
         } finally {
@@ -1160,31 +1356,42 @@ public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
         return byteArr.toString(Charsets.UTF_8)
     }
 
+    fun toUtf8(value: String): ByteBuffer {
+        // Make sure we don't have invalid UTF-16, check for lone surrogates.
+        return Charsets.UTF_8.newEncoder().run {
+            onMalformedInput(CodingErrorAction.REPORT)
+            encode(CharBuffer.wrap(value))
+        }
+    }
+
     override fun lower(value: String): RustBuffer.ByValue {
-        val byteArr = value.toByteArray(Charsets.UTF_8)
+        val byteBuf = toUtf8(value)
         // Ideally we'd pass these bytes to `ffi_bytebuffer_from_bytes`, but doing so would require us
         // to copy them into a JNA `Memory`. So we might as well directly copy them into a `RustBuffer`.
-        val rbuf = RustBuffer.alloc(byteArr.size)
-        rbuf.asByteBuffer()!!.put(byteArr)
+        val rbuf = RustBuffer.alloc(byteBuf.limit().toULong())
+        rbuf.asByteBuffer()!!.put(byteBuf)
         return rbuf
     }
 
     // We aren't sure exactly how many bytes our string will be once it's UTF-8
-    // encoded.  Allocate 3 bytes per unicode codepoint which will always be
+    // encoded.  Allocate 3 bytes per UTF-16 code unit which will always be
     // enough.
-    override fun allocationSize(value: String): Int {
-        val sizeForLength = 4
-        val sizeForString = value.length * 3
+    override fun allocationSize(value: String): ULong {
+        val sizeForLength = 4UL
+        val sizeForString = value.length.toULong() * 3UL
         return sizeForLength + sizeForString
     }
 
     override fun write(value: String, buf: ByteBuffer) {
-        val byteArr = value.toByteArray(Charsets.UTF_8)
-        buf.putInt(byteArr.size)
-        buf.put(byteArr)
+        val byteBuf = toUtf8(value)
+        buf.putInt(byteBuf.limit())
+        buf.put(byteBuf)
     }
 }
 
+/**
+ * @suppress
+ */
 public object FfiConverterByteArray: FfiConverterRustBuffer<ByteArray> {
     override fun read(buf: ByteBuffer): ByteArray {
         val len = buf.getInt()
@@ -1192,8 +1399,8 @@ public object FfiConverterByteArray: FfiConverterRustBuffer<ByteArray> {
         buf.get(byteArr)
         return byteArr
     }
-    override fun allocationSize(value: ByteArray): Int {
-        return 4 + value.size
+    override fun allocationSize(value: ByteArray): ULong {
+        return 4UL + value.size.toULong()
     }
     override fun write(value: ByteArray, buf: ByteBuffer) {
         buf.putInt(value.size)
@@ -1203,14 +1410,23 @@ public object FfiConverterByteArray: FfiConverterRustBuffer<ByteArray> {
 
 
 
-
 data class Keys (
-    var `secret`: String, 
-    var `pubkey`: String
-) {
+    var `secret`: kotlin.String
+    , 
+    var `pubkey`: kotlin.String
     
+){
+    
+
+    
+
+    
+    companion object
 }
 
+/**
+ * @suppress
+ */
 public object FfiConverterTypeKeys: FfiConverterRustBuffer<Keys> {
     override fun read(buf: ByteBuffer): Keys {
         return Keys(
@@ -1232,24 +1448,43 @@ public object FfiConverterTypeKeys: FfiConverterRustBuffer<Keys> {
 
 
 
-
 data class Msg (
-    var `message`: String?, 
-    var `type`: UByte?, 
-    var `uuid`: String?, 
-    var `tag`: String?, 
-    var `index`: String?, 
-    var `sender`: String?, 
-    var `msat`: ULong?, 
-    var `timestamp`: ULong?, 
-    var `sentTo`: String?, 
-    var `fromMe`: Boolean?, 
-    var `paymentHash`: String?, 
-    var `error`: String?
-) {
+    var `message`: kotlin.String?
+    , 
+    var `type`: kotlin.UByte?
+    , 
+    var `uuid`: kotlin.String?
+    , 
+    var `tag`: kotlin.String?
+    , 
+    var `index`: kotlin.String?
+    , 
+    var `sender`: kotlin.String?
+    , 
+    var `msat`: kotlin.ULong?
+    , 
+    var `timestamp`: kotlin.ULong?
+    , 
+    var `sentTo`: kotlin.String?
+    , 
+    var `fromMe`: kotlin.Boolean?
+    , 
+    var `paymentHash`: kotlin.String?
+    , 
+    var `error`: kotlin.String?
     
+){
+    
+
+    
+
+    
+    companion object
 }
 
+/**
+ * @suppress
+ */
 public object FfiConverterTypeMsg: FfiConverterRustBuffer<Msg> {
     override fun read(buf: ByteBuffer): Msg {
         return Msg(
@@ -1301,17 +1536,29 @@ public object FfiConverterTypeMsg: FfiConverterRustBuffer<Msg> {
 
 
 
-
 data class ParsedInvite (
-    var `code`: String, 
-    var `inviterContactInfo`: String?, 
-    var `inviterAlias`: String?, 
-    var `initialTribe`: String?, 
-    var `lspHost`: String?
-) {
+    var `code`: kotlin.String
+    , 
+    var `inviterContactInfo`: kotlin.String?
+    , 
+    var `inviterAlias`: kotlin.String?
+    , 
+    var `initialTribe`: kotlin.String?
+    , 
+    var `lspHost`: kotlin.String?
     
+){
+    
+
+    
+
+    
+    companion object
 }
 
+/**
+ * @suppress
+ */
 public object FfiConverterTypeParsedInvite: FfiConverterRustBuffer<ParsedInvite> {
     override fun read(buf: ByteBuffer): ParsedInvite {
         return ParsedInvite(
@@ -1342,51 +1589,97 @@ public object FfiConverterTypeParsedInvite: FfiConverterRustBuffer<ParsedInvite>
 
 
 
-
 data class RunReturn (
-    var `msgs`: List<Msg>, 
-    var `msgsTotal`: ULong?, 
-    var `msgsCounts`: String?, 
-    var `subscriptionTopics`: List<String>, 
-    var `settleTopic`: String?, 
-    var `settlePayload`: ByteArray?, 
-    var `asyncpayTopic`: String?, 
-    var `asyncpayPayload`: ByteArray?, 
-    var `registerTopic`: String?, 
-    var `registerPayload`: ByteArray?, 
-    var `topics`: List<String>, 
-    var `payloads`: List<ByteArray>, 
-    var `stateMp`: ByteArray?, 
-    var `stateToDelete`: List<String>, 
-    var `newBalance`: ULong?, 
-    var `myContactInfo`: String?, 
-    var `sentStatus`: String?, 
-    var `settledStatus`: String?, 
-    var `registerResponse`: String?, 
-    var `asyncpayTag`: String?, 
-    var `error`: String?, 
-    var `newTribe`: String?, 
-    var `tribeMembers`: String?, 
-    var `newInvite`: String?, 
-    var `inviterContactInfo`: String?, 
-    var `inviterAlias`: String?, 
-    var `initialTribe`: String?, 
-    var `lspHost`: String?, 
-    var `invoice`: String?, 
-    var `route`: String?, 
-    var `node`: String?, 
-    var `lastRead`: String?, 
-    var `muteLevels`: String?, 
-    var `payments`: String?, 
-    var `paymentsTotal`: ULong?, 
-    var `tags`: String?, 
-    var `deletedMsgs`: String?, 
-    var `newChildIdx`: ULong?, 
-    var `ping`: String?
-) {
+    var `msgs`: List<Msg>
+    , 
+    var `msgsTotal`: kotlin.ULong?
+    , 
+    var `msgsCounts`: kotlin.String?
+    , 
+    var `subscriptionTopics`: List<kotlin.String>
+    , 
+    var `settleTopic`: kotlin.String?
+    , 
+    var `settlePayload`: kotlin.ByteArray?
+    , 
+    var `asyncpayTopic`: kotlin.String?
+    , 
+    var `asyncpayPayload`: kotlin.ByteArray?
+    , 
+    var `registerTopic`: kotlin.String?
+    , 
+    var `registerPayload`: kotlin.ByteArray?
+    , 
+    var `topics`: List<kotlin.String>
+    , 
+    var `payloads`: List<kotlin.ByteArray>
+    , 
+    var `stateMp`: kotlin.ByteArray?
+    , 
+    var `stateToDelete`: List<kotlin.String>
+    , 
+    var `newBalance`: kotlin.ULong?
+    , 
+    var `myContactInfo`: kotlin.String?
+    , 
+    var `sentStatus`: kotlin.String?
+    , 
+    var `settledStatus`: kotlin.String?
+    , 
+    var `registerResponse`: kotlin.String?
+    , 
+    var `asyncpayTag`: kotlin.String?
+    , 
+    var `error`: kotlin.String?
+    , 
+    var `newTribe`: kotlin.String?
+    , 
+    var `tribeMembers`: kotlin.String?
+    , 
+    var `newInvite`: kotlin.String?
+    , 
+    var `inviterContactInfo`: kotlin.String?
+    , 
+    var `inviterAlias`: kotlin.String?
+    , 
+    var `initialTribe`: kotlin.String?
+    , 
+    var `lspHost`: kotlin.String?
+    , 
+    var `invoice`: kotlin.String?
+    , 
+    var `route`: kotlin.String?
+    , 
+    var `node`: kotlin.String?
+    , 
+    var `lastRead`: kotlin.String?
+    , 
+    var `muteLevels`: kotlin.String?
+    , 
+    var `payments`: kotlin.String?
+    , 
+    var `paymentsTotal`: kotlin.ULong?
+    , 
+    var `tags`: kotlin.String?
+    , 
+    var `deletedMsgs`: kotlin.String?
+    , 
+    var `newChildIdx`: kotlin.ULong?
+    , 
+    var `ping`: kotlin.String?
     
+){
+    
+
+    
+
+    
+    companion object
 }
 
+/**
+ * @suppress
+ */
 public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
     override fun read(buf: ByteBuffer): RunReturn {
         return RunReturn(
@@ -1519,16 +1812,27 @@ public object FfiConverterTypeRunReturn: FfiConverterRustBuffer<RunReturn> {
 
 
 
-
 data class ServerStatus (
-    var `clnOk`: Boolean, 
-    var `degraded`: Boolean, 
-    var `reason`: String?, 
-    var `ts`: ULong
-) {
+    var `clnOk`: kotlin.Boolean
+    , 
+    var `degraded`: kotlin.Boolean
+    , 
+    var `reason`: kotlin.String?
+    , 
+    var `ts`: kotlin.ULong
     
+){
+    
+
+    
+
+    
+    companion object
 }
 
+/**
+ * @suppress
+ */
 public object FfiConverterTypeServerStatus: FfiConverterRustBuffer<ServerStatus> {
     override fun read(buf: ByteBuffer): ServerStatus {
         return ServerStatus(
@@ -1558,9 +1862,22 @@ public object FfiConverterTypeServerStatus: FfiConverterRustBuffer<ServerStatus>
 
 
 enum class MixerErrorCode {
-    CLN_UNAVAILABLE,CLN_TIMEOUT,INSUFFICIENT_BALANCE,UNKNOWN;
+    
+    CLN_UNAVAILABLE,
+    CLN_TIMEOUT,
+    INSUFFICIENT_BALANCE,
+    UNKNOWN;
+
+    
+
+
+    companion object
 }
 
+
+/**
+ * @suppress
+ */
 public object FfiConverterTypeMixerErrorCode: FfiConverterRustBuffer<MixerErrorCode> {
     override fun read(buf: ByteBuffer) = try {
         MixerErrorCode.values()[buf.getInt() - 1]
@@ -1568,7 +1885,7 @@ public object FfiConverterTypeMixerErrorCode: FfiConverterRustBuffer<MixerErrorC
         throw RuntimeException("invalid enum value, something is very wrong!!", e)
     }
 
-    override fun allocationSize(value: MixerErrorCode) = 4
+    override fun allocationSize(value: MixerErrorCode) = 4UL
 
     override fun write(value: MixerErrorCode, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
@@ -1581,9 +1898,21 @@ public object FfiConverterTypeMixerErrorCode: FfiConverterRustBuffer<MixerErrorC
 
 
 enum class ServerHealth {
-    OK,DEGRADED,UNKNOWN;
+    
+    OK,
+    DEGRADED,
+    UNKNOWN;
+
+    
+
+
+    companion object
 }
 
+
+/**
+ * @suppress
+ */
 public object FfiConverterTypeServerHealth: FfiConverterRustBuffer<ServerHealth> {
     override fun read(buf: ByteBuffer) = try {
         ServerHealth.values()[buf.getInt() - 1]
@@ -1591,7 +1920,7 @@ public object FfiConverterTypeServerHealth: FfiConverterRustBuffer<ServerHealth>
         throw RuntimeException("invalid enum value, something is very wrong!!", e)
     }
 
-    override fun allocationSize(value: ServerHealth) = 4
+    override fun allocationSize(value: ServerHealth) = 4UL
 
     override fun write(value: ServerHealth, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
@@ -1604,185 +1933,214 @@ public object FfiConverterTypeServerHealth: FfiConverterRustBuffer<ServerHealth>
 
 
 
-sealed class SphinxException: Exception() {
-    // Each variant is a nested class
+sealed class SphinxException: kotlin.Exception() {
     
     class DerivePublicKey(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class DeriveSharedSecret(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class Encrypt(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class Decrypt(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class BadPubkey(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class BadSecret(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class BadNonce(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class BadCiper(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class InvalidNetwork(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class BadRequest(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class BadResponse(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class BadArgs(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class BadChildIndex(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class BadMsg(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class AddContactFailed(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class GetContactFailed(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class HandleFailed(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class FetchMsgsFailed(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class SendFailed(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class SetNetworkFailed(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class SetBlockheightFailed(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class ParseStateFailed(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class BadState(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
     class ContentBudgetExceeded(
-        val `r`: String
+        
+        val `r`: kotlin.String
         ) : SphinxException() {
         override val message
             get() = "r=${ `r` }"
     }
     
 
-    companion object ErrorHandler : CallStatusErrorHandler<SphinxException> {
+    
+
+
+    companion object ErrorHandler : UniffiRustCallStatusErrorHandler<SphinxException> {
         override fun lift(error_buf: RustBuffer.ByValue): SphinxException = FfiConverterTypeSphinxError.lift(error_buf)
     }
 
     
 }
 
+/**
+ * @suppress
+ */
 public object FfiConverterTypeSphinxError : FfiConverterRustBuffer<SphinxException> {
     override fun read(buf: ByteBuffer): SphinxException {
         
@@ -1864,126 +2222,126 @@ public object FfiConverterTypeSphinxError : FfiConverterRustBuffer<SphinxExcepti
         }
     }
 
-    override fun allocationSize(value: SphinxException): Int {
+    override fun allocationSize(value: SphinxException): ULong {
         return when(value) {
             is SphinxException.DerivePublicKey -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.DeriveSharedSecret -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.Encrypt -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.Decrypt -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.BadPubkey -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.BadSecret -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.BadNonce -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.BadCiper -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.InvalidNetwork -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.BadRequest -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.BadResponse -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.BadArgs -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.BadChildIndex -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.BadMsg -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.AddContactFailed -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.GetContactFailed -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.HandleFailed -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.FetchMsgsFailed -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.SendFailed -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.SetNetworkFailed -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.SetBlockheightFailed -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.ParseStateFailed -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.BadState -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
             is SphinxException.ContentBudgetExceeded -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
+                4UL
                 + FfiConverterString.allocationSize(value.`r`)
             )
         }
@@ -2119,23 +2477,26 @@ public object FfiConverterTypeSphinxError : FfiConverterRustBuffer<SphinxExcepti
 
 
 
-public object FfiConverterOptionalUByte: FfiConverterRustBuffer<UByte?> {
-    override fun read(buf: ByteBuffer): UByte? {
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalUByte: FfiConverterRustBuffer<kotlin.UByte?> {
+    override fun read(buf: ByteBuffer): kotlin.UByte? {
         if (buf.get().toInt() == 0) {
             return null
         }
         return FfiConverterUByte.read(buf)
     }
 
-    override fun allocationSize(value: UByte?): Int {
+    override fun allocationSize(value: kotlin.UByte?): ULong {
         if (value == null) {
-            return 1
+            return 1UL
         } else {
-            return 1 + FfiConverterUByte.allocationSize(value)
+            return 1UL + FfiConverterUByte.allocationSize(value)
         }
     }
 
-    override fun write(value: UByte?, buf: ByteBuffer) {
+    override fun write(value: kotlin.UByte?, buf: ByteBuffer) {
         if (value == null) {
             buf.put(0)
         } else {
@@ -2148,23 +2509,26 @@ public object FfiConverterOptionalUByte: FfiConverterRustBuffer<UByte?> {
 
 
 
-public object FfiConverterOptionalUInt: FfiConverterRustBuffer<UInt?> {
-    override fun read(buf: ByteBuffer): UInt? {
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalUInt: FfiConverterRustBuffer<kotlin.UInt?> {
+    override fun read(buf: ByteBuffer): kotlin.UInt? {
         if (buf.get().toInt() == 0) {
             return null
         }
         return FfiConverterUInt.read(buf)
     }
 
-    override fun allocationSize(value: UInt?): Int {
+    override fun allocationSize(value: kotlin.UInt?): ULong {
         if (value == null) {
-            return 1
+            return 1UL
         } else {
-            return 1 + FfiConverterUInt.allocationSize(value)
+            return 1UL + FfiConverterUInt.allocationSize(value)
         }
     }
 
-    override fun write(value: UInt?, buf: ByteBuffer) {
+    override fun write(value: kotlin.UInt?, buf: ByteBuffer) {
         if (value == null) {
             buf.put(0)
         } else {
@@ -2177,23 +2541,26 @@ public object FfiConverterOptionalUInt: FfiConverterRustBuffer<UInt?> {
 
 
 
-public object FfiConverterOptionalULong: FfiConverterRustBuffer<ULong?> {
-    override fun read(buf: ByteBuffer): ULong? {
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalULong: FfiConverterRustBuffer<kotlin.ULong?> {
+    override fun read(buf: ByteBuffer): kotlin.ULong? {
         if (buf.get().toInt() == 0) {
             return null
         }
         return FfiConverterULong.read(buf)
     }
 
-    override fun allocationSize(value: ULong?): Int {
+    override fun allocationSize(value: kotlin.ULong?): ULong {
         if (value == null) {
-            return 1
+            return 1UL
         } else {
-            return 1 + FfiConverterULong.allocationSize(value)
+            return 1UL + FfiConverterULong.allocationSize(value)
         }
     }
 
-    override fun write(value: ULong?, buf: ByteBuffer) {
+    override fun write(value: kotlin.ULong?, buf: ByteBuffer) {
         if (value == null) {
             buf.put(0)
         } else {
@@ -2206,23 +2573,26 @@ public object FfiConverterOptionalULong: FfiConverterRustBuffer<ULong?> {
 
 
 
-public object FfiConverterOptionalBoolean: FfiConverterRustBuffer<Boolean?> {
-    override fun read(buf: ByteBuffer): Boolean? {
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalBoolean: FfiConverterRustBuffer<kotlin.Boolean?> {
+    override fun read(buf: ByteBuffer): kotlin.Boolean? {
         if (buf.get().toInt() == 0) {
             return null
         }
         return FfiConverterBoolean.read(buf)
     }
 
-    override fun allocationSize(value: Boolean?): Int {
+    override fun allocationSize(value: kotlin.Boolean?): ULong {
         if (value == null) {
-            return 1
+            return 1UL
         } else {
-            return 1 + FfiConverterBoolean.allocationSize(value)
+            return 1UL + FfiConverterBoolean.allocationSize(value)
         }
     }
 
-    override fun write(value: Boolean?, buf: ByteBuffer) {
+    override fun write(value: kotlin.Boolean?, buf: ByteBuffer) {
         if (value == null) {
             buf.put(0)
         } else {
@@ -2235,23 +2605,26 @@ public object FfiConverterOptionalBoolean: FfiConverterRustBuffer<Boolean?> {
 
 
 
-public object FfiConverterOptionalString: FfiConverterRustBuffer<String?> {
-    override fun read(buf: ByteBuffer): String? {
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?> {
+    override fun read(buf: ByteBuffer): kotlin.String? {
         if (buf.get().toInt() == 0) {
             return null
         }
         return FfiConverterString.read(buf)
     }
 
-    override fun allocationSize(value: String?): Int {
+    override fun allocationSize(value: kotlin.String?): ULong {
         if (value == null) {
-            return 1
+            return 1UL
         } else {
-            return 1 + FfiConverterString.allocationSize(value)
+            return 1UL + FfiConverterString.allocationSize(value)
         }
     }
 
-    override fun write(value: String?, buf: ByteBuffer) {
+    override fun write(value: kotlin.String?, buf: ByteBuffer) {
         if (value == null) {
             buf.put(0)
         } else {
@@ -2264,23 +2637,26 @@ public object FfiConverterOptionalString: FfiConverterRustBuffer<String?> {
 
 
 
-public object FfiConverterOptionalByteArray: FfiConverterRustBuffer<ByteArray?> {
-    override fun read(buf: ByteBuffer): ByteArray? {
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalByteArray: FfiConverterRustBuffer<kotlin.ByteArray?> {
+    override fun read(buf: ByteBuffer): kotlin.ByteArray? {
         if (buf.get().toInt() == 0) {
             return null
         }
         return FfiConverterByteArray.read(buf)
     }
 
-    override fun allocationSize(value: ByteArray?): Int {
+    override fun allocationSize(value: kotlin.ByteArray?): ULong {
         if (value == null) {
-            return 1
+            return 1UL
         } else {
-            return 1 + FfiConverterByteArray.allocationSize(value)
+            return 1UL + FfiConverterByteArray.allocationSize(value)
         }
     }
 
-    override fun write(value: ByteArray?, buf: ByteBuffer) {
+    override fun write(value: kotlin.ByteArray?, buf: ByteBuffer) {
         if (value == null) {
             buf.put(0)
         } else {
@@ -2293,6 +2669,9 @@ public object FfiConverterOptionalByteArray: FfiConverterRustBuffer<ByteArray?> 
 
 
 
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeServerStatus: FfiConverterRustBuffer<ServerStatus?> {
     override fun read(buf: ByteBuffer): ServerStatus? {
         if (buf.get().toInt() == 0) {
@@ -2301,11 +2680,11 @@ public object FfiConverterOptionalTypeServerStatus: FfiConverterRustBuffer<Serve
         return FfiConverterTypeServerStatus.read(buf)
     }
 
-    override fun allocationSize(value: ServerStatus?): Int {
+    override fun allocationSize(value: ServerStatus?): ULong {
         if (value == null) {
-            return 1
+            return 1UL
         } else {
-            return 1 + FfiConverterTypeServerStatus.allocationSize(value)
+            return 1UL + FfiConverterTypeServerStatus.allocationSize(value)
         }
     }
 
@@ -2322,23 +2701,26 @@ public object FfiConverterOptionalTypeServerStatus: FfiConverterRustBuffer<Serve
 
 
 
-public object FfiConverterOptionalSequenceULong: FfiConverterRustBuffer<List<ULong>?> {
-    override fun read(buf: ByteBuffer): List<ULong>? {
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalSequenceULong: FfiConverterRustBuffer<List<kotlin.ULong>?> {
+    override fun read(buf: ByteBuffer): List<kotlin.ULong>? {
         if (buf.get().toInt() == 0) {
             return null
         }
         return FfiConverterSequenceULong.read(buf)
     }
 
-    override fun allocationSize(value: List<ULong>?): Int {
+    override fun allocationSize(value: List<kotlin.ULong>?): ULong {
         if (value == null) {
-            return 1
+            return 1UL
         } else {
-            return 1 + FfiConverterSequenceULong.allocationSize(value)
+            return 1UL + FfiConverterSequenceULong.allocationSize(value)
         }
     }
 
-    override fun write(value: List<ULong>?, buf: ByteBuffer) {
+    override fun write(value: List<kotlin.ULong>?, buf: ByteBuffer) {
         if (value == null) {
             buf.put(0)
         } else {
@@ -2351,23 +2733,26 @@ public object FfiConverterOptionalSequenceULong: FfiConverterRustBuffer<List<ULo
 
 
 
-public object FfiConverterSequenceULong: FfiConverterRustBuffer<List<ULong>> {
-    override fun read(buf: ByteBuffer): List<ULong> {
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceULong: FfiConverterRustBuffer<List<kotlin.ULong>> {
+    override fun read(buf: ByteBuffer): List<kotlin.ULong> {
         val len = buf.getInt()
-        return List<ULong>(len) {
+        return List<kotlin.ULong>(len) {
             FfiConverterULong.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<ULong>): Int {
-        val sizeForLength = 4
+    override fun allocationSize(value: List<kotlin.ULong>): ULong {
+        val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterULong.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<ULong>, buf: ByteBuffer) {
+    override fun write(value: List<kotlin.ULong>, buf: ByteBuffer) {
         buf.putInt(value.size)
-        value.forEach {
+        value.iterator().forEach {
             FfiConverterULong.write(it, buf)
         }
     }
@@ -2376,23 +2761,26 @@ public object FfiConverterSequenceULong: FfiConverterRustBuffer<List<ULong>> {
 
 
 
-public object FfiConverterSequenceString: FfiConverterRustBuffer<List<String>> {
-    override fun read(buf: ByteBuffer): List<String> {
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.String>> {
+    override fun read(buf: ByteBuffer): List<kotlin.String> {
         val len = buf.getInt()
-        return List<String>(len) {
+        return List<kotlin.String>(len) {
             FfiConverterString.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<String>): Int {
-        val sizeForLength = 4
+    override fun allocationSize(value: List<kotlin.String>): ULong {
+        val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterString.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<String>, buf: ByteBuffer) {
+    override fun write(value: List<kotlin.String>, buf: ByteBuffer) {
         buf.putInt(value.size)
-        value.forEach {
+        value.iterator().forEach {
             FfiConverterString.write(it, buf)
         }
     }
@@ -2401,23 +2789,26 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<String>> {
 
 
 
-public object FfiConverterSequenceByteArray: FfiConverterRustBuffer<List<ByteArray>> {
-    override fun read(buf: ByteBuffer): List<ByteArray> {
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceByteArray: FfiConverterRustBuffer<List<kotlin.ByteArray>> {
+    override fun read(buf: ByteBuffer): List<kotlin.ByteArray> {
         val len = buf.getInt()
-        return List<ByteArray>(len) {
+        return List<kotlin.ByteArray>(len) {
             FfiConverterByteArray.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<ByteArray>): Int {
-        val sizeForLength = 4
+    override fun allocationSize(value: List<kotlin.ByteArray>): ULong {
+        val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterByteArray.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<ByteArray>, buf: ByteBuffer) {
+    override fun write(value: List<kotlin.ByteArray>, buf: ByteBuffer) {
         buf.putInt(value.size)
-        value.forEach {
+        value.iterator().forEach {
             FfiConverterByteArray.write(it, buf)
         }
     }
@@ -2426,6 +2817,9 @@ public object FfiConverterSequenceByteArray: FfiConverterRustBuffer<List<ByteArr
 
 
 
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeMsg: FfiConverterRustBuffer<List<Msg>> {
     override fun read(buf: ByteBuffer): List<Msg> {
         val len = buf.getInt()
@@ -2434,868 +2828,1058 @@ public object FfiConverterSequenceTypeMsg: FfiConverterRustBuffer<List<Msg>> {
         }
     }
 
-    override fun allocationSize(value: List<Msg>): Int {
-        val sizeForLength = 4
+    override fun allocationSize(value: List<Msg>): ULong {
+        val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeMsg.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
     override fun write(value: List<Msg>, buf: ByteBuffer) {
         buf.putInt(value.size)
-        value.forEach {
+        value.iterator().forEach {
             FfiConverterTypeMsg.write(it, buf)
         }
     }
 }
-@Throws(SphinxException::class)
-
-fun `pubkeyFromSecretKey`(`mySecretKey`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_pubkey_from_secret_key(FfiConverterString.lower(`mySecretKey`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `deriveSharedSecret`(`theirPubkey`: String, `mySecretKey`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_derive_shared_secret(FfiConverterString.lower(`theirPubkey`),FfiConverterString.lower(`mySecretKey`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `encrypt`(`plaintext`: String, `secret`: String, `nonce`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_encrypt(FfiConverterString.lower(`plaintext`),FfiConverterString.lower(`secret`),FfiConverterString.lower(`nonce`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `decrypt`(`ciphertext`: String, `secret`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_decrypt(FfiConverterString.lower(`ciphertext`),FfiConverterString.lower(`secret`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `nodeKeys`(`net`: String, `seed`: String): Keys {
-    return FfiConverterTypeKeys.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_node_keys(FfiConverterString.lower(`net`),FfiConverterString.lower(`seed`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `mnemonicFromEntropy`(`entropy`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_mnemonic_from_entropy(FfiConverterString.lower(`entropy`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `entropyFromMnemonic`(`mnemonic`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_entropy_from_mnemonic(FfiConverterString.lower(`mnemonic`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `mnemonicToSeed`(`mnemonic`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_mnemonic_to_seed(FfiConverterString.lower(`mnemonic`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `entropyToSeed`(`entropy`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_entropy_to_seed(FfiConverterString.lower(`entropy`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `agentSeed`(`seed`: String, `n`: UInt): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_agent_seed(FfiConverterString.lower(`seed`),FfiConverterUInt.lower(`n`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `buildRequest`(`msg`: String, `secret`: String, `nonce`: ULong): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_build_request(FfiConverterString.lower(`msg`),FfiConverterString.lower(`secret`),FfiConverterULong.lower(`nonce`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `parseResponse`(`res`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_parse_response(FfiConverterString.lower(`res`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `makeAuthToken`(`ts`: UInt, `secret`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_make_auth_token(FfiConverterUInt.lower(`ts`),FfiConverterString.lower(`secret`),_status)
-})
-}
-
-
-fun `sha256`(`msg`: ByteArray): String {
-    return FfiConverterString.lift(
-    rustCall() { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_sha_256(FfiConverterByteArray.lower(`msg`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `createOnion`(`seed`: String, `idx`: ULong, `time`: String, `network`: String, `hops`: String, `payload`: ByteArray): ByteArray {
-    return FfiConverterByteArray.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_create_onion(FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterString.lower(`hops`),FfiConverterByteArray.lower(`payload`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `createOnionMsg`(`seed`: String, `idx`: ULong, `time`: String, `network`: String, `hops`: String, `json`: String): ByteArray {
-    return FfiConverterByteArray.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_create_onion_msg(FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterString.lower(`hops`),FfiConverterString.lower(`json`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `createKeysend`(`seed`: String, `idx`: ULong, `time`: String, `network`: String, `hops`: String, `msat`: ULong, `rhash`: String, `payload`: ByteArray, `currHeight`: UInt, `preimage`: String): ByteArray {
-    return FfiConverterByteArray.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_create_keysend(FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterString.lower(`hops`),FfiConverterULong.lower(`msat`),FfiConverterString.lower(`rhash`),FfiConverterByteArray.lower(`payload`),FfiConverterUInt.lower(`currHeight`),FfiConverterString.lower(`preimage`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `createKeysendMsg`(`seed`: String, `idx`: ULong, `time`: String, `network`: String, `hops`: String, `msat`: ULong, `rhash`: String, `msgJson`: String, `currHeight`: UInt, `preimage`: String): ByteArray {
-    return FfiConverterByteArray.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_create_keysend_msg(FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterString.lower(`hops`),FfiConverterULong.lower(`msat`),FfiConverterString.lower(`rhash`),FfiConverterString.lower(`msgJson`),FfiConverterUInt.lower(`currHeight`),FfiConverterString.lower(`preimage`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `peelOnion`(`seed`: String, `idx`: ULong, `time`: String, `network`: String, `payload`: ByteArray): ByteArray {
-    return FfiConverterByteArray.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_peel_onion(FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterByteArray.lower(`payload`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `peelOnionMsg`(`seed`: String, `idx`: ULong, `time`: String, `network`: String, `payload`: ByteArray): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_peel_onion_msg(FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterByteArray.lower(`payload`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `peelPayment`(`seed`: String, `idx`: ULong, `time`: String, `network`: String, `payload`: ByteArray, `rhash`: String, `curHeight`: UInt, `cltvExpiry`: UInt): ByteArray {
-    return FfiConverterByteArray.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_peel_payment(FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterByteArray.lower(`payload`),FfiConverterString.lower(`rhash`),FfiConverterUInt.lower(`curHeight`),FfiConverterUInt.lower(`cltvExpiry`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `peelPaymentMsg`(`seed`: String, `idx`: ULong, `time`: String, `network`: String, `payload`: ByteArray, `rhash`: String, `curHeight`: UInt, `cltvExpiry`: UInt): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_peel_payment_msg(FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterByteArray.lower(`payload`),FfiConverterString.lower(`rhash`),FfiConverterUInt.lower(`curHeight`),FfiConverterUInt.lower(`cltvExpiry`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `signMs`(`seed`: String, `idx`: ULong, `time`: String, `network`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_sign_ms(FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `signedTimestamp`(`seed`: String, `idx`: ULong, `time`: String, `network`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_signed_timestamp(FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `signBytes`(`seed`: String, `idx`: ULong, `time`: String, `network`: String, `msg`: ByteArray): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_sign_bytes(FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterByteArray.lower(`msg`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `signBase64`(`seed`: String, `idx`: ULong, `time`: String, `network`: String, `msg`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_sign_base64(FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterString.lower(`msg`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `pubkeyFromSeed`(`seed`: String, `idx`: ULong, `time`: String, `network`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_pubkey_from_seed(FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `rootSignMs`(`seed`: String, `time`: String, `network`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_root_sign_ms(FfiConverterString.lower(`seed`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `xpubFromSeed`(`seed`: String, `time`: String, `network`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_xpub_from_seed(FfiConverterString.lower(`seed`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `setNetwork`(`network`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_set_network(FfiConverterString.lower(`network`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `setDevice`(`device`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_set_device(FfiConverterString.lower(`device`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `setBlockheight`(`blockheight`: UInt): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_set_blockheight(FfiConverterUInt.lower(`blockheight`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `getBlockheight`(`seed`: String, `uniqueTime`: String, `state`: ByteArray): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_get_blockheight(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `addContact`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `toPubkey`: String, `routeHint`: String, `myAlias`: String, `myImg`: String, `amtMsat`: ULong, `inviteCode`: String?, `theirAlias`: String?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_add_contact(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`toPubkey`),FfiConverterString.lower(`routeHint`),FfiConverterString.lower(`myAlias`),FfiConverterString.lower(`myImg`),FfiConverterULong.lower(`amtMsat`),FfiConverterOptionalString.lower(`inviteCode`),FfiConverterOptionalString.lower(`theirAlias`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `getContact`(`state`: ByteArray, `pubkey`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_get_contact(FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`pubkey`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `listContacts`(`state`: ByteArray): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_list_contacts(FfiConverterByteArray.lower(`state`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `contactPubkeyByChildIndex`(`state`: ByteArray, `childIdx`: ULong): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_contact_pubkey_by_child_index(FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`childIdx`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `contactPubkeyByEncryptedChild`(`seed`: String, `state`: ByteArray, `child`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(FfiConverterString.lower(`seed`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`child`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `getTribeManagementTopic`(`seed`: String, `uniqueTime`: String, `state`: ByteArray): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_get_tribe_management_topic(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `initialSetup`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `device`: String, `inviteCode`: String?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_initial_setup(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`device`),FfiConverterOptionalString.lower(`inviteCode`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `fetchMsgs`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `lastMsgIdx`: ULong, `limit`: UInt?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_fetch_msgs(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`lastMsgIdx`),FfiConverterOptionalUInt.lower(`limit`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `handle`(`topic`: String, `payload`: ByteArray, `seed`: String, `uniqueTime`: String, `state`: ByteArray, `myAlias`: String, `myImg`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_handle(FfiConverterString.lower(`topic`),FfiConverterByteArray.lower(`payload`),FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`myAlias`),FfiConverterString.lower(`myImg`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `send`(`seed`: String, `uniqueTime`: String, `to`: String, `msgType`: UByte, `msgJson`: String, `state`: ByteArray, `myAlias`: String, `myImg`: String, `amtMsat`: ULong, `isTribe`: Boolean = false): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_send(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterString.lower(`to`),FfiConverterUByte.lower(`msgType`),FfiConverterString.lower(`msgJson`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`myAlias`),FfiConverterString.lower(`myImg`),FfiConverterULong.lower(`amtMsat`),FfiConverterBoolean.lower(`isTribe`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `keysend`(`seed`: String, `uniqueTime`: String, `to`: String, `state`: ByteArray, `amtMsat`: ULong, `data`: ByteArray?, `routeHint`: String?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_keysend(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterString.lower(`to`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`amtMsat`),FfiConverterOptionalByteArray.lower(`data`),FfiConverterOptionalString.lower(`routeHint`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `pay`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `bolt11`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_pay(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`bolt11`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `makeMediaToken`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `host`: String, `muid`: String, `to`: String, `expiry`: UInt): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_make_media_token(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`host`),FfiConverterString.lower(`muid`),FfiConverterString.lower(`to`),FfiConverterUInt.lower(`expiry`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `makeMediaTokenWithMeta`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `host`: String, `muid`: String, `to`: String, `expiry`: UInt, `meta`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_make_media_token_with_meta(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`host`),FfiConverterString.lower(`muid`),FfiConverterString.lower(`to`),FfiConverterUInt.lower(`expiry`),FfiConverterString.lower(`meta`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `makeMediaTokenWithPrice`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `host`: String, `muid`: String, `to`: String, `expiry`: UInt, `price`: ULong): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_make_media_token_with_price(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`host`),FfiConverterString.lower(`muid`),FfiConverterString.lower(`to`),FfiConverterUInt.lower(`expiry`),FfiConverterULong.lower(`price`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `requestInvoice`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `amtMsat`: ULong, `description`: String?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_request_invoice(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`amtMsat`),FfiConverterOptionalString.lower(`description`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `makeInvoice`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `amtMsat`: ULong, `description`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_make_invoice(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`amtMsat`),FfiConverterString.lower(`description`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `payInvoice`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `bolt11`: String, `overpayMsat`: ULong?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_pay_invoice(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`bolt11`),FfiConverterOptionalULong.lower(`overpayMsat`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `payContactInvoice`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `bolt11`: String, `myAlias`: String, `myImg`: String, `isTribe`: Boolean): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_pay_contact_invoice(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`bolt11`),FfiConverterString.lower(`myAlias`),FfiConverterString.lower(`myImg`),FfiConverterBoolean.lower(`isTribe`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `paymentHashFromInvoice`(`bolt11`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_payment_hash_from_invoice(FfiConverterString.lower(`bolt11`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `parseInvoice`(`invoiceJson`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_parse_invoice(FfiConverterString.lower(`invoiceJson`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `createTribe`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `tribeServerPubkey`: String, `tribeJson`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_create_tribe(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribeServerPubkey`),FfiConverterString.lower(`tribeJson`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `joinTribe`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `tribePubkey`: String, `tribeRouteHint`: String, `alias`: String, `amtMsat`: ULong, `isPrivate`: Boolean): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_join_tribe(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribePubkey`),FfiConverterString.lower(`tribeRouteHint`),FfiConverterString.lower(`alias`),FfiConverterULong.lower(`amtMsat`),FfiConverterBoolean.lower(`isPrivate`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `listTribeMembers`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `tribeServerPubkey`: String, `tribePubkey`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_list_tribe_members(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribeServerPubkey`),FfiConverterString.lower(`tribePubkey`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `makeInvite`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `host`: String, `amtMsat`: ULong, `myAlias`: String, `tribeHost`: String?, `tribePubkey`: String?, `inviterPubkey`: String?, `inviterRouteHint`: String?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_make_invite(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`host`),FfiConverterULong.lower(`amtMsat`),FfiConverterString.lower(`myAlias`),FfiConverterOptionalString.lower(`tribeHost`),FfiConverterOptionalString.lower(`tribePubkey`),FfiConverterOptionalString.lower(`inviterPubkey`),FfiConverterOptionalString.lower(`inviterRouteHint`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `processInvite`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `inviteQr`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_process_invite(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`inviteQr`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `parseInvite`(`inviteQr`: String): ParsedInvite {
-    return FfiConverterTypeParsedInvite.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_parse_invite(FfiConverterString.lower(`inviteQr`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `codeFromInvite`(`inviteQr`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_code_from_invite(FfiConverterString.lower(`inviteQr`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `cancelInvite`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `inviteCode`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_cancel_invite(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`inviteCode`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `getDefaultTribeServer`(`state`: ByteArray): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_get_default_tribe_server(FfiConverterByteArray.lower(`state`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `read`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `pubkey`: String, `msgIdx`: ULong): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_read(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`pubkey`),FfiConverterULong.lower(`msgIdx`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `getReads`(`seed`: String, `uniqueTime`: String, `state`: ByteArray): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_get_reads(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `mute`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `pubkey`: String, `muteLevel`: UByte): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_mute(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`pubkey`),FfiConverterUByte.lower(`muteLevel`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `getMutes`(`seed`: String, `uniqueTime`: String, `state`: ByteArray): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_get_mutes(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `setPushToken`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `pushToken`: String, `pushKey`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_set_push_token(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`pushToken`),FfiConverterString.lower(`pushKey`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `setPushTokenForApp`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `pushToken`: String, `pushKey`: String, `appId`: String?, `pushEnvironment`: String?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_set_push_token_for_app(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`pushToken`),FfiConverterString.lower(`pushKey`),FfiConverterOptionalString.lower(`appId`),FfiConverterOptionalString.lower(`pushEnvironment`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `setActive`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `active`: Boolean, `ttlSecs`: ULong?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_set_active(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterBoolean.lower(`active`),FfiConverterOptionalULong.lower(`ttlSecs`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `readAll`(`seed`: String, `uniqueTime`: String, `state`: ByteArray): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_read_all(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `unregisterPushTokenForApp`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `appId`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_unregister_push_token_for_app(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`appId`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `decryptChildIndex`(`encryptedChild`: String, `pushKey`: String): ULong {
-    return FfiConverterULong.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_decrypt_child_index(FfiConverterString.lower(`encryptedChild`),FfiConverterString.lower(`pushKey`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `getMsgsCounts`(`seed`: String, `uniqueTime`: String, `state`: ByteArray): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_get_msgs_counts(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `fetchMsgsBatch`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `lastMsgIdx`: ULong, `limit`: UInt?, `reverse`: Boolean?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_fetch_msgs_batch(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`lastMsgIdx`),FfiConverterOptionalUInt.lower(`limit`),FfiConverterOptionalBoolean.lower(`reverse`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `fetchMsgsBatchPerContact`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `lastMsgIdx`: ULong, `limit`: UInt?, `reverse`: Boolean?, `contact`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_fetch_msgs_batch_per_contact(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`lastMsgIdx`),FfiConverterOptionalUInt.lower(`limit`),FfiConverterOptionalBoolean.lower(`reverse`),FfiConverterString.lower(`contact`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `fetchMsgsBatchOkkey`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `lastMsgIdx`: ULong, `limit`: UInt?, `reverse`: Boolean?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_fetch_msgs_batch_okkey(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`lastMsgIdx`),FfiConverterOptionalUInt.lower(`limit`),FfiConverterOptionalBoolean.lower(`reverse`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `fetchFirstMsgsPerKey`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `lastMsgIdx`: ULong, `limit`: UInt?, `reverse`: Boolean?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_fetch_first_msgs_per_key(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`lastMsgIdx`),FfiConverterOptionalUInt.lower(`limit`),FfiConverterOptionalBoolean.lower(`reverse`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `fetchPayments`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `since`: ULong?, `limit`: UInt?, `scid`: ULong?, `remoteOnly`: Boolean?, `minMsat`: ULong?, `reverse`: Boolean?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_fetch_payments(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterOptionalULong.lower(`since`),FfiConverterOptionalUInt.lower(`limit`),FfiConverterOptionalULong.lower(`scid`),FfiConverterOptionalBoolean.lower(`remoteOnly`),FfiConverterOptionalULong.lower(`minMsat`),FfiConverterOptionalBoolean.lower(`reverse`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `getTags`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `tags`: List<String>, `pubkey`: String?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_get_tags(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterSequenceString.lower(`tags`),FfiConverterOptionalString.lower(`pubkey`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `deleteMsgs`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `pubkey`: String?, `msgIdxs`: List<ULong>?): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_delete_msgs(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterOptionalString.lower(`pubkey`),FfiConverterOptionalSequenceULong.lower(`msgIdxs`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `updateTribe`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `tribeServerPubkey`: String, `tribeJson`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_update_tribe(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribeServerPubkey`),FfiConverterString.lower(`tribeJson`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `deleteTribe`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `tribeServerPubkey`: String, `tribePubkey`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_delete_tribe(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribeServerPubkey`),FfiConverterString.lower(`tribePubkey`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `showSenders`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `tribeServerPubkey`: String, `tribePubkey`: String, `memberPubkey`: String, `on`: Boolean): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_show_senders(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribeServerPubkey`),FfiConverterString.lower(`tribePubkey`),FfiConverterString.lower(`memberPubkey`),FfiConverterBoolean.lower(`on`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `showSendersOnion`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `tribePubkey`: String, `memberPubkey`: String, `on`: Boolean, `amtMsat`: ULong, `alias`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_show_senders_onion(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribePubkey`),FfiConverterString.lower(`memberPubkey`),FfiConverterBoolean.lower(`on`),FfiConverterULong.lower(`amtMsat`),FfiConverterString.lower(`alias`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `addNode`(`node`: String): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_add_node(FfiConverterString.lower(`node`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `concatRoute`(`state`: ByteArray, `endHops`: String, `routerPubkey`: String, `amtMsat`: ULong): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_concat_route(FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`endHops`),FfiConverterString.lower(`routerPubkey`),FfiConverterULong.lower(`amtMsat`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `pingDone`(`seed`: String, `uniqueTime`: String, `state`: ByteArray, `pingTs`: ULong): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_ping_done(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`pingTs`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `fetchPings`(`seed`: String, `uniqueTime`: String, `state`: ByteArray): RunReturn {
-    return FfiConverterTypeRunReturn.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_fetch_pings(FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `idFromMacaroon`(`macaroon`: String): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_id_from_macaroon(FfiConverterString.lower(`macaroon`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `findRoute`(`state`: ByteArray, `toPubkey`: String, `routeHint`: String?, `amtMsat`: ULong): String {
-    return FfiConverterString.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_find_route(FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`toPubkey`),FfiConverterOptionalString.lower(`routeHint`),FfiConverterULong.lower(`amtMsat`),_status)
-})
-}
-
-@Throws(SphinxException::class)
-
-fun `parseServerStatus`(`payload`: String): ServerStatus {
-    return FfiConverterTypeServerStatus.lift(
-    rustCallWithError(SphinxException) { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_parse_server_status(FfiConverterString.lower(`payload`),_status)
-})
-}
-
-
-fun `evaluateServerHealth`(`last`: ServerStatus?, `lastSeenMs`: ULong, `nowMs`: ULong, `intervalMs`: ULong, `maxMissed`: UInt): ServerHealth {
-    return FfiConverterTypeServerHealth.lift(
-    rustCall() { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_evaluate_server_health(FfiConverterOptionalTypeServerStatus.lower(`last`),FfiConverterULong.lower(`lastSeenMs`),FfiConverterULong.lower(`nowMs`),FfiConverterULong.lower(`intervalMs`),FfiConverterUInt.lower(`maxMissed`),_status)
-})
-}
-
-
-fun `parseMixerErrorCode`(`raw`: String): MixerErrorCode {
-    return FfiConverterTypeMixerErrorCode.lift(
-    rustCall() { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_parse_mixer_error_code(FfiConverterString.lower(`raw`),_status)
-})
-}
-
-
-fun `serverStatusTopic`(): String {
-    return FfiConverterString.lift(
-    rustCall() { _status ->
-    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_server_status_topic(_status)
-})
-}
+    @Throws(SphinxException::class) fun `addContact`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `toPubkey`: kotlin.String, `routeHint`: kotlin.String, `myAlias`: kotlin.String, `myImg`: kotlin.String, `amtMsat`: kotlin.ULong, `inviteCode`: kotlin.String?, `theirAlias`: kotlin.String?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_add_contact(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`toPubkey`),FfiConverterString.lower(`routeHint`),FfiConverterString.lower(`myAlias`),FfiConverterString.lower(`myImg`),FfiConverterULong.lower(`amtMsat`),FfiConverterOptionalString.lower(`inviteCode`),FfiConverterOptionalString.lower(`theirAlias`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `addNode`(`node`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_add_node(
+    
+        FfiConverterString.lower(`node`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `agentSeed`(`seed`: kotlin.String, `n`: kotlin.UInt): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_agent_seed(
+    
+        FfiConverterString.lower(`seed`),FfiConverterUInt.lower(`n`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `buildRequest`(`msg`: kotlin.String, `secret`: kotlin.String, `nonce`: kotlin.ULong): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_build_request(
+    
+        FfiConverterString.lower(`msg`),FfiConverterString.lower(`secret`),FfiConverterULong.lower(`nonce`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `cancelInvite`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `inviteCode`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_cancel_invite(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`inviteCode`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `codeFromInvite`(`inviteQr`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_code_from_invite(
+    
+        FfiConverterString.lower(`inviteQr`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `concatRoute`(`state`: kotlin.ByteArray, `endHops`: kotlin.String, `routerPubkey`: kotlin.String, `amtMsat`: kotlin.ULong): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_concat_route(
+    
+        FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`endHops`),FfiConverterString.lower(`routerPubkey`),FfiConverterULong.lower(`amtMsat`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `contactPubkeyByChildIndex`(`state`: kotlin.ByteArray, `childIdx`: kotlin.ULong): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_contact_pubkey_by_child_index(
+    
+        FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`childIdx`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `contactPubkeyByEncryptedChild`(`seed`: kotlin.String, `state`: kotlin.ByteArray, `child`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(
+    
+        FfiConverterString.lower(`seed`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`child`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `createKeysend`(`seed`: kotlin.String, `idx`: kotlin.ULong, `time`: kotlin.String, `network`: kotlin.String, `hops`: kotlin.String, `msat`: kotlin.ULong, `rhash`: kotlin.String, `payload`: kotlin.ByteArray, `currHeight`: kotlin.UInt, `preimage`: kotlin.String): kotlin.ByteArray {
+            return FfiConverterByteArray.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_create_keysend(
+    
+        FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterString.lower(`hops`),FfiConverterULong.lower(`msat`),FfiConverterString.lower(`rhash`),FfiConverterByteArray.lower(`payload`),FfiConverterUInt.lower(`currHeight`),FfiConverterString.lower(`preimage`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `createKeysendMsg`(`seed`: kotlin.String, `idx`: kotlin.ULong, `time`: kotlin.String, `network`: kotlin.String, `hops`: kotlin.String, `msat`: kotlin.ULong, `rhash`: kotlin.String, `msgJson`: kotlin.String, `currHeight`: kotlin.UInt, `preimage`: kotlin.String): kotlin.ByteArray {
+            return FfiConverterByteArray.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_create_keysend_msg(
+    
+        FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterString.lower(`hops`),FfiConverterULong.lower(`msat`),FfiConverterString.lower(`rhash`),FfiConverterString.lower(`msgJson`),FfiConverterUInt.lower(`currHeight`),FfiConverterString.lower(`preimage`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `createOnion`(`seed`: kotlin.String, `idx`: kotlin.ULong, `time`: kotlin.String, `network`: kotlin.String, `hops`: kotlin.String, `payload`: kotlin.ByteArray): kotlin.ByteArray {
+            return FfiConverterByteArray.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_create_onion(
+    
+        FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterString.lower(`hops`),FfiConverterByteArray.lower(`payload`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `createOnionMsg`(`seed`: kotlin.String, `idx`: kotlin.ULong, `time`: kotlin.String, `network`: kotlin.String, `hops`: kotlin.String, `json`: kotlin.String): kotlin.ByteArray {
+            return FfiConverterByteArray.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_create_onion_msg(
+    
+        FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterString.lower(`hops`),FfiConverterString.lower(`json`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `createTribe`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `tribeServerPubkey`: kotlin.String, `tribeJson`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_create_tribe(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribeServerPubkey`),FfiConverterString.lower(`tribeJson`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `decrypt`(`ciphertext`: kotlin.String, `secret`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_decrypt(
+    
+        FfiConverterString.lower(`ciphertext`),FfiConverterString.lower(`secret`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `decryptChildIndex`(`encryptedChild`: kotlin.String, `pushKey`: kotlin.String): kotlin.ULong {
+            return FfiConverterULong.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_decrypt_child_index(
+    
+        FfiConverterString.lower(`encryptedChild`),FfiConverterString.lower(`pushKey`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `deleteMsgs`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `pubkey`: kotlin.String?, `msgIdxs`: List<kotlin.ULong>?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_delete_msgs(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterOptionalString.lower(`pubkey`),FfiConverterOptionalSequenceULong.lower(`msgIdxs`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `deleteTribe`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `tribeServerPubkey`: kotlin.String, `tribePubkey`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_delete_tribe(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribeServerPubkey`),FfiConverterString.lower(`tribePubkey`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `deriveSharedSecret`(`theirPubkey`: kotlin.String, `mySecretKey`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_derive_shared_secret(
+    
+        FfiConverterString.lower(`theirPubkey`),FfiConverterString.lower(`mySecretKey`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `encrypt`(`plaintext`: kotlin.String, `secret`: kotlin.String, `nonce`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_encrypt(
+    
+        FfiConverterString.lower(`plaintext`),FfiConverterString.lower(`secret`),FfiConverterString.lower(`nonce`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `entropyFromMnemonic`(`mnemonic`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_entropy_from_mnemonic(
+    
+        FfiConverterString.lower(`mnemonic`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `entropyToSeed`(`entropy`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_entropy_to_seed(
+    
+        FfiConverterString.lower(`entropy`),_status)
+}
+    )
+    }
+    
+ fun `evaluateServerHealth`(`last`: ServerStatus?, `lastSeenMs`: kotlin.ULong, `nowMs`: kotlin.ULong, `intervalMs`: kotlin.ULong, `maxMissed`: kotlin.UInt): ServerHealth {
+            return FfiConverterTypeServerHealth.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_evaluate_server_health(
+    
+        FfiConverterOptionalTypeServerStatus.lower(`last`),FfiConverterULong.lower(`lastSeenMs`),FfiConverterULong.lower(`nowMs`),FfiConverterULong.lower(`intervalMs`),FfiConverterUInt.lower(`maxMissed`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `fetchFirstMsgsPerKey`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `lastMsgIdx`: kotlin.ULong, `limit`: kotlin.UInt?, `reverse`: kotlin.Boolean?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_fetch_first_msgs_per_key(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`lastMsgIdx`),FfiConverterOptionalUInt.lower(`limit`),FfiConverterOptionalBoolean.lower(`reverse`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `fetchMsgs`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `lastMsgIdx`: kotlin.ULong, `limit`: kotlin.UInt?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_fetch_msgs(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`lastMsgIdx`),FfiConverterOptionalUInt.lower(`limit`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `fetchMsgsBatch`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `lastMsgIdx`: kotlin.ULong, `limit`: kotlin.UInt?, `reverse`: kotlin.Boolean?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_fetch_msgs_batch(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`lastMsgIdx`),FfiConverterOptionalUInt.lower(`limit`),FfiConverterOptionalBoolean.lower(`reverse`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `fetchMsgsBatchOkkey`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `lastMsgIdx`: kotlin.ULong, `limit`: kotlin.UInt?, `reverse`: kotlin.Boolean?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_fetch_msgs_batch_okkey(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`lastMsgIdx`),FfiConverterOptionalUInt.lower(`limit`),FfiConverterOptionalBoolean.lower(`reverse`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `fetchMsgsBatchPerContact`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `lastMsgIdx`: kotlin.ULong, `limit`: kotlin.UInt?, `reverse`: kotlin.Boolean?, `contact`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_fetch_msgs_batch_per_contact(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`lastMsgIdx`),FfiConverterOptionalUInt.lower(`limit`),FfiConverterOptionalBoolean.lower(`reverse`),FfiConverterString.lower(`contact`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `fetchPayments`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `since`: kotlin.ULong?, `limit`: kotlin.UInt?, `scid`: kotlin.ULong?, `remoteOnly`: kotlin.Boolean?, `minMsat`: kotlin.ULong?, `reverse`: kotlin.Boolean?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_fetch_payments(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterOptionalULong.lower(`since`),FfiConverterOptionalUInt.lower(`limit`),FfiConverterOptionalULong.lower(`scid`),FfiConverterOptionalBoolean.lower(`remoteOnly`),FfiConverterOptionalULong.lower(`minMsat`),FfiConverterOptionalBoolean.lower(`reverse`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `fetchPings`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_fetch_pings(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `findRoute`(`state`: kotlin.ByteArray, `toPubkey`: kotlin.String, `routeHint`: kotlin.String?, `amtMsat`: kotlin.ULong): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_find_route(
+    
+        FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`toPubkey`),FfiConverterOptionalString.lower(`routeHint`),FfiConverterULong.lower(`amtMsat`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `getBlockheight`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_get_blockheight(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `getContact`(`state`: kotlin.ByteArray, `pubkey`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_get_contact(
+    
+        FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`pubkey`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `getDefaultTribeServer`(`state`: kotlin.ByteArray): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_get_default_tribe_server(
+    
+        FfiConverterByteArray.lower(`state`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `getMsgsCounts`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_get_msgs_counts(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `getMutes`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_get_mutes(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `getReads`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_get_reads(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `getTags`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `tags`: List<kotlin.String>, `pubkey`: kotlin.String?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_get_tags(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterSequenceString.lower(`tags`),FfiConverterOptionalString.lower(`pubkey`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `getTribeManagementTopic`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_get_tribe_management_topic(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `handle`(`topic`: kotlin.String, `payload`: kotlin.ByteArray, `seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `myAlias`: kotlin.String, `myImg`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_handle(
+    
+        FfiConverterString.lower(`topic`),FfiConverterByteArray.lower(`payload`),FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`myAlias`),FfiConverterString.lower(`myImg`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `idFromMacaroon`(`macaroon`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_id_from_macaroon(
+    
+        FfiConverterString.lower(`macaroon`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `initialSetup`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `device`: kotlin.String, `inviteCode`: kotlin.String?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_initial_setup(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`device`),FfiConverterOptionalString.lower(`inviteCode`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `joinTribe`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `tribePubkey`: kotlin.String, `tribeRouteHint`: kotlin.String, `alias`: kotlin.String, `amtMsat`: kotlin.ULong, `isPrivate`: kotlin.Boolean): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_join_tribe(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribePubkey`),FfiConverterString.lower(`tribeRouteHint`),FfiConverterString.lower(`alias`),FfiConverterULong.lower(`amtMsat`),FfiConverterBoolean.lower(`isPrivate`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `keysend`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `to`: kotlin.String, `state`: kotlin.ByteArray, `amtMsat`: kotlin.ULong, `data`: kotlin.ByteArray?, `routeHint`: kotlin.String?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_keysend(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterString.lower(`to`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`amtMsat`),FfiConverterOptionalByteArray.lower(`data`),FfiConverterOptionalString.lower(`routeHint`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `listContacts`(`state`: kotlin.ByteArray): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_list_contacts(
+    
+        FfiConverterByteArray.lower(`state`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `listTribeMembers`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `tribeServerPubkey`: kotlin.String, `tribePubkey`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_list_tribe_members(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribeServerPubkey`),FfiConverterString.lower(`tribePubkey`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `makeAuthToken`(`ts`: kotlin.UInt, `secret`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_make_auth_token(
+    
+        FfiConverterUInt.lower(`ts`),FfiConverterString.lower(`secret`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `makeInvite`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `host`: kotlin.String, `amtMsat`: kotlin.ULong, `myAlias`: kotlin.String, `tribeHost`: kotlin.String?, `tribePubkey`: kotlin.String?, `inviterPubkey`: kotlin.String?, `inviterRouteHint`: kotlin.String?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_make_invite(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`host`),FfiConverterULong.lower(`amtMsat`),FfiConverterString.lower(`myAlias`),FfiConverterOptionalString.lower(`tribeHost`),FfiConverterOptionalString.lower(`tribePubkey`),FfiConverterOptionalString.lower(`inviterPubkey`),FfiConverterOptionalString.lower(`inviterRouteHint`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `makeInvoice`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `amtMsat`: kotlin.ULong, `description`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_make_invoice(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`amtMsat`),FfiConverterString.lower(`description`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `makeMediaToken`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `host`: kotlin.String, `muid`: kotlin.String, `to`: kotlin.String, `expiry`: kotlin.UInt): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_make_media_token(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`host`),FfiConverterString.lower(`muid`),FfiConverterString.lower(`to`),FfiConverterUInt.lower(`expiry`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `makeMediaTokenWithMeta`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `host`: kotlin.String, `muid`: kotlin.String, `to`: kotlin.String, `expiry`: kotlin.UInt, `meta`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_make_media_token_with_meta(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`host`),FfiConverterString.lower(`muid`),FfiConverterString.lower(`to`),FfiConverterUInt.lower(`expiry`),FfiConverterString.lower(`meta`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `makeMediaTokenWithPrice`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `host`: kotlin.String, `muid`: kotlin.String, `to`: kotlin.String, `expiry`: kotlin.UInt, `price`: kotlin.ULong): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_make_media_token_with_price(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`host`),FfiConverterString.lower(`muid`),FfiConverterString.lower(`to`),FfiConverterUInt.lower(`expiry`),FfiConverterULong.lower(`price`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `mnemonicFromEntropy`(`entropy`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_mnemonic_from_entropy(
+    
+        FfiConverterString.lower(`entropy`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `mnemonicToSeed`(`mnemonic`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_mnemonic_to_seed(
+    
+        FfiConverterString.lower(`mnemonic`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `mute`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `pubkey`: kotlin.String, `muteLevel`: kotlin.UByte): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_mute(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`pubkey`),FfiConverterUByte.lower(`muteLevel`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `nodeKeys`(`net`: kotlin.String, `seed`: kotlin.String): Keys {
+            return FfiConverterTypeKeys.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_node_keys(
+    
+        FfiConverterString.lower(`net`),FfiConverterString.lower(`seed`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `parseInvite`(`inviteQr`: kotlin.String): ParsedInvite {
+            return FfiConverterTypeParsedInvite.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_parse_invite(
+    
+        FfiConverterString.lower(`inviteQr`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `parseInvoice`(`invoiceJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_parse_invoice(
+    
+        FfiConverterString.lower(`invoiceJson`),_status)
+}
+    )
+    }
+    
+ fun `parseMixerErrorCode`(`raw`: kotlin.String): MixerErrorCode {
+            return FfiConverterTypeMixerErrorCode.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_parse_mixer_error_code(
+    
+        FfiConverterString.lower(`raw`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `parseResponse`(`res`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_parse_response(
+    
+        FfiConverterString.lower(`res`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `parseServerStatus`(`payload`: kotlin.String): ServerStatus {
+            return FfiConverterTypeServerStatus.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_parse_server_status(
+    
+        FfiConverterString.lower(`payload`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `pay`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `bolt11`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_pay(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`bolt11`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `payContactInvoice`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `bolt11`: kotlin.String, `myAlias`: kotlin.String, `myImg`: kotlin.String, `isTribe`: kotlin.Boolean): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_pay_contact_invoice(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`bolt11`),FfiConverterString.lower(`myAlias`),FfiConverterString.lower(`myImg`),FfiConverterBoolean.lower(`isTribe`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `payInvoice`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `bolt11`: kotlin.String, `overpayMsat`: kotlin.ULong?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_pay_invoice(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`bolt11`),FfiConverterOptionalULong.lower(`overpayMsat`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `paymentHashFromInvoice`(`bolt11`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_payment_hash_from_invoice(
+    
+        FfiConverterString.lower(`bolt11`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `peelOnion`(`seed`: kotlin.String, `idx`: kotlin.ULong, `time`: kotlin.String, `network`: kotlin.String, `payload`: kotlin.ByteArray): kotlin.ByteArray {
+            return FfiConverterByteArray.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_peel_onion(
+    
+        FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterByteArray.lower(`payload`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `peelOnionMsg`(`seed`: kotlin.String, `idx`: kotlin.ULong, `time`: kotlin.String, `network`: kotlin.String, `payload`: kotlin.ByteArray): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_peel_onion_msg(
+    
+        FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterByteArray.lower(`payload`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `peelPayment`(`seed`: kotlin.String, `idx`: kotlin.ULong, `time`: kotlin.String, `network`: kotlin.String, `payload`: kotlin.ByteArray, `rhash`: kotlin.String, `curHeight`: kotlin.UInt, `cltvExpiry`: kotlin.UInt): kotlin.ByteArray {
+            return FfiConverterByteArray.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_peel_payment(
+    
+        FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterByteArray.lower(`payload`),FfiConverterString.lower(`rhash`),FfiConverterUInt.lower(`curHeight`),FfiConverterUInt.lower(`cltvExpiry`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `peelPaymentMsg`(`seed`: kotlin.String, `idx`: kotlin.ULong, `time`: kotlin.String, `network`: kotlin.String, `payload`: kotlin.ByteArray, `rhash`: kotlin.String, `curHeight`: kotlin.UInt, `cltvExpiry`: kotlin.UInt): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_peel_payment_msg(
+    
+        FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterByteArray.lower(`payload`),FfiConverterString.lower(`rhash`),FfiConverterUInt.lower(`curHeight`),FfiConverterUInt.lower(`cltvExpiry`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `pingDone`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `pingTs`: kotlin.ULong): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_ping_done(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`pingTs`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `processInvite`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `inviteQr`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_process_invite(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`inviteQr`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `pubkeyFromSecretKey`(`mySecretKey`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_pubkey_from_secret_key(
+    
+        FfiConverterString.lower(`mySecretKey`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `pubkeyFromSeed`(`seed`: kotlin.String, `idx`: kotlin.ULong, `time`: kotlin.String, `network`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_pubkey_from_seed(
+    
+        FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `read`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `pubkey`: kotlin.String, `msgIdx`: kotlin.ULong): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_read(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`pubkey`),FfiConverterULong.lower(`msgIdx`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `readAll`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_read_all(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `requestInvoice`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `amtMsat`: kotlin.ULong, `description`: kotlin.String?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_request_invoice(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterULong.lower(`amtMsat`),FfiConverterOptionalString.lower(`description`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `rootSignMs`(`seed`: kotlin.String, `time`: kotlin.String, `network`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_root_sign_ms(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `send`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `to`: kotlin.String, `msgType`: kotlin.UByte, `msgJson`: kotlin.String, `state`: kotlin.ByteArray, `myAlias`: kotlin.String, `myImg`: kotlin.String, `amtMsat`: kotlin.ULong, `isTribe`: kotlin.Boolean = false): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_send(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterString.lower(`to`),FfiConverterUByte.lower(`msgType`),FfiConverterString.lower(`msgJson`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`myAlias`),FfiConverterString.lower(`myImg`),FfiConverterULong.lower(`amtMsat`),FfiConverterBoolean.lower(`isTribe`),_status)
+}
+    )
+    }
+    
+ fun `serverStatusTopic`(): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_server_status_topic(
+    
+        _status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `setActive`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `active`: kotlin.Boolean, `ttlSecs`: kotlin.ULong?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_set_active(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterBoolean.lower(`active`),FfiConverterOptionalULong.lower(`ttlSecs`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `setBlockheight`(`blockheight`: kotlin.UInt): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_set_blockheight(
+    
+        FfiConverterUInt.lower(`blockheight`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `setDevice`(`device`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_set_device(
+    
+        FfiConverterString.lower(`device`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `setNetwork`(`network`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_set_network(
+    
+        FfiConverterString.lower(`network`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `setPushToken`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `pushToken`: kotlin.String, `pushKey`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_set_push_token(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`pushToken`),FfiConverterString.lower(`pushKey`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `setPushTokenForApp`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `pushToken`: kotlin.String, `pushKey`: kotlin.String, `appId`: kotlin.String?, `pushEnvironment`: kotlin.String?): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_set_push_token_for_app(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`pushToken`),FfiConverterString.lower(`pushKey`),FfiConverterOptionalString.lower(`appId`),FfiConverterOptionalString.lower(`pushEnvironment`),_status)
+}
+    )
+    }
+    
+ fun `sha256`(`msg`: kotlin.ByteArray): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_sha_256(
+    
+        FfiConverterByteArray.lower(`msg`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `showSenders`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `tribeServerPubkey`: kotlin.String, `tribePubkey`: kotlin.String, `memberPubkey`: kotlin.String, `on`: kotlin.Boolean): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_show_senders(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribeServerPubkey`),FfiConverterString.lower(`tribePubkey`),FfiConverterString.lower(`memberPubkey`),FfiConverterBoolean.lower(`on`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `showSendersOnion`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `tribePubkey`: kotlin.String, `memberPubkey`: kotlin.String, `on`: kotlin.Boolean, `amtMsat`: kotlin.ULong, `alias`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_show_senders_onion(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribePubkey`),FfiConverterString.lower(`memberPubkey`),FfiConverterBoolean.lower(`on`),FfiConverterULong.lower(`amtMsat`),FfiConverterString.lower(`alias`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `signBase64`(`seed`: kotlin.String, `idx`: kotlin.ULong, `time`: kotlin.String, `network`: kotlin.String, `msg`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_sign_base64(
+    
+        FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterString.lower(`msg`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `signBytes`(`seed`: kotlin.String, `idx`: kotlin.ULong, `time`: kotlin.String, `network`: kotlin.String, `msg`: kotlin.ByteArray): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_sign_bytes(
+    
+        FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),FfiConverterByteArray.lower(`msg`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `signMs`(`seed`: kotlin.String, `idx`: kotlin.ULong, `time`: kotlin.String, `network`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_sign_ms(
+    
+        FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `signedTimestamp`(`seed`: kotlin.String, `idx`: kotlin.ULong, `time`: kotlin.String, `network`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_signed_timestamp(
+    
+        FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `unregisterPushTokenForApp`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `appId`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_unregister_push_token_for_app(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`appId`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `updateTribe`(`seed`: kotlin.String, `uniqueTime`: kotlin.String, `state`: kotlin.ByteArray, `tribeServerPubkey`: kotlin.String, `tribeJson`: kotlin.String): RunReturn {
+            return FfiConverterTypeRunReturn.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_update_tribe(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`uniqueTime`),FfiConverterByteArray.lower(`state`),FfiConverterString.lower(`tribeServerPubkey`),FfiConverterString.lower(`tribeJson`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SphinxException::class) fun `xpubFromSeed`(`seed`: kotlin.String, `time`: kotlin.String, `network`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SphinxException) { _status ->
+    UniffiLib.uniffi_sphinxrs_fn_func_xpub_from_seed(
+    
+        FfiConverterString.lower(`seed`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),_status)
+}
+    )
+    }
+    
 
 

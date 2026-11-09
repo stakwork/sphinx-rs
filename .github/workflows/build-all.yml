@@ -35,7 +35,7 @@ jobs:
 
       - name: Generate Swift bindings
         run: |
-          cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language swift
+          cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language swift --out-dir src
           sed -i '' 's/module\ sphinxrsFFI/framework\ module\ sphinxrsFFI/' src/sphinxrsFFI.modulemap
 
       - name: Commit and push regenerated Swift bindings
@@ -143,7 +143,7 @@ jobs:
 
       - name: Generate Kotlin bindings
         run: |
-          cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language kotlin
+          cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language kotlin --out-dir src
           sed -i 's/return "uniffi_sphinxrs"/return "sphinxrs"/' src/uniffi/sphinxrs/sphinxrs.kt
 
       - name: Commit and push regenerated Kotlin bindings

@@ -1,6 +1,6 @@
 
 echo "=> creating kotlin bindings"
-cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language kotlin
+cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language kotlin --out-dir src
 
 echo "=> renaming uniffi_sphinxrs to sphinxrs"
 sed -i '' 's/return "uniffi_sphinxrs"/return "sphinxrs"/' src/uniffi/sphinxrs/sphinxrs.kt

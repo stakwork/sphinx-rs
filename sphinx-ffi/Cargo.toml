@@ -24,7 +24,7 @@ sphinx = { git = "https://github.com/stakwork/sphinx", rev = "70605f3bda5941fd0d
     "macaroon",
 ] }
 # sphinx = { path = "../../sphinx/sphinx" }
-uniffi = { version = "0.24.1", optional = true }
+uniffi = { version = "0.31.2", optional = true }
 hex = { version = "0.4.3", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -32,7 +32,7 @@ thiserror = "1.0.31"
 time = "0.3.37"
 
 [build-dependencies]
-uniffi = { version = "0.24.1", optional = true, features = ["build"] }
+uniffi = { version = "0.31.2", optional = true, features = ["build"] }
 
 [profile.release]
 opt-level = 'z'   # Optimize for size.

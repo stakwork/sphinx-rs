@@ -24,24 +24,10 @@
 
 typedef struct RustBuffer
 {
-    int32_t capacity;
-    int32_t len;
+    uint64_t capacity;
+    uint64_t len;
     uint8_t *_Nullable data;
 } RustBuffer;
-
-typedef int32_t (*ForeignCallback)(uint64_t, int32_t, const uint8_t *_Nonnull, int32_t, RustBuffer *_Nonnull);
-
-// Task defined in Rust that Swift executes
-typedef void (*UniFfiRustTaskCallback)(const void * _Nullable);
-
-// Callback to execute Rust tasks using a Swift Task
-//
-// Args:
-//   executor: ForeignExecutor lowered into a size_t value
-//   delay: Delay in MS
-//   task: UniFfiRustTaskCallback to call
-//   task_data: data to pass the task callback
-typedef void (*UniFfiForeignExecutorCallback)(size_t, uint32_t, UniFfiRustTaskCallback _Nullable, const void * _Nullable);
 
 typedef struct ForeignBytes
 {
@@ -58,497 +44,1515 @@ typedef struct RustCallStatus {
 // ⚠️ Attention: If you change this #else block (ending in `#endif // def UNIFFI_SHARED_H`) you *must* ⚠️
 // ⚠️ increment the version suffix in all instances of UNIFFI_SHARED_HEADER_V4 in this file.           ⚠️
 #endif // def UNIFFI_SHARED_H
+#ifndef UNIFFI_FFIDEF_RUST_FUTURE_CONTINUATION_CALLBACK
+#define UNIFFI_FFIDEF_RUST_FUTURE_CONTINUATION_CALLBACK
+typedef void (*UniffiRustFutureContinuationCallback)(uint64_t, int8_t
+    );
 
-// Callbacks for UniFFI Futures
-typedef void (*UniFfiFutureCallbackUInt64)(const void * _Nonnull, uint64_t, RustCallStatus);
-typedef void (*UniFfiFutureCallbackRustBuffer)(const void * _Nonnull, RustBuffer, RustCallStatus);
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK
+typedef void (*UniffiForeignFutureDroppedCallback)(uint64_t
+    );
 
-// Scaffolding functions
-RustBuffer uniffi_sphinxrs_fn_func_pubkey_from_secret_key(RustBuffer my_secret_key, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_derive_shared_secret(RustBuffer their_pubkey, RustBuffer my_secret_key, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_encrypt(RustBuffer plaintext, RustBuffer secret, RustBuffer nonce, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_decrypt(RustBuffer ciphertext, RustBuffer secret, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_node_keys(RustBuffer net, RustBuffer seed, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_mnemonic_from_entropy(RustBuffer entropy, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_entropy_from_mnemonic(RustBuffer mnemonic, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_mnemonic_to_seed(RustBuffer mnemonic, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_entropy_to_seed(RustBuffer entropy, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_agent_seed(RustBuffer seed, uint32_t n, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_build_request(RustBuffer msg, RustBuffer secret, uint64_t nonce, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_parse_response(RustBuffer res, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_make_auth_token(uint32_t ts, RustBuffer secret, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_sha_256(RustBuffer msg, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_create_onion(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer hops, RustBuffer payload, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_create_onion_msg(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer hops, RustBuffer json, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_create_keysend(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer hops, uint64_t msat, RustBuffer rhash, RustBuffer payload, uint32_t curr_height, RustBuffer preimage, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_create_keysend_msg(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer hops, uint64_t msat, RustBuffer rhash, RustBuffer msg_json, uint32_t curr_height, RustBuffer preimage, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_peel_onion(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_peel_onion_msg(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_peel_payment(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustBuffer rhash, uint32_t cur_height, uint32_t cltv_expiry, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_peel_payment_msg(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustBuffer rhash, uint32_t cur_height, uint32_t cltv_expiry, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_sign_ms(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_signed_timestamp(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_sign_bytes(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer msg, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_sign_base64(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer msg, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_pubkey_from_seed(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_root_sign_ms(RustBuffer seed, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_xpub_from_seed(RustBuffer seed, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_set_network(RustBuffer network, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_set_device(RustBuffer device, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_set_blockheight(uint32_t blockheight, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_get_blockheight(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
-);
+#endif
+#ifndef UNIFFI_FFIDEF_CALLBACK_INTERFACE_FREE
+#define UNIFFI_FFIDEF_CALLBACK_INTERFACE_FREE
+typedef void (*UniffiCallbackInterfaceFree)(uint64_t
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_CALLBACK_INTERFACE_CLONE
+#define UNIFFI_FFIDEF_CALLBACK_INTERFACE_CLONE
+typedef uint64_t (*UniffiCallbackInterfaceClone)(uint64_t
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK_STRUCT
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK_STRUCT
+typedef struct UniffiForeignFutureDroppedCallbackStruct {
+    uint64_t handle;
+    UniffiForeignFutureDroppedCallback _Nonnull free;
+} UniffiForeignFutureDroppedCallbackStruct;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U8
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U8
+typedef struct UniffiForeignFutureResultU8 {
+    uint8_t returnValue;
+    RustCallStatus callStatus;
+} UniffiForeignFutureResultU8;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U8
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U8
+typedef void (*UniffiForeignFutureCompleteU8)(uint64_t, UniffiForeignFutureResultU8
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I8
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I8
+typedef struct UniffiForeignFutureResultI8 {
+    int8_t returnValue;
+    RustCallStatus callStatus;
+} UniffiForeignFutureResultI8;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I8
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I8
+typedef void (*UniffiForeignFutureCompleteI8)(uint64_t, UniffiForeignFutureResultI8
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U16
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U16
+typedef struct UniffiForeignFutureResultU16 {
+    uint16_t returnValue;
+    RustCallStatus callStatus;
+} UniffiForeignFutureResultU16;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U16
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U16
+typedef void (*UniffiForeignFutureCompleteU16)(uint64_t, UniffiForeignFutureResultU16
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I16
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I16
+typedef struct UniffiForeignFutureResultI16 {
+    int16_t returnValue;
+    RustCallStatus callStatus;
+} UniffiForeignFutureResultI16;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I16
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I16
+typedef void (*UniffiForeignFutureCompleteI16)(uint64_t, UniffiForeignFutureResultI16
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U32
+typedef struct UniffiForeignFutureResultU32 {
+    uint32_t returnValue;
+    RustCallStatus callStatus;
+} UniffiForeignFutureResultU32;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U32
+typedef void (*UniffiForeignFutureCompleteU32)(uint64_t, UniffiForeignFutureResultU32
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I32
+typedef struct UniffiForeignFutureResultI32 {
+    int32_t returnValue;
+    RustCallStatus callStatus;
+} UniffiForeignFutureResultI32;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I32
+typedef void (*UniffiForeignFutureCompleteI32)(uint64_t, UniffiForeignFutureResultI32
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U64
+typedef struct UniffiForeignFutureResultU64 {
+    uint64_t returnValue;
+    RustCallStatus callStatus;
+} UniffiForeignFutureResultU64;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U64
+typedef void (*UniffiForeignFutureCompleteU64)(uint64_t, UniffiForeignFutureResultU64
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I64
+typedef struct UniffiForeignFutureResultI64 {
+    int64_t returnValue;
+    RustCallStatus callStatus;
+} UniffiForeignFutureResultI64;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I64
+typedef void (*UniffiForeignFutureCompleteI64)(uint64_t, UniffiForeignFutureResultI64
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F32
+typedef struct UniffiForeignFutureResultF32 {
+    float returnValue;
+    RustCallStatus callStatus;
+} UniffiForeignFutureResultF32;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F32
+typedef void (*UniffiForeignFutureCompleteF32)(uint64_t, UniffiForeignFutureResultF32
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F64
+typedef struct UniffiForeignFutureResultF64 {
+    double returnValue;
+    RustCallStatus callStatus;
+} UniffiForeignFutureResultF64;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F64
+typedef void (*UniffiForeignFutureCompleteF64)(uint64_t, UniffiForeignFutureResultF64
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_RUST_BUFFER
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_RUST_BUFFER
+typedef struct UniffiForeignFutureResultRustBuffer {
+    RustBuffer returnValue;
+    RustCallStatus callStatus;
+} UniffiForeignFutureResultRustBuffer;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_RUST_BUFFER
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_RUST_BUFFER
+typedef void (*UniffiForeignFutureCompleteRustBuffer)(uint64_t, UniffiForeignFutureResultRustBuffer
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_VOID
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_VOID
+typedef struct UniffiForeignFutureResultVoid {
+    RustCallStatus callStatus;
+} UniffiForeignFutureResultVoid;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_VOID
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_VOID
+typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureResultVoid
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_ADD_CONTACT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_ADD_CONTACT
 RustBuffer uniffi_sphinxrs_fn_func_add_contact(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer to_pubkey, RustBuffer route_hint, RustBuffer my_alias, RustBuffer my_img, uint64_t amt_msat, RustBuffer invite_code, RustBuffer their_alias, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_get_contact(RustBuffer state, RustBuffer pubkey, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_list_contacts(RustBuffer state, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_contact_pubkey_by_child_index(RustBuffer state, uint64_t child_idx, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(RustBuffer seed, RustBuffer state, RustBuffer child, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_get_tribe_management_topic(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_initial_setup(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer device, RustBuffer invite_code, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_fetch_msgs(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t last_msg_idx, RustBuffer limit, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_handle(RustBuffer topic, RustBuffer payload, RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer my_alias, RustBuffer my_img, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_send(RustBuffer seed, RustBuffer unique_time, RustBuffer to, uint8_t msg_type, RustBuffer msg_json, RustBuffer state, RustBuffer my_alias, RustBuffer my_img, uint64_t amt_msat, int8_t is_tribe, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_keysend(RustBuffer seed, RustBuffer unique_time, RustBuffer to, RustBuffer state, uint64_t amt_msat, RustBuffer data, RustBuffer route_hint, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_pay(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer bolt11, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_make_media_token(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer host, RustBuffer muid, RustBuffer to, uint32_t expiry, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_make_media_token_with_meta(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer host, RustBuffer muid, RustBuffer to, uint32_t expiry, RustBuffer meta, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_make_media_token_with_price(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer host, RustBuffer muid, RustBuffer to, uint32_t expiry, uint64_t price, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_request_invoice(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t amt_msat, RustBuffer description, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_make_invoice(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t amt_msat, RustBuffer description, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_pay_invoice(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer bolt11, RustBuffer overpay_msat, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_pay_contact_invoice(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer bolt11, RustBuffer my_alias, RustBuffer my_img, int8_t is_tribe, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_payment_hash_from_invoice(RustBuffer bolt11, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_parse_invoice(RustBuffer invoice_json, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_create_tribe(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_json, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_join_tribe(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_pubkey, RustBuffer tribe_route_hint, RustBuffer alias, uint64_t amt_msat, int8_t is_private, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_list_tribe_members(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_pubkey, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_make_invite(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer host, uint64_t amt_msat, RustBuffer my_alias, RustBuffer tribe_host, RustBuffer tribe_pubkey, RustBuffer inviter_pubkey, RustBuffer inviter_route_hint, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_process_invite(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer invite_qr, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_parse_invite(RustBuffer invite_qr, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_code_from_invite(RustBuffer invite_qr, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_cancel_invite(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer invite_code, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_get_default_tribe_server(RustBuffer state, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_read(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer pubkey, uint64_t msg_idx, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_get_reads(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_mute(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer pubkey, uint8_t mute_level, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_get_mutes(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_set_push_token(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer push_token, RustBuffer push_key, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_set_push_token_for_app(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer push_token, RustBuffer push_key, RustBuffer app_id, RustBuffer push_environment, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_set_active(RustBuffer seed, RustBuffer unique_time, RustBuffer state, int8_t active, RustBuffer ttl_secs, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_read_all(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_unregister_push_token_for_app(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer app_id, RustCallStatus *_Nonnull out_status
-);
-uint64_t uniffi_sphinxrs_fn_func_decrypt_child_index(RustBuffer encrypted_child, RustBuffer push_key, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_get_msgs_counts(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_fetch_msgs_batch(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t last_msg_idx, RustBuffer limit, RustBuffer reverse, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_fetch_msgs_batch_per_contact(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t last_msg_idx, RustBuffer limit, RustBuffer reverse, RustBuffer contact, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_fetch_msgs_batch_okkey(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t last_msg_idx, RustBuffer limit, RustBuffer reverse, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_fetch_first_msgs_per_key(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t last_msg_idx, RustBuffer limit, RustBuffer reverse, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_fetch_payments(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer since, RustBuffer limit, RustBuffer scid, RustBuffer remote_only, RustBuffer min_msat, RustBuffer reverse, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_get_tags(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tags, RustBuffer pubkey, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_delete_msgs(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer pubkey, RustBuffer msg_idxs, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_update_tribe(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_json, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_delete_tribe(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_pubkey, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_show_senders(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_pubkey, RustBuffer member_pubkey, int8_t on, RustCallStatus *_Nonnull out_status
-);
-RustBuffer uniffi_sphinxrs_fn_func_show_senders_onion(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_pubkey, RustBuffer member_pubkey, int8_t on, uint64_t amt_msat, RustBuffer alias, RustCallStatus *_Nonnull out_status
-);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_ADD_NODE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_ADD_NODE
 RustBuffer uniffi_sphinxrs_fn_func_add_node(RustBuffer node, RustCallStatus *_Nonnull out_status
 );
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_AGENT_SEED
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_AGENT_SEED
+RustBuffer uniffi_sphinxrs_fn_func_agent_seed(RustBuffer seed, uint32_t n, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_BUILD_REQUEST
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_BUILD_REQUEST
+RustBuffer uniffi_sphinxrs_fn_func_build_request(RustBuffer msg, RustBuffer secret, uint64_t nonce, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CANCEL_INVITE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CANCEL_INVITE
+RustBuffer uniffi_sphinxrs_fn_func_cancel_invite(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer invite_code, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CODE_FROM_INVITE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CODE_FROM_INVITE
+RustBuffer uniffi_sphinxrs_fn_func_code_from_invite(RustBuffer invite_qr, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CONCAT_ROUTE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CONCAT_ROUTE
 RustBuffer uniffi_sphinxrs_fn_func_concat_route(RustBuffer state, RustBuffer end_hops, RustBuffer router_pubkey, uint64_t amt_msat, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_ping_done(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t ping_ts, RustCallStatus *_Nonnull out_status
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CONTACT_PUBKEY_BY_CHILD_INDEX
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CONTACT_PUBKEY_BY_CHILD_INDEX
+RustBuffer uniffi_sphinxrs_fn_func_contact_pubkey_by_child_index(RustBuffer state, uint64_t child_idx, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_fetch_pings(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CONTACT_PUBKEY_BY_ENCRYPTED_CHILD
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CONTACT_PUBKEY_BY_ENCRYPTED_CHILD
+RustBuffer uniffi_sphinxrs_fn_func_contact_pubkey_by_encrypted_child(RustBuffer seed, RustBuffer state, RustBuffer child, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_id_from_macaroon(RustBuffer macaroon, RustCallStatus *_Nonnull out_status
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CREATE_KEYSEND
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CREATE_KEYSEND
+RustBuffer uniffi_sphinxrs_fn_func_create_keysend(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer hops, uint64_t msat, RustBuffer rhash, RustBuffer payload, uint32_t curr_height, RustBuffer preimage, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_find_route(RustBuffer state, RustBuffer to_pubkey, RustBuffer route_hint, uint64_t amt_msat, RustCallStatus *_Nonnull out_status
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CREATE_KEYSEND_MSG
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CREATE_KEYSEND_MSG
+RustBuffer uniffi_sphinxrs_fn_func_create_keysend_msg(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer hops, uint64_t msat, RustBuffer rhash, RustBuffer msg_json, uint32_t curr_height, RustBuffer preimage, RustCallStatus *_Nonnull out_status
 );
-RustBuffer uniffi_sphinxrs_fn_func_parse_server_status(RustBuffer payload, RustCallStatus *_Nonnull out_status
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CREATE_ONION
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CREATE_ONION
+RustBuffer uniffi_sphinxrs_fn_func_create_onion(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer hops, RustBuffer payload, RustCallStatus *_Nonnull out_status
 );
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CREATE_ONION_MSG
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CREATE_ONION_MSG
+RustBuffer uniffi_sphinxrs_fn_func_create_onion_msg(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer hops, RustBuffer json, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CREATE_TRIBE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_CREATE_TRIBE
+RustBuffer uniffi_sphinxrs_fn_func_create_tribe(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_json, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_DECRYPT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_DECRYPT
+RustBuffer uniffi_sphinxrs_fn_func_decrypt(RustBuffer ciphertext, RustBuffer secret, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_DECRYPT_CHILD_INDEX
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_DECRYPT_CHILD_INDEX
+uint64_t uniffi_sphinxrs_fn_func_decrypt_child_index(RustBuffer encrypted_child, RustBuffer push_key, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_DELETE_MSGS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_DELETE_MSGS
+RustBuffer uniffi_sphinxrs_fn_func_delete_msgs(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer pubkey, RustBuffer msg_idxs, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_DELETE_TRIBE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_DELETE_TRIBE
+RustBuffer uniffi_sphinxrs_fn_func_delete_tribe(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_pubkey, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_DERIVE_SHARED_SECRET
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_DERIVE_SHARED_SECRET
+RustBuffer uniffi_sphinxrs_fn_func_derive_shared_secret(RustBuffer their_pubkey, RustBuffer my_secret_key, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_ENCRYPT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_ENCRYPT
+RustBuffer uniffi_sphinxrs_fn_func_encrypt(RustBuffer plaintext, RustBuffer secret, RustBuffer nonce, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_ENTROPY_FROM_MNEMONIC
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_ENTROPY_FROM_MNEMONIC
+RustBuffer uniffi_sphinxrs_fn_func_entropy_from_mnemonic(RustBuffer mnemonic, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_ENTROPY_TO_SEED
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_ENTROPY_TO_SEED
+RustBuffer uniffi_sphinxrs_fn_func_entropy_to_seed(RustBuffer entropy, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_EVALUATE_SERVER_HEALTH
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_EVALUATE_SERVER_HEALTH
 RustBuffer uniffi_sphinxrs_fn_func_evaluate_server_health(RustBuffer last, uint64_t last_seen_ms, uint64_t now_ms, uint64_t interval_ms, uint32_t max_missed, RustCallStatus *_Nonnull out_status
 );
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FETCH_FIRST_MSGS_PER_KEY
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FETCH_FIRST_MSGS_PER_KEY
+RustBuffer uniffi_sphinxrs_fn_func_fetch_first_msgs_per_key(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t last_msg_idx, RustBuffer limit, RustBuffer reverse, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FETCH_MSGS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FETCH_MSGS
+RustBuffer uniffi_sphinxrs_fn_func_fetch_msgs(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t last_msg_idx, RustBuffer limit, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FETCH_MSGS_BATCH
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FETCH_MSGS_BATCH
+RustBuffer uniffi_sphinxrs_fn_func_fetch_msgs_batch(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t last_msg_idx, RustBuffer limit, RustBuffer reverse, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FETCH_MSGS_BATCH_OKKEY
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FETCH_MSGS_BATCH_OKKEY
+RustBuffer uniffi_sphinxrs_fn_func_fetch_msgs_batch_okkey(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t last_msg_idx, RustBuffer limit, RustBuffer reverse, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FETCH_MSGS_BATCH_PER_CONTACT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FETCH_MSGS_BATCH_PER_CONTACT
+RustBuffer uniffi_sphinxrs_fn_func_fetch_msgs_batch_per_contact(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t last_msg_idx, RustBuffer limit, RustBuffer reverse, RustBuffer contact, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FETCH_PAYMENTS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FETCH_PAYMENTS
+RustBuffer uniffi_sphinxrs_fn_func_fetch_payments(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer since, RustBuffer limit, RustBuffer scid, RustBuffer remote_only, RustBuffer min_msat, RustBuffer reverse, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FETCH_PINGS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FETCH_PINGS
+RustBuffer uniffi_sphinxrs_fn_func_fetch_pings(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FIND_ROUTE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_FIND_ROUTE
+RustBuffer uniffi_sphinxrs_fn_func_find_route(RustBuffer state, RustBuffer to_pubkey, RustBuffer route_hint, uint64_t amt_msat, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_BLOCKHEIGHT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_BLOCKHEIGHT
+RustBuffer uniffi_sphinxrs_fn_func_get_blockheight(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_CONTACT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_CONTACT
+RustBuffer uniffi_sphinxrs_fn_func_get_contact(RustBuffer state, RustBuffer pubkey, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_DEFAULT_TRIBE_SERVER
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_DEFAULT_TRIBE_SERVER
+RustBuffer uniffi_sphinxrs_fn_func_get_default_tribe_server(RustBuffer state, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_MSGS_COUNTS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_MSGS_COUNTS
+RustBuffer uniffi_sphinxrs_fn_func_get_msgs_counts(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_MUTES
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_MUTES
+RustBuffer uniffi_sphinxrs_fn_func_get_mutes(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_READS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_READS
+RustBuffer uniffi_sphinxrs_fn_func_get_reads(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_TAGS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_TAGS
+RustBuffer uniffi_sphinxrs_fn_func_get_tags(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tags, RustBuffer pubkey, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_TRIBE_MANAGEMENT_TOPIC
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_GET_TRIBE_MANAGEMENT_TOPIC
+RustBuffer uniffi_sphinxrs_fn_func_get_tribe_management_topic(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_HANDLE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_HANDLE
+RustBuffer uniffi_sphinxrs_fn_func_handle(RustBuffer topic, RustBuffer payload, RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer my_alias, RustBuffer my_img, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_ID_FROM_MACAROON
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_ID_FROM_MACAROON
+RustBuffer uniffi_sphinxrs_fn_func_id_from_macaroon(RustBuffer macaroon, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_INITIAL_SETUP
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_INITIAL_SETUP
+RustBuffer uniffi_sphinxrs_fn_func_initial_setup(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer device, RustBuffer invite_code, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_JOIN_TRIBE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_JOIN_TRIBE
+RustBuffer uniffi_sphinxrs_fn_func_join_tribe(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_pubkey, RustBuffer tribe_route_hint, RustBuffer alias, uint64_t amt_msat, int8_t is_private, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_KEYSEND
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_KEYSEND
+RustBuffer uniffi_sphinxrs_fn_func_keysend(RustBuffer seed, RustBuffer unique_time, RustBuffer to, RustBuffer state, uint64_t amt_msat, RustBuffer data, RustBuffer route_hint, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_LIST_CONTACTS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_LIST_CONTACTS
+RustBuffer uniffi_sphinxrs_fn_func_list_contacts(RustBuffer state, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_LIST_TRIBE_MEMBERS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_LIST_TRIBE_MEMBERS
+RustBuffer uniffi_sphinxrs_fn_func_list_tribe_members(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_pubkey, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MAKE_AUTH_TOKEN
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MAKE_AUTH_TOKEN
+RustBuffer uniffi_sphinxrs_fn_func_make_auth_token(uint32_t ts, RustBuffer secret, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MAKE_INVITE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MAKE_INVITE
+RustBuffer uniffi_sphinxrs_fn_func_make_invite(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer host, uint64_t amt_msat, RustBuffer my_alias, RustBuffer tribe_host, RustBuffer tribe_pubkey, RustBuffer inviter_pubkey, RustBuffer inviter_route_hint, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MAKE_INVOICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MAKE_INVOICE
+RustBuffer uniffi_sphinxrs_fn_func_make_invoice(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t amt_msat, RustBuffer description, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MAKE_MEDIA_TOKEN
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MAKE_MEDIA_TOKEN
+RustBuffer uniffi_sphinxrs_fn_func_make_media_token(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer host, RustBuffer muid, RustBuffer to, uint32_t expiry, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MAKE_MEDIA_TOKEN_WITH_META
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MAKE_MEDIA_TOKEN_WITH_META
+RustBuffer uniffi_sphinxrs_fn_func_make_media_token_with_meta(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer host, RustBuffer muid, RustBuffer to, uint32_t expiry, RustBuffer meta, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MAKE_MEDIA_TOKEN_WITH_PRICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MAKE_MEDIA_TOKEN_WITH_PRICE
+RustBuffer uniffi_sphinxrs_fn_func_make_media_token_with_price(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer host, RustBuffer muid, RustBuffer to, uint32_t expiry, uint64_t price, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MNEMONIC_FROM_ENTROPY
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MNEMONIC_FROM_ENTROPY
+RustBuffer uniffi_sphinxrs_fn_func_mnemonic_from_entropy(RustBuffer entropy, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MNEMONIC_TO_SEED
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MNEMONIC_TO_SEED
+RustBuffer uniffi_sphinxrs_fn_func_mnemonic_to_seed(RustBuffer mnemonic, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MUTE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_MUTE
+RustBuffer uniffi_sphinxrs_fn_func_mute(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer pubkey, uint8_t mute_level, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_NODE_KEYS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_NODE_KEYS
+RustBuffer uniffi_sphinxrs_fn_func_node_keys(RustBuffer net, RustBuffer seed, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PARSE_INVITE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PARSE_INVITE
+RustBuffer uniffi_sphinxrs_fn_func_parse_invite(RustBuffer invite_qr, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PARSE_INVOICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PARSE_INVOICE
+RustBuffer uniffi_sphinxrs_fn_func_parse_invoice(RustBuffer invoice_json, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PARSE_MIXER_ERROR_CODE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PARSE_MIXER_ERROR_CODE
 RustBuffer uniffi_sphinxrs_fn_func_parse_mixer_error_code(RustBuffer raw, RustCallStatus *_Nonnull out_status
 );
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PARSE_RESPONSE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PARSE_RESPONSE
+RustBuffer uniffi_sphinxrs_fn_func_parse_response(RustBuffer res, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PARSE_SERVER_STATUS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PARSE_SERVER_STATUS
+RustBuffer uniffi_sphinxrs_fn_func_parse_server_status(RustBuffer payload, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PAY
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PAY
+RustBuffer uniffi_sphinxrs_fn_func_pay(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer bolt11, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PAY_CONTACT_INVOICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PAY_CONTACT_INVOICE
+RustBuffer uniffi_sphinxrs_fn_func_pay_contact_invoice(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer bolt11, RustBuffer my_alias, RustBuffer my_img, int8_t is_tribe, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PAY_INVOICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PAY_INVOICE
+RustBuffer uniffi_sphinxrs_fn_func_pay_invoice(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer bolt11, RustBuffer overpay_msat, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PAYMENT_HASH_FROM_INVOICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PAYMENT_HASH_FROM_INVOICE
+RustBuffer uniffi_sphinxrs_fn_func_payment_hash_from_invoice(RustBuffer bolt11, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PEEL_ONION
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PEEL_ONION
+RustBuffer uniffi_sphinxrs_fn_func_peel_onion(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PEEL_ONION_MSG
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PEEL_ONION_MSG
+RustBuffer uniffi_sphinxrs_fn_func_peel_onion_msg(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PEEL_PAYMENT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PEEL_PAYMENT
+RustBuffer uniffi_sphinxrs_fn_func_peel_payment(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustBuffer rhash, uint32_t cur_height, uint32_t cltv_expiry, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PEEL_PAYMENT_MSG
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PEEL_PAYMENT_MSG
+RustBuffer uniffi_sphinxrs_fn_func_peel_payment_msg(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer payload, RustBuffer rhash, uint32_t cur_height, uint32_t cltv_expiry, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PING_DONE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PING_DONE
+RustBuffer uniffi_sphinxrs_fn_func_ping_done(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t ping_ts, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PROCESS_INVITE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PROCESS_INVITE
+RustBuffer uniffi_sphinxrs_fn_func_process_invite(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer invite_qr, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PUBKEY_FROM_SECRET_KEY
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PUBKEY_FROM_SECRET_KEY
+RustBuffer uniffi_sphinxrs_fn_func_pubkey_from_secret_key(RustBuffer my_secret_key, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PUBKEY_FROM_SEED
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_PUBKEY_FROM_SEED
+RustBuffer uniffi_sphinxrs_fn_func_pubkey_from_seed(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_READ
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_READ
+RustBuffer uniffi_sphinxrs_fn_func_read(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer pubkey, uint64_t msg_idx, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_READ_ALL
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_READ_ALL
+RustBuffer uniffi_sphinxrs_fn_func_read_all(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_REQUEST_INVOICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_REQUEST_INVOICE
+RustBuffer uniffi_sphinxrs_fn_func_request_invoice(RustBuffer seed, RustBuffer unique_time, RustBuffer state, uint64_t amt_msat, RustBuffer description, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_ROOT_SIGN_MS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_ROOT_SIGN_MS
+RustBuffer uniffi_sphinxrs_fn_func_root_sign_ms(RustBuffer seed, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SEND
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SEND
+RustBuffer uniffi_sphinxrs_fn_func_send(RustBuffer seed, RustBuffer unique_time, RustBuffer to, uint8_t msg_type, RustBuffer msg_json, RustBuffer state, RustBuffer my_alias, RustBuffer my_img, uint64_t amt_msat, int8_t is_tribe, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SERVER_STATUS_TOPIC
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SERVER_STATUS_TOPIC
 RustBuffer uniffi_sphinxrs_fn_func_server_status_topic(RustCallStatus *_Nonnull out_status
     
 );
-RustBuffer ffi_sphinxrs_rustbuffer_alloc(int32_t size, RustCallStatus *_Nonnull out_status
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SET_ACTIVE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SET_ACTIVE
+RustBuffer uniffi_sphinxrs_fn_func_set_active(RustBuffer seed, RustBuffer unique_time, RustBuffer state, int8_t active, RustBuffer ttl_secs, RustCallStatus *_Nonnull out_status
 );
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SET_BLOCKHEIGHT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SET_BLOCKHEIGHT
+RustBuffer uniffi_sphinxrs_fn_func_set_blockheight(uint32_t blockheight, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SET_DEVICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SET_DEVICE
+RustBuffer uniffi_sphinxrs_fn_func_set_device(RustBuffer device, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SET_NETWORK
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SET_NETWORK
+RustBuffer uniffi_sphinxrs_fn_func_set_network(RustBuffer network, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SET_PUSH_TOKEN
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SET_PUSH_TOKEN
+RustBuffer uniffi_sphinxrs_fn_func_set_push_token(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer push_token, RustBuffer push_key, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SET_PUSH_TOKEN_FOR_APP
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SET_PUSH_TOKEN_FOR_APP
+RustBuffer uniffi_sphinxrs_fn_func_set_push_token_for_app(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer push_token, RustBuffer push_key, RustBuffer app_id, RustBuffer push_environment, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SHA_256
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SHA_256
+RustBuffer uniffi_sphinxrs_fn_func_sha_256(RustBuffer msg, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SHOW_SENDERS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SHOW_SENDERS
+RustBuffer uniffi_sphinxrs_fn_func_show_senders(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_pubkey, RustBuffer member_pubkey, int8_t on, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SHOW_SENDERS_ONION
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SHOW_SENDERS_ONION
+RustBuffer uniffi_sphinxrs_fn_func_show_senders_onion(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_pubkey, RustBuffer member_pubkey, int8_t on, uint64_t amt_msat, RustBuffer alias, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SIGN_BASE64
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SIGN_BASE64
+RustBuffer uniffi_sphinxrs_fn_func_sign_base64(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer msg, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SIGN_BYTES
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SIGN_BYTES
+RustBuffer uniffi_sphinxrs_fn_func_sign_bytes(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer msg, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SIGN_MS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SIGN_MS
+RustBuffer uniffi_sphinxrs_fn_func_sign_ms(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SIGNED_TIMESTAMP
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_SIGNED_TIMESTAMP
+RustBuffer uniffi_sphinxrs_fn_func_signed_timestamp(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_UNREGISTER_PUSH_TOKEN_FOR_APP
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_UNREGISTER_PUSH_TOKEN_FOR_APP
+RustBuffer uniffi_sphinxrs_fn_func_unregister_push_token_for_app(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer app_id, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_UPDATE_TRIBE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_UPDATE_TRIBE
+RustBuffer uniffi_sphinxrs_fn_func_update_tribe(RustBuffer seed, RustBuffer unique_time, RustBuffer state, RustBuffer tribe_server_pubkey, RustBuffer tribe_json, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_XPUB_FROM_SEED
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_FN_FUNC_XPUB_FROM_SEED
+RustBuffer uniffi_sphinxrs_fn_func_xpub_from_seed(RustBuffer seed, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUSTBUFFER_ALLOC
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUSTBUFFER_ALLOC
+RustBuffer ffi_sphinxrs_rustbuffer_alloc(uint64_t size, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUSTBUFFER_FROM_BYTES
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUSTBUFFER_FROM_BYTES
 RustBuffer ffi_sphinxrs_rustbuffer_from_bytes(ForeignBytes bytes, RustCallStatus *_Nonnull out_status
 );
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUSTBUFFER_FREE
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUSTBUFFER_FREE
 void ffi_sphinxrs_rustbuffer_free(RustBuffer buf, RustCallStatus *_Nonnull out_status
 );
-RustBuffer ffi_sphinxrs_rustbuffer_reserve(RustBuffer buf, int32_t additional, RustCallStatus *_Nonnull out_status
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUSTBUFFER_RESERVE
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUSTBUFFER_RESERVE
+RustBuffer ffi_sphinxrs_rustbuffer_reserve(RustBuffer buf, uint64_t additional, RustCallStatus *_Nonnull out_status
 );
-uint16_t uniffi_sphinxrs_checksum_func_pubkey_from_secret_key(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_U8
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_U8
+void ffi_sphinxrs_rust_future_poll_u8(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
 );
-uint16_t uniffi_sphinxrs_checksum_func_derive_shared_secret(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_U8
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_U8
+void ffi_sphinxrs_rust_future_cancel_u8(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_encrypt(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_U8
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_U8
+void ffi_sphinxrs_rust_future_free_u8(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_decrypt(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_U8
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_U8
+uint8_t ffi_sphinxrs_rust_future_complete_u8(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
-uint16_t uniffi_sphinxrs_checksum_func_node_keys(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_I8
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_I8
+void ffi_sphinxrs_rust_future_poll_i8(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
 );
-uint16_t uniffi_sphinxrs_checksum_func_mnemonic_from_entropy(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_I8
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_I8
+void ffi_sphinxrs_rust_future_cancel_i8(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_entropy_from_mnemonic(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_I8
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_I8
+void ffi_sphinxrs_rust_future_free_i8(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_mnemonic_to_seed(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_I8
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_I8
+int8_t ffi_sphinxrs_rust_future_complete_i8(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
-uint16_t uniffi_sphinxrs_checksum_func_entropy_to_seed(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_U16
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_U16
+void ffi_sphinxrs_rust_future_poll_u16(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
 );
-uint16_t uniffi_sphinxrs_checksum_func_agent_seed(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_U16
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_U16
+void ffi_sphinxrs_rust_future_cancel_u16(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_build_request(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_U16
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_U16
+void ffi_sphinxrs_rust_future_free_u16(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_parse_response(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_U16
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_U16
+uint16_t ffi_sphinxrs_rust_future_complete_u16(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
-uint16_t uniffi_sphinxrs_checksum_func_make_auth_token(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_I16
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_I16
+void ffi_sphinxrs_rust_future_poll_i16(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
 );
-uint16_t uniffi_sphinxrs_checksum_func_sha_256(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_I16
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_I16
+void ffi_sphinxrs_rust_future_cancel_i16(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_create_onion(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_I16
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_I16
+void ffi_sphinxrs_rust_future_free_i16(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_create_onion_msg(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_I16
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_I16
+int16_t ffi_sphinxrs_rust_future_complete_i16(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
-uint16_t uniffi_sphinxrs_checksum_func_create_keysend(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_U32
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_U32
+void ffi_sphinxrs_rust_future_poll_u32(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
 );
-uint16_t uniffi_sphinxrs_checksum_func_create_keysend_msg(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_U32
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_U32
+void ffi_sphinxrs_rust_future_cancel_u32(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_peel_onion(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_U32
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_U32
+void ffi_sphinxrs_rust_future_free_u32(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_peel_onion_msg(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_U32
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_U32
+uint32_t ffi_sphinxrs_rust_future_complete_u32(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
-uint16_t uniffi_sphinxrs_checksum_func_peel_payment(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_I32
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_I32
+void ffi_sphinxrs_rust_future_poll_i32(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
 );
-uint16_t uniffi_sphinxrs_checksum_func_peel_payment_msg(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_I32
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_I32
+void ffi_sphinxrs_rust_future_cancel_i32(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_sign_ms(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_I32
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_I32
+void ffi_sphinxrs_rust_future_free_i32(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_signed_timestamp(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_I32
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_I32
+int32_t ffi_sphinxrs_rust_future_complete_i32(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
-uint16_t uniffi_sphinxrs_checksum_func_sign_bytes(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_U64
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_U64
+void ffi_sphinxrs_rust_future_poll_u64(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
 );
-uint16_t uniffi_sphinxrs_checksum_func_sign_base64(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_U64
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_U64
+void ffi_sphinxrs_rust_future_cancel_u64(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_pubkey_from_seed(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_U64
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_U64
+void ffi_sphinxrs_rust_future_free_u64(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_root_sign_ms(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_U64
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_U64
+uint64_t ffi_sphinxrs_rust_future_complete_u64(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
-uint16_t uniffi_sphinxrs_checksum_func_xpub_from_seed(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_I64
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_I64
+void ffi_sphinxrs_rust_future_poll_i64(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
 );
-uint16_t uniffi_sphinxrs_checksum_func_set_network(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_I64
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_I64
+void ffi_sphinxrs_rust_future_cancel_i64(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_set_device(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_I64
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_I64
+void ffi_sphinxrs_rust_future_free_i64(uint64_t handle
 );
-uint16_t uniffi_sphinxrs_checksum_func_set_blockheight(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_I64
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_I64
+int64_t ffi_sphinxrs_rust_future_complete_i64(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
-uint16_t uniffi_sphinxrs_checksum_func_get_blockheight(void
-    
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_F32
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_F32
+void ffi_sphinxrs_rust_future_poll_f32(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
 );
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_F32
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_F32
+void ffi_sphinxrs_rust_future_cancel_f32(uint64_t handle
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_F32
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_F32
+void ffi_sphinxrs_rust_future_free_f32(uint64_t handle
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_F32
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_F32
+float ffi_sphinxrs_rust_future_complete_f32(uint64_t handle, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_F64
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_F64
+void ffi_sphinxrs_rust_future_poll_f64(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_F64
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_F64
+void ffi_sphinxrs_rust_future_cancel_f64(uint64_t handle
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_F64
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_F64
+void ffi_sphinxrs_rust_future_free_f64(uint64_t handle
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_F64
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_F64
+double ffi_sphinxrs_rust_future_complete_f64(uint64_t handle, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_RUST_BUFFER
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_RUST_BUFFER
+void ffi_sphinxrs_rust_future_poll_rust_buffer(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_RUST_BUFFER
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_RUST_BUFFER
+void ffi_sphinxrs_rust_future_cancel_rust_buffer(uint64_t handle
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_RUST_BUFFER
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_RUST_BUFFER
+void ffi_sphinxrs_rust_future_free_rust_buffer(uint64_t handle
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_RUST_BUFFER
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_RUST_BUFFER
+RustBuffer ffi_sphinxrs_rust_future_complete_rust_buffer(uint64_t handle, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_VOID
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_POLL_VOID
+void ffi_sphinxrs_rust_future_poll_void(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_VOID
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_CANCEL_VOID
+void ffi_sphinxrs_rust_future_cancel_void(uint64_t handle
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_VOID
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_FREE_VOID
+void ffi_sphinxrs_rust_future_free_void(uint64_t handle
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_VOID
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_RUST_FUTURE_COMPLETE_VOID
+void ffi_sphinxrs_rust_future_complete_void(uint64_t handle, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_ADD_CONTACT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_ADD_CONTACT
 uint16_t uniffi_sphinxrs_checksum_func_add_contact(void
     
 );
-uint16_t uniffi_sphinxrs_checksum_func_get_contact(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_list_contacts(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_contact_pubkey_by_child_index(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_contact_pubkey_by_encrypted_child(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_get_tribe_management_topic(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_initial_setup(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_fetch_msgs(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_handle(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_send(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_keysend(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_pay(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_make_media_token(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_make_media_token_with_meta(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_make_media_token_with_price(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_request_invoice(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_make_invoice(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_pay_invoice(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_pay_contact_invoice(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_payment_hash_from_invoice(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_parse_invoice(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_create_tribe(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_join_tribe(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_list_tribe_members(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_make_invite(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_process_invite(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_parse_invite(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_code_from_invite(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_cancel_invite(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_get_default_tribe_server(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_read(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_get_reads(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_mute(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_get_mutes(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_set_push_token(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_set_push_token_for_app(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_set_active(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_read_all(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_unregister_push_token_for_app(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_decrypt_child_index(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_get_msgs_counts(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_fetch_msgs_batch(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_fetch_msgs_batch_per_contact(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_fetch_msgs_batch_okkey(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_fetch_first_msgs_per_key(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_fetch_payments(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_get_tags(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_delete_msgs(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_update_tribe(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_delete_tribe(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_show_senders(void
-    
-);
-uint16_t uniffi_sphinxrs_checksum_func_show_senders_onion(void
-    
-);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_ADD_NODE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_ADD_NODE
 uint16_t uniffi_sphinxrs_checksum_func_add_node(void
     
 );
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_AGENT_SEED
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_AGENT_SEED
+uint16_t uniffi_sphinxrs_checksum_func_agent_seed(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_BUILD_REQUEST
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_BUILD_REQUEST
+uint16_t uniffi_sphinxrs_checksum_func_build_request(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CANCEL_INVITE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CANCEL_INVITE
+uint16_t uniffi_sphinxrs_checksum_func_cancel_invite(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CODE_FROM_INVITE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CODE_FROM_INVITE
+uint16_t uniffi_sphinxrs_checksum_func_code_from_invite(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CONCAT_ROUTE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CONCAT_ROUTE
 uint16_t uniffi_sphinxrs_checksum_func_concat_route(void
     
 );
-uint16_t uniffi_sphinxrs_checksum_func_ping_done(void
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CONTACT_PUBKEY_BY_CHILD_INDEX
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CONTACT_PUBKEY_BY_CHILD_INDEX
+uint16_t uniffi_sphinxrs_checksum_func_contact_pubkey_by_child_index(void
     
 );
-uint16_t uniffi_sphinxrs_checksum_func_fetch_pings(void
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CONTACT_PUBKEY_BY_ENCRYPTED_CHILD
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CONTACT_PUBKEY_BY_ENCRYPTED_CHILD
+uint16_t uniffi_sphinxrs_checksum_func_contact_pubkey_by_encrypted_child(void
     
 );
-uint16_t uniffi_sphinxrs_checksum_func_id_from_macaroon(void
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CREATE_KEYSEND
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CREATE_KEYSEND
+uint16_t uniffi_sphinxrs_checksum_func_create_keysend(void
     
 );
-uint16_t uniffi_sphinxrs_checksum_func_find_route(void
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CREATE_KEYSEND_MSG
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CREATE_KEYSEND_MSG
+uint16_t uniffi_sphinxrs_checksum_func_create_keysend_msg(void
     
 );
-uint16_t uniffi_sphinxrs_checksum_func_parse_server_status(void
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CREATE_ONION
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CREATE_ONION
+uint16_t uniffi_sphinxrs_checksum_func_create_onion(void
     
 );
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CREATE_ONION_MSG
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CREATE_ONION_MSG
+uint16_t uniffi_sphinxrs_checksum_func_create_onion_msg(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CREATE_TRIBE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_CREATE_TRIBE
+uint16_t uniffi_sphinxrs_checksum_func_create_tribe(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_DECRYPT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_DECRYPT
+uint16_t uniffi_sphinxrs_checksum_func_decrypt(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_DECRYPT_CHILD_INDEX
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_DECRYPT_CHILD_INDEX
+uint16_t uniffi_sphinxrs_checksum_func_decrypt_child_index(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_DELETE_MSGS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_DELETE_MSGS
+uint16_t uniffi_sphinxrs_checksum_func_delete_msgs(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_DELETE_TRIBE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_DELETE_TRIBE
+uint16_t uniffi_sphinxrs_checksum_func_delete_tribe(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_DERIVE_SHARED_SECRET
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_DERIVE_SHARED_SECRET
+uint16_t uniffi_sphinxrs_checksum_func_derive_shared_secret(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_ENCRYPT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_ENCRYPT
+uint16_t uniffi_sphinxrs_checksum_func_encrypt(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_ENTROPY_FROM_MNEMONIC
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_ENTROPY_FROM_MNEMONIC
+uint16_t uniffi_sphinxrs_checksum_func_entropy_from_mnemonic(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_ENTROPY_TO_SEED
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_ENTROPY_TO_SEED
+uint16_t uniffi_sphinxrs_checksum_func_entropy_to_seed(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_EVALUATE_SERVER_HEALTH
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_EVALUATE_SERVER_HEALTH
 uint16_t uniffi_sphinxrs_checksum_func_evaluate_server_health(void
     
 );
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FETCH_FIRST_MSGS_PER_KEY
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FETCH_FIRST_MSGS_PER_KEY
+uint16_t uniffi_sphinxrs_checksum_func_fetch_first_msgs_per_key(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FETCH_MSGS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FETCH_MSGS
+uint16_t uniffi_sphinxrs_checksum_func_fetch_msgs(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FETCH_MSGS_BATCH
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FETCH_MSGS_BATCH
+uint16_t uniffi_sphinxrs_checksum_func_fetch_msgs_batch(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FETCH_MSGS_BATCH_OKKEY
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FETCH_MSGS_BATCH_OKKEY
+uint16_t uniffi_sphinxrs_checksum_func_fetch_msgs_batch_okkey(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FETCH_MSGS_BATCH_PER_CONTACT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FETCH_MSGS_BATCH_PER_CONTACT
+uint16_t uniffi_sphinxrs_checksum_func_fetch_msgs_batch_per_contact(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FETCH_PAYMENTS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FETCH_PAYMENTS
+uint16_t uniffi_sphinxrs_checksum_func_fetch_payments(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FETCH_PINGS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FETCH_PINGS
+uint16_t uniffi_sphinxrs_checksum_func_fetch_pings(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FIND_ROUTE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_FIND_ROUTE
+uint16_t uniffi_sphinxrs_checksum_func_find_route(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_BLOCKHEIGHT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_BLOCKHEIGHT
+uint16_t uniffi_sphinxrs_checksum_func_get_blockheight(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_CONTACT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_CONTACT
+uint16_t uniffi_sphinxrs_checksum_func_get_contact(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_DEFAULT_TRIBE_SERVER
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_DEFAULT_TRIBE_SERVER
+uint16_t uniffi_sphinxrs_checksum_func_get_default_tribe_server(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_MSGS_COUNTS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_MSGS_COUNTS
+uint16_t uniffi_sphinxrs_checksum_func_get_msgs_counts(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_MUTES
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_MUTES
+uint16_t uniffi_sphinxrs_checksum_func_get_mutes(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_READS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_READS
+uint16_t uniffi_sphinxrs_checksum_func_get_reads(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_TAGS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_TAGS
+uint16_t uniffi_sphinxrs_checksum_func_get_tags(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_TRIBE_MANAGEMENT_TOPIC
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_GET_TRIBE_MANAGEMENT_TOPIC
+uint16_t uniffi_sphinxrs_checksum_func_get_tribe_management_topic(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_HANDLE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_HANDLE
+uint16_t uniffi_sphinxrs_checksum_func_handle(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_ID_FROM_MACAROON
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_ID_FROM_MACAROON
+uint16_t uniffi_sphinxrs_checksum_func_id_from_macaroon(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_INITIAL_SETUP
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_INITIAL_SETUP
+uint16_t uniffi_sphinxrs_checksum_func_initial_setup(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_JOIN_TRIBE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_JOIN_TRIBE
+uint16_t uniffi_sphinxrs_checksum_func_join_tribe(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_KEYSEND
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_KEYSEND
+uint16_t uniffi_sphinxrs_checksum_func_keysend(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_LIST_CONTACTS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_LIST_CONTACTS
+uint16_t uniffi_sphinxrs_checksum_func_list_contacts(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_LIST_TRIBE_MEMBERS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_LIST_TRIBE_MEMBERS
+uint16_t uniffi_sphinxrs_checksum_func_list_tribe_members(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MAKE_AUTH_TOKEN
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MAKE_AUTH_TOKEN
+uint16_t uniffi_sphinxrs_checksum_func_make_auth_token(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MAKE_INVITE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MAKE_INVITE
+uint16_t uniffi_sphinxrs_checksum_func_make_invite(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MAKE_INVOICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MAKE_INVOICE
+uint16_t uniffi_sphinxrs_checksum_func_make_invoice(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MAKE_MEDIA_TOKEN
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MAKE_MEDIA_TOKEN
+uint16_t uniffi_sphinxrs_checksum_func_make_media_token(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MAKE_MEDIA_TOKEN_WITH_META
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MAKE_MEDIA_TOKEN_WITH_META
+uint16_t uniffi_sphinxrs_checksum_func_make_media_token_with_meta(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MAKE_MEDIA_TOKEN_WITH_PRICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MAKE_MEDIA_TOKEN_WITH_PRICE
+uint16_t uniffi_sphinxrs_checksum_func_make_media_token_with_price(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MNEMONIC_FROM_ENTROPY
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MNEMONIC_FROM_ENTROPY
+uint16_t uniffi_sphinxrs_checksum_func_mnemonic_from_entropy(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MNEMONIC_TO_SEED
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MNEMONIC_TO_SEED
+uint16_t uniffi_sphinxrs_checksum_func_mnemonic_to_seed(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MUTE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_MUTE
+uint16_t uniffi_sphinxrs_checksum_func_mute(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_NODE_KEYS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_NODE_KEYS
+uint16_t uniffi_sphinxrs_checksum_func_node_keys(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PARSE_INVITE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PARSE_INVITE
+uint16_t uniffi_sphinxrs_checksum_func_parse_invite(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PARSE_INVOICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PARSE_INVOICE
+uint16_t uniffi_sphinxrs_checksum_func_parse_invoice(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PARSE_MIXER_ERROR_CODE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PARSE_MIXER_ERROR_CODE
 uint16_t uniffi_sphinxrs_checksum_func_parse_mixer_error_code(void
     
 );
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PARSE_RESPONSE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PARSE_RESPONSE
+uint16_t uniffi_sphinxrs_checksum_func_parse_response(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PARSE_SERVER_STATUS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PARSE_SERVER_STATUS
+uint16_t uniffi_sphinxrs_checksum_func_parse_server_status(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PAY
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PAY
+uint16_t uniffi_sphinxrs_checksum_func_pay(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PAY_CONTACT_INVOICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PAY_CONTACT_INVOICE
+uint16_t uniffi_sphinxrs_checksum_func_pay_contact_invoice(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PAY_INVOICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PAY_INVOICE
+uint16_t uniffi_sphinxrs_checksum_func_pay_invoice(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PAYMENT_HASH_FROM_INVOICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PAYMENT_HASH_FROM_INVOICE
+uint16_t uniffi_sphinxrs_checksum_func_payment_hash_from_invoice(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PEEL_ONION
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PEEL_ONION
+uint16_t uniffi_sphinxrs_checksum_func_peel_onion(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PEEL_ONION_MSG
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PEEL_ONION_MSG
+uint16_t uniffi_sphinxrs_checksum_func_peel_onion_msg(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PEEL_PAYMENT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PEEL_PAYMENT
+uint16_t uniffi_sphinxrs_checksum_func_peel_payment(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PEEL_PAYMENT_MSG
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PEEL_PAYMENT_MSG
+uint16_t uniffi_sphinxrs_checksum_func_peel_payment_msg(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PING_DONE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PING_DONE
+uint16_t uniffi_sphinxrs_checksum_func_ping_done(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PROCESS_INVITE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PROCESS_INVITE
+uint16_t uniffi_sphinxrs_checksum_func_process_invite(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PUBKEY_FROM_SECRET_KEY
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PUBKEY_FROM_SECRET_KEY
+uint16_t uniffi_sphinxrs_checksum_func_pubkey_from_secret_key(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PUBKEY_FROM_SEED
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_PUBKEY_FROM_SEED
+uint16_t uniffi_sphinxrs_checksum_func_pubkey_from_seed(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_READ
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_READ
+uint16_t uniffi_sphinxrs_checksum_func_read(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_READ_ALL
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_READ_ALL
+uint16_t uniffi_sphinxrs_checksum_func_read_all(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_REQUEST_INVOICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_REQUEST_INVOICE
+uint16_t uniffi_sphinxrs_checksum_func_request_invoice(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_ROOT_SIGN_MS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_ROOT_SIGN_MS
+uint16_t uniffi_sphinxrs_checksum_func_root_sign_ms(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SEND
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SEND
+uint16_t uniffi_sphinxrs_checksum_func_send(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SERVER_STATUS_TOPIC
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SERVER_STATUS_TOPIC
 uint16_t uniffi_sphinxrs_checksum_func_server_status_topic(void
     
 );
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SET_ACTIVE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SET_ACTIVE
+uint16_t uniffi_sphinxrs_checksum_func_set_active(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SET_BLOCKHEIGHT
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SET_BLOCKHEIGHT
+uint16_t uniffi_sphinxrs_checksum_func_set_blockheight(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SET_DEVICE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SET_DEVICE
+uint16_t uniffi_sphinxrs_checksum_func_set_device(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SET_NETWORK
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SET_NETWORK
+uint16_t uniffi_sphinxrs_checksum_func_set_network(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SET_PUSH_TOKEN
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SET_PUSH_TOKEN
+uint16_t uniffi_sphinxrs_checksum_func_set_push_token(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SET_PUSH_TOKEN_FOR_APP
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SET_PUSH_TOKEN_FOR_APP
+uint16_t uniffi_sphinxrs_checksum_func_set_push_token_for_app(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SHA_256
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SHA_256
+uint16_t uniffi_sphinxrs_checksum_func_sha_256(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SHOW_SENDERS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SHOW_SENDERS
+uint16_t uniffi_sphinxrs_checksum_func_show_senders(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SHOW_SENDERS_ONION
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SHOW_SENDERS_ONION
+uint16_t uniffi_sphinxrs_checksum_func_show_senders_onion(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SIGN_BASE64
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SIGN_BASE64
+uint16_t uniffi_sphinxrs_checksum_func_sign_base64(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SIGN_BYTES
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SIGN_BYTES
+uint16_t uniffi_sphinxrs_checksum_func_sign_bytes(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SIGN_MS
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SIGN_MS
+uint16_t uniffi_sphinxrs_checksum_func_sign_ms(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SIGNED_TIMESTAMP
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_SIGNED_TIMESTAMP
+uint16_t uniffi_sphinxrs_checksum_func_signed_timestamp(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_UNREGISTER_PUSH_TOKEN_FOR_APP
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_UNREGISTER_PUSH_TOKEN_FOR_APP
+uint16_t uniffi_sphinxrs_checksum_func_unregister_push_token_for_app(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_UPDATE_TRIBE
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_UPDATE_TRIBE
+uint16_t uniffi_sphinxrs_checksum_func_update_tribe(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_XPUB_FROM_SEED
+#define UNIFFI_FFIDEF_UNIFFI_SPHINXRS_CHECKSUM_FUNC_XPUB_FROM_SEED
+uint16_t uniffi_sphinxrs_checksum_func_xpub_from_seed(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_SPHINXRS_UNIFFI_CONTRACT_VERSION
+#define UNIFFI_FFIDEF_FFI_SPHINXRS_UNIFFI_CONTRACT_VERSION
 uint32_t ffi_sphinxrs_uniffi_contract_version(void
     
 );
+#endif
 

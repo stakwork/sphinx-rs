@@ -1,5 +1,5 @@
 echo "=> compiling swift ios bindings"
-cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language swift
+cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/sphinxrs.udl --language swift --out-dir src
 
 echo "=> creating swift ios bindings"
 sed -i '' 's/module\ sphinxrsFFI/framework\ module\ sphinxrsFFI/' src/sphinxrsFFI.modulemap
