@@ -1,0 +1,4 @@
+[bindings.kotlin]
+# UniFFI 0.31.2 Kotlin checksum check fails on 64-bit ARM (sign-extended 16-bit checksums, mozilla/uniffi-rs#2897).
+# Same workaround as livekit-ffi. Bindings and library are always built together.
+omit_checksums = true
