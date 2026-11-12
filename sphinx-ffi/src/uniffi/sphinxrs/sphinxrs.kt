@@ -380,6 +380,8 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_mnemonic_to_seed(`mnemonic`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_mnemonic_to_bip39_seed(`mnemonic`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_entropy_to_seed(`entropy`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_agent_seed(`seed`: RustBuffer.ByValue,`n`: Int,_uniffi_out_err: RustCallStatus, 
@@ -417,6 +419,10 @@ internal interface _UniFFILib : Library {
     fun uniffi_sphinxrs_fn_func_sign_base64(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,`msg`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_pubkey_from_seed(`seed`: RustBuffer.ByValue,`idx`: Long,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_sign_bytes_lud05(`bip39Seed`: RustBuffer.ByValue,`domain`: RustBuffer.ByValue,`msg`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_lud05_pubkey(`bip39Seed`: RustBuffer.ByValue,`domain`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_root_sign_ms(`seed`: RustBuffer.ByValue,`time`: RustBuffer.ByValue,`network`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
@@ -578,6 +584,8 @@ internal interface _UniFFILib : Library {
     ): Short
     fun uniffi_sphinxrs_checksum_func_mnemonic_to_seed(
     ): Short
+    fun uniffi_sphinxrs_checksum_func_mnemonic_to_bip39_seed(
+    ): Short
     fun uniffi_sphinxrs_checksum_func_entropy_to_seed(
     ): Short
     fun uniffi_sphinxrs_checksum_func_agent_seed(
@@ -615,6 +623,10 @@ internal interface _UniFFILib : Library {
     fun uniffi_sphinxrs_checksum_func_sign_base64(
     ): Short
     fun uniffi_sphinxrs_checksum_func_pubkey_from_seed(
+    ): Short
+    fun uniffi_sphinxrs_checksum_func_sign_bytes_lud05(
+    ): Short
+    fun uniffi_sphinxrs_checksum_func_lud05_pubkey(
     ): Short
     fun uniffi_sphinxrs_checksum_func_root_sign_ms(
     ): Short
@@ -793,6 +805,9 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
     if (lib.uniffi_sphinxrs_checksum_func_mnemonic_to_seed() != 23084.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_sphinxrs_checksum_func_mnemonic_to_bip39_seed() != 22093.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_sphinxrs_checksum_func_entropy_to_seed() != 33710.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -848,6 +863,12 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_pubkey_from_seed() != 23394.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_sphinxrs_checksum_func_sign_bytes_lud05() != 56519.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_sphinxrs_checksum_func_lud05_pubkey() != 18360.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_root_sign_ms() != 52594.toShort()) {
@@ -1227,6 +1248,35 @@ public object FfiConverterTypeKeys: FfiConverterRustBuffer<Keys> {
     override fun write(value: Keys, buf: ByteBuffer) {
             FfiConverterString.write(value.`secret`, buf)
             FfiConverterString.write(value.`pubkey`, buf)
+    }
+}
+
+
+
+
+data class Lud05Sig (
+    var `pubkey`: String, 
+    var `sig`: String
+) {
+    
+}
+
+public object FfiConverterTypeLud05Sig: FfiConverterRustBuffer<Lud05Sig> {
+    override fun read(buf: ByteBuffer): Lud05Sig {
+        return Lud05Sig(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: Lud05Sig) = (
+            FfiConverterString.allocationSize(value.`pubkey`) +
+            FfiConverterString.allocationSize(value.`sig`)
+    )
+
+    override fun write(value: Lud05Sig, buf: ByteBuffer) {
+            FfiConverterString.write(value.`pubkey`, buf)
+            FfiConverterString.write(value.`sig`, buf)
     }
 }
 
@@ -2521,6 +2571,15 @@ fun `mnemonicToSeed`(`mnemonic`: String): String {
 
 @Throws(SphinxException::class)
 
+fun `mnemonicToBip39Seed`(`mnemonic`: String): String {
+    return FfiConverterString.lift(
+    rustCallWithError(SphinxException) { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_mnemonic_to_bip39_seed(FfiConverterString.lower(`mnemonic`),_status)
+})
+}
+
+@Throws(SphinxException::class)
+
 fun `entropyToSeed`(`entropy`: String): String {
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
@@ -2686,6 +2745,24 @@ fun `pubkeyFromSeed`(`seed`: String, `idx`: ULong, `time`: String, `network`: St
     return FfiConverterString.lift(
     rustCallWithError(SphinxException) { _status ->
     _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_pubkey_from_seed(FfiConverterString.lower(`seed`),FfiConverterULong.lower(`idx`),FfiConverterString.lower(`time`),FfiConverterString.lower(`network`),_status)
+})
+}
+
+@Throws(SphinxException::class)
+
+fun `signBytesLud05`(`bip39Seed`: String, `domain`: String, `msg`: ByteArray): Lud05Sig {
+    return FfiConverterTypeLud05Sig.lift(
+    rustCallWithError(SphinxException) { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_sign_bytes_lud05(FfiConverterString.lower(`bip39Seed`),FfiConverterString.lower(`domain`),FfiConverterByteArray.lower(`msg`),_status)
+})
+}
+
+@Throws(SphinxException::class)
+
+fun `lud05Pubkey`(`bip39Seed`: String, `domain`: String): String {
+    return FfiConverterString.lift(
+    rustCallWithError(SphinxException) { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_lud05_pubkey(FfiConverterString.lower(`bip39Seed`),FfiConverterString.lower(`domain`),_status)
 })
 }
 
