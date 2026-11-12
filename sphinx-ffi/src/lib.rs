@@ -173,6 +173,16 @@ pub fn mnemonic_to_seed(mnemonic: String) -> Result<String> {
     Ok(hex::encode(m))
 }
 
+/// The whole 64-byte BIP39 seed of the twelve words (empty passphrase), hex:
+/// what `sign_bytes_lud05` and `lud05_pubkey` take. `mnemonic_to_seed` is its
+/// first 32 bytes.
+pub fn mnemonic_to_bip39_seed(mnemonic: String) -> Result<String> {
+    let m = sphinx_derive::mnemonic_to_bip39_seed(&mnemonic).map_err(|e| SphinxError::BadSecret {
+        r: format!("{:?}", e),
+    })?;
+    Ok(hex::encode(m))
+}
+
 pub fn entropy_to_seed(entropy: String) -> Result<String> {
     let entropy = parse::parse_entropy_string(entropy)?;
     let m = sphinx_derive::entropy_to_seed(&entropy[..]).map_err(|e| SphinxError::BadSecret {

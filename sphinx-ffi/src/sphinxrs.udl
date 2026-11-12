@@ -31,6 +31,11 @@ dictionary Keys {
     string pubkey;
 };
 
+dictionary Lud05Sig {
+    string pubkey;
+    string sig;
+};
+
 dictionary Msg {
     string? message;
     u8? type;
@@ -134,6 +139,8 @@ namespace sphinxrs {
   [Throws=SphinxError]
   string mnemonic_to_seed(string mnemonic);
   [Throws=SphinxError]
+  string mnemonic_to_bip39_seed(string mnemonic);
+  [Throws=SphinxError]
   string entropy_to_seed(string entropy);
   [Throws=SphinxError]
   string agent_seed(string seed, u32 n);
@@ -170,6 +177,10 @@ namespace sphinxrs {
   string sign_base64(string seed, u64 idx, string time, string network, string msg);
   [Throws=SphinxError]
   string pubkey_from_seed(string seed, u64 idx, string time, string network);
+  [Throws=SphinxError]
+  Lud05Sig sign_bytes_lud05(string bip39_seed, string domain, bytes msg);
+  [Throws=SphinxError]
+  string lud05_pubkey(string bip39_seed, string domain);
   [Throws=SphinxError]
   string root_sign_ms(string seed, string time, string network);
   [Throws=SphinxError]
