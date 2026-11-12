@@ -80,6 +80,8 @@ RustBuffer uniffi_sphinxrs_fn_func_entropy_from_mnemonic(RustBuffer mnemonic, Ru
 );
 RustBuffer uniffi_sphinxrs_fn_func_mnemonic_to_seed(RustBuffer mnemonic, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_mnemonic_to_bip39_seed(RustBuffer mnemonic, RustCallStatus *_Nonnull out_status
+);
 RustBuffer uniffi_sphinxrs_fn_func_entropy_to_seed(RustBuffer entropy, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_agent_seed(RustBuffer seed, uint32_t n, RustCallStatus *_Nonnull out_status
@@ -117,6 +119,10 @@ RustBuffer uniffi_sphinxrs_fn_func_sign_bytes(RustBuffer seed, uint64_t idx, Rus
 RustBuffer uniffi_sphinxrs_fn_func_sign_base64(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustBuffer msg, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_pubkey_from_seed(RustBuffer seed, uint64_t idx, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_sign_bytes_lud05(RustBuffer bip39_seed, RustBuffer domain, RustBuffer msg, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_sphinxrs_fn_func_lud05_pubkey(RustBuffer bip39_seed, RustBuffer domain, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_root_sign_ms(RustBuffer seed, RustBuffer time, RustBuffer network, RustCallStatus *_Nonnull out_status
 );
@@ -287,6 +293,9 @@ uint16_t uniffi_sphinxrs_checksum_func_entropy_from_mnemonic(void
 uint16_t uniffi_sphinxrs_checksum_func_mnemonic_to_seed(void
     
 );
+uint16_t uniffi_sphinxrs_checksum_func_mnemonic_to_bip39_seed(void
+    
+);
 uint16_t uniffi_sphinxrs_checksum_func_entropy_to_seed(void
     
 );
@@ -342,6 +351,12 @@ uint16_t uniffi_sphinxrs_checksum_func_sign_base64(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_pubkey_from_seed(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_sign_bytes_lud05(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_lud05_pubkey(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_root_sign_ms(void

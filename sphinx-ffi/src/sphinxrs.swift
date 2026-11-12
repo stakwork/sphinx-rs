@@ -458,6 +458,57 @@ public func FfiConverterTypeKeys_lower(_ value: Keys) -> RustBuffer {
     return FfiConverterTypeKeys.lower(value)
 }
 
+public struct Lud05Sig {
+    public var pubkey: String
+    public var sig: String
+
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
+    public init(pubkey: String, sig: String) {
+        self.pubkey = pubkey
+        self.sig = sig
+    }
+}
+
+extension Lud05Sig: Equatable, Hashable {
+    public static func == (lhs: Lud05Sig, rhs: Lud05Sig) -> Bool {
+        if lhs.pubkey != rhs.pubkey {
+            return false
+        }
+        if lhs.sig != rhs.sig {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(pubkey)
+        hasher.combine(sig)
+    }
+}
+
+public struct FfiConverterTypeLud05Sig: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Lud05Sig {
+        return try Lud05Sig(
+            pubkey: FfiConverterString.read(from: &buf),
+            sig: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Lud05Sig, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.pubkey, into: &buf)
+        FfiConverterString.write(value.sig, into: &buf)
+    }
+}
+
+public func FfiConverterTypeLud05Sig_lift(_ buf: RustBuffer) throws -> Lud05Sig {
+    return try FfiConverterTypeLud05Sig.lift(buf)
+}
+
+public func FfiConverterTypeLud05Sig_lower(_ value: Lud05Sig) -> RustBuffer {
+    return FfiConverterTypeLud05Sig.lower(value)
+}
+
 public struct Msg {
     public var message: String?
     public var type: UInt8?
@@ -1739,6 +1790,16 @@ public func mnemonicToSeed(mnemonic: String) throws -> String {
     )
 }
 
+public func mnemonicToBip39Seed(mnemonic: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_mnemonic_to_bip39_seed(
+                FfiConverterString.lower(mnemonic), $0
+            )
+        }
+    )
+}
+
 public func entropyToSeed(entropy: String) throws -> String {
     return try FfiConverterString.lift(
         rustCallWithError(FfiConverterTypeSphinxError.lift) {
@@ -1995,6 +2056,29 @@ public func pubkeyFromSeed(seed: String, idx: UInt64, time: String, network: Str
                 FfiConverterUInt64.lower(idx),
                 FfiConverterString.lower(time),
                 FfiConverterString.lower(network), $0
+            )
+        }
+    )
+}
+
+public func signBytesLud05(bip39Seed: String, domain: String, msg: Data) throws -> Lud05Sig {
+    return try FfiConverterTypeLud05Sig.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_sign_bytes_lud05(
+                FfiConverterString.lower(bip39Seed),
+                FfiConverterString.lower(domain),
+                FfiConverterData.lower(msg), $0
+            )
+        }
+    )
+}
+
+public func lud05Pubkey(bip39Seed: String, domain: String) throws -> String {
+    return try FfiConverterString.lift(
+        rustCallWithError(FfiConverterTypeSphinxError.lift) {
+            uniffi_sphinxrs_fn_func_lud05_pubkey(
+                FfiConverterString.lower(bip39Seed),
+                FfiConverterString.lower(domain), $0
             )
         }
     )
@@ -2946,6 +3030,9 @@ private var initializationResult: InitializationResult {
     if uniffi_sphinxrs_checksum_func_mnemonic_to_seed() != 23084 {
         return InitializationResult.apiChecksumMismatch
     }
+    if uniffi_sphinxrs_checksum_func_mnemonic_to_bip39_seed() != 22093 {
+        return InitializationResult.apiChecksumMismatch
+    }
     if uniffi_sphinxrs_checksum_func_entropy_to_seed() != 33710 {
         return InitializationResult.apiChecksumMismatch
     }
@@ -3001,6 +3088,12 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_sphinxrs_checksum_func_pubkey_from_seed() != 23394 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_sphinxrs_checksum_func_sign_bytes_lud05() != 56519 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_sphinxrs_checksum_func_lud05_pubkey() != 18360 {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_sphinxrs_checksum_func_root_sign_ms() != 52594 {
