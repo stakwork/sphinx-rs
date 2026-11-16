@@ -2,6 +2,7 @@ mod auto;
 mod chunk;
 mod control;
 mod health;
+mod pbkdf2;
 mod onion;
 mod parse;
 
@@ -12,6 +13,7 @@ pub use onion::*;
 pub use auto::*;
 
 pub use health::*;
+pub use pbkdf2::*;
 
 use sphinx_crypter::chacha::{decrypt as chacha_decrypt, encrypt as chacha_encrypt};
 use sphinx_crypter::ecdh::derive_shared_secret_from_slice;
