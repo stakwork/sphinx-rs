@@ -256,6 +256,8 @@ RustBuffer uniffi_sphinxrs_fn_func_parse_server_status(RustBuffer payload, RustC
 );
 RustBuffer uniffi_sphinxrs_fn_func_evaluate_server_health(RustBuffer last, uint64_t last_seen_ms, uint64_t now_ms, uint64_t interval_ms, uint32_t max_missed, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_sphinxrs_fn_func_pbkdf2_hmac_sha256(RustBuffer pin, RustBuffer salt, uint32_t iterations, RustCallStatus *_Nonnull out_status
+);
 RustBuffer uniffi_sphinxrs_fn_func_parse_mixer_error_code(RustBuffer raw, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_sphinxrs_fn_func_server_status_topic(RustCallStatus *_Nonnull out_status
@@ -555,6 +557,9 @@ uint16_t uniffi_sphinxrs_checksum_func_parse_server_status(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_evaluate_server_health(void
+    
+);
+uint16_t uniffi_sphinxrs_checksum_func_pbkdf2_hmac_sha256(void
     
 );
 uint16_t uniffi_sphinxrs_checksum_func_parse_mixer_error_code(void

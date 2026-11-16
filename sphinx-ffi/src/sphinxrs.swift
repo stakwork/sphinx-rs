@@ -2972,6 +2972,18 @@ public func evaluateServerHealth(last: ServerStatus?, lastSeenMs: UInt64, nowMs:
     )
 }
 
+public func pbkdf2HmacSha256(pin: String, salt: Data, iterations: UInt32) -> Data {
+    return try! FfiConverterData.lift(
+        try! rustCall {
+            uniffi_sphinxrs_fn_func_pbkdf2_hmac_sha256(
+                FfiConverterString.lower(pin),
+                FfiConverterData.lower(salt),
+                FfiConverterUInt32.lower(iterations), $0
+            )
+        }
+    )
+}
+
 public func parseMixerErrorCode(raw: String) -> MixerErrorCode {
     return try! FfiConverterTypeMixerErrorCode.lift(
         try! rustCall {
@@ -3292,6 +3304,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_sphinxrs_checksum_func_evaluate_server_health() != 25525 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_sphinxrs_checksum_func_pbkdf2_hmac_sha256() != 17688 {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_sphinxrs_checksum_func_parse_mixer_error_code() != 52624 {
