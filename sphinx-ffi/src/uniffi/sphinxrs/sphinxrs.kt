@@ -556,6 +556,8 @@ internal interface _UniFFILib : Library {
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_evaluate_server_health(`last`: RustBuffer.ByValue,`lastSeenMs`: Long,`nowMs`: Long,`intervalMs`: Long,`maxMissed`: Int,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_sphinxrs_fn_func_pbkdf2_hmac_sha256(`pin`: RustBuffer.ByValue,`salt`: RustBuffer.ByValue,`iterations`: Int,_uniffi_out_err: RustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_parse_mixer_error_code(`raw`: RustBuffer.ByValue,_uniffi_out_err: RustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_sphinxrs_fn_func_server_status_topic(_uniffi_out_err: RustCallStatus, 
@@ -759,6 +761,8 @@ internal interface _UniFFILib : Library {
     fun uniffi_sphinxrs_checksum_func_parse_server_status(
     ): Short
     fun uniffi_sphinxrs_checksum_func_evaluate_server_health(
+    ): Short
+    fun uniffi_sphinxrs_checksum_func_pbkdf2_hmac_sha256(
     ): Short
     fun uniffi_sphinxrs_checksum_func_parse_mixer_error_code(
     ): Short
@@ -1067,6 +1071,9 @@ private fun uniffiCheckApiChecksums(lib: _UniFFILib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_evaluate_server_health() != 25525.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_sphinxrs_checksum_func_pbkdf2_hmac_sha256() != 17688.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_sphinxrs_checksum_func_parse_mixer_error_code() != 52624.toShort()) {
@@ -3356,6 +3363,14 @@ fun `evaluateServerHealth`(`last`: ServerStatus?, `lastSeenMs`: ULong, `nowMs`: 
     return FfiConverterTypeServerHealth.lift(
     rustCall() { _status ->
     _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_evaluate_server_health(FfiConverterOptionalTypeServerStatus.lower(`last`),FfiConverterULong.lower(`lastSeenMs`),FfiConverterULong.lower(`nowMs`),FfiConverterULong.lower(`intervalMs`),FfiConverterUInt.lower(`maxMissed`),_status)
+})
+}
+
+
+fun `pbkdf2HmacSha256`(`pin`: String, `salt`: ByteArray, `iterations`: UInt): ByteArray {
+    return FfiConverterByteArray.lift(
+    rustCall() { _status ->
+    _UniFFILib.INSTANCE.uniffi_sphinxrs_fn_func_pbkdf2_hmac_sha256(FfiConverterString.lower(`pin`),FfiConverterByteArray.lower(`salt`),FfiConverterUInt.lower(`iterations`),_status)
 })
 }
 
